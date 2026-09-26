@@ -30,6 +30,9 @@ def env_list(name, default=""):
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 DEBUG = env_bool("DJANGO_DEBUG", False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+# Needed when the site is opened via another address, e.g. GitHub Codespaces:
+# DJANGO_CSRF_TRUSTED_ORIGINS=https://*.app.github.dev
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "")
 
 if not SECRET_KEY:
     if DEBUG:

@@ -1,0 +1,16 @@
+// Setup for GitHub Codespaces: the project runs in the browser, nothing to install.
+// On first start it installs the packages, creates the database, the roles,
+// the test users and imports the demo data (see postCreateCommand).
+{
+  "name": "Planungssystem",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "containerEnv": {
+    "DJANGO_DEBUG": "True",
+    "DJANGO_ALLOWED_HOSTS": "localhost,127.0.0.1,.app.github.dev",
+    "DJANGO_CSRF_TRUSTED_ORIGINS": "https://*.app.github.dev"
+  },
+  "postCreateCommand": "pip install -r requirements.txt && cp -n .env.example .env && python manage.py migrate && python manage.py setup_roles && python manage.py create_demo_users --password Test-Passwort-2026 && python manage.py import_prototype",
+  "forwardPorts": [8000],
+  "portsAttributes": { "8000": { "label": "Planungssystem", "onAutoForward": "openBrowser" } },
+  "customizations": { "vscode": { "extensions": ["ms-python.python", "batisteo.vscode-django"] } }
+}
