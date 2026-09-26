@@ -24,3 +24,17 @@ def normalize_file_number(number):
     if len(digits) == 7 and digits.startswith("07"):
         return str(int(digits[2:]))
     return str(int(digits))
+
+
+def extract_re_numbers(*texts):
+    """Find order numbers like 'RE90298' or 're 090298' in free text.
+
+    Port of reListe() in the prototype: used to link a building to its
+    installation orders via the "Auftrag" field and handwritten notes.
+    Returns a set of normalised numbers such as {"RE90298"}.
+    """
+    found = set()
+    for text in texts:
+        for match in re.findall(r"RE\s?0*\d{4,6}", str(text or ""), flags=re.IGNORECASE):
+            found.add(re.sub(r"\s+", "", match).upper())
+    return found

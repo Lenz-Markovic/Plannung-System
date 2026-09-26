@@ -16,6 +16,7 @@ python manage.py migrate
 python manage.py setup_roles
 python manage.py createsuperuser     # your own admin account
 python manage.py create_demo_users --password "Test-Passwort-2026"   # optional, local only
+python manage.py import_prototype    # demo data from docs/prototype/
 ```
 
 ## Daily use
@@ -29,13 +30,24 @@ pytest                               # run all tests
 After changing a `models.py`: `python manage.py makemigrations` and then
 `python manage.py migrate`.
 
+## Demo data import
+
+`python manage.py import_prototype` reads the demo data from the two HTML
+files in `docs/prototype/` (240 buildings, 70 installation orders with their
+contract lines, 11 readers/installers). Running it again updates instead of
+duplicating; `--flush` deletes buildings, orders and tours first.
+Planned days from the prototype become *provisional* tours without drive
+times: they have to be recalculated with TomTom before they can be confirmed.
+Imported readers get a user without a password; an admin sets one in
+`/admin/` if a reader should log in.
+
 ## Project layout
 
 | Folder | Contents |
 |---|---|
 | `config/` | settings (read from `.env`), URLs |
 | `core/` | shared base models, roles (`core/roles.py`), login, start page, user admin |
-| `buildings/` | buildings, property managers, installation orders (+ import later) |
+| `buildings/` | buildings, property managers, installation orders, prototype import (`importers/`) |
 | `planning/` | employees, absences, tours and stops (+ TomTom client, working-time rules later) |
 | `conflicts/` | stored conflict results (+ rules later) |
 | `documents/` | cover sheets, received cost documents / 14-day deadline |
