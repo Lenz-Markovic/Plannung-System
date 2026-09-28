@@ -1,0 +1,8 @@
+{# Answer to the ▸/▾ button: the row itself, plus the detail row when opened. #}
+{% include "buildings/_row.html" %}
+{% if open %}
+  {% include "buildings/_detail.html" %}
+{% else %}
+  {# Removes the detail row that is still on the page (HTMX "out of band" swap). #}
+  <tr id="det-{{ b.pk }}" hx-swap-oob="delete"></tr>
+{% endif %}

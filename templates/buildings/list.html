@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Liegenschaften-Dashboard{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>Liegenschaften-Dashboard</h1>
+  <span class="sub">
+    Stichtag {% for d in sources.stichtage %}{{ d|date:"d.m.Y" }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}
+    · {{ sources.total }} Liegenschaften · {{ sources.bfw }} BFW / {{ sources.ceos }} CEOS
+  </span>
+  <span class="spacer"></span>
+  {# Kalender, Fahrplan erstellen, Excel: follow in the next steps #}
+  <span id="loading" class="htmx-indicator">wird geladen …</span>
+</header>
+
+{# Every change sends the form via HTMX; only #results is replaced and the URL is updated. #}
+<form id="filter-form" class="filters" method="get" action="{% url 'buildings:list' %}"
+      hx-get="{% url 'buildings:list' %}" hx-target="#results" hx-indicator="#loading"
+      hx-trigger="change, input changed delay:400ms from:[name=q], submit">
+  {% for field in filter.form %}
+    {% if field.field.widget.input_type == "checkbox" %}
+      <label class="chk">{{ field }} {{ field.label }}</label>
+    {% else %}
+      <div class="f"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>
+    {% endif %}
+  {% endfor %}
+  <a class="btn" href="{% url 'buildings:list' %}">Filter zurücksetzen</a>
+</form>
+
+<div id="results">
+  {% include "buildings/_results.html" %}
+</div>
+{% endblock %}

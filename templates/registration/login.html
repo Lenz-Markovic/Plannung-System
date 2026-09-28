@@ -1,28 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Anmelden – Planungssystem{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
+<div class="row justify-content-center mt-5">
   <div class="col-12 col-sm-8 col-md-5 col-lg-4">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h1 class="h4 mb-3">Anmelden</h1>
-        {% if form.errors %}
-          <div class="alert alert-danger">Benutzername oder Passwort ist falsch.</div>
-        {% endif %}
-        <form method="post">
-          {% csrf_token %}
-          <div class="mb-3">
-            <label class="form-label" for="id_username">Benutzername</label>
-            <input class="form-control" type="text" name="username" id="id_username" autofocus required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label" for="id_password">Passwort</label>
-            <input class="form-control" type="password" name="password" id="id_password" required>
-          </div>
-          <input type="hidden" name="next" value="{{ next }}">
-          <button class="btn btn-primary w-100">Anmelden</button>
-        </form>
-      </div>
+    <div class="card-lite">
+      <h1 class="h5 mb-3">Planungssystem · Anmelden</h1>
+      {% if form.errors %}
+        <div class="alert alert-danger py-2">Benutzername oder Passwort ist falsch.</div>
+      {% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="f mb-3">
+          <label for="id_username">Benutzername</label>
+          <input type="text" name="username" id="id_username" autofocus required>
+        </div>
+        <div class="f mb-3">
+          <label for="id_password">Passwort</label>
+          <input type="password" name="password" id="id_password" required>
+        </div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn primary w-100">Anmelden</button>
+      </form>
     </div>
   </div>
 </div>

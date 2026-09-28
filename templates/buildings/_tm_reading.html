@@ -1,0 +1,4 @@
+<span class="tm-z"><span class="tm-ic" title="Ablesung">📖</span>
+  {% if s.reading.date %}<span class="tm-dat">{{ s.reading.date|date:"d.m.Y" }}</span>{% else %}<span class="tm-dat leer">kein Ablesetag</span>{% endif %}
+  <span class="tm-pers {% if s.same_person %}same{% endif %}">{{ s.reading.people|join:", "|default:"kein Ableser" }}</span>
+</span>

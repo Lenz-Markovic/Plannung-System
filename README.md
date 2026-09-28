@@ -41,6 +41,14 @@ times: they have to be recalculated with TomTom before they can be confirmed.
 Imported readers get a user without a password; an admin sets one in
 `/admin/` if a reader should log in.
 
+## Building list (Liegenschaften-Dashboard)
+
+`/liegenschaften/`: same layout as the Deckblätter prototype (KPI tiles,
+filters, table with detail rows). Filtering and sorting run on the server;
+HTMX swaps only the results and keeps the filters in the URL. Rows are
+loaded 100 at a time while scrolling. Readers (role Ableser/Monteur) cannot
+open the list; they will get their own day plan.
+
 ## Project layout
 
 | Folder | Contents |

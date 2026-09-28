@@ -1,0 +1,11 @@
+{% with first=s.first_installation %}
+<span class="tm-z"><span class="tm-ic mont" title="Montage">🔧</span>
+  {% if not s.order_count %}<span class="tm-dat leer">kein Montageauftrag</span>
+  {% elif first %}
+    <span class="tm-dat">{{ first.date|date:"d.m.Y" }}</span>{% if first.time %}<span class="tm-uhr">{{ first.time|time:"H:i" }}</span>{% endif %}
+    <span class="tm-pers {% if s.same_person %}same{% endif %}" {% if s.same_person %}title="Monteur ist hier auch als Ableser eingeteilt"{% endif %}>{{ first.people|join:", "|default:"Monteur offen" }}</span>
+  {% else %}<span class="tm-dat leer">noch kein Termin</span>{% endif %}
+</span>
+{% if s.installations|length > 1 %}<span class="tm-plus">+ {{ s.installations|length|add:"-1" }} weitere{% if s.installations|length > 2 %} Termine{% else %}r Termin{% endif %}</span>{% endif %}
+{% if first and s.orders_without_date %}<span class="tm-plus">+ {{ s.orders_without_date }} Auftrag ohne Termin</span>{% endif %}
+{% endwith %}

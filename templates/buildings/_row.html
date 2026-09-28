@@ -1,0 +1,52 @@
+{# One building in the list (columns as in rowHtml() of the prototype). #}
+{% load building_tags %}
+{% with s=b.schedule %}
+<tr id="row-{{ b.pk }}">
+  <td>
+    <div class="obj-str" title="{{ b.full_address }}">{{ b.street }}</div>
+    <div class="obj-sub">{{ b.zip_code }} {{ b.city }}</div>
+    <div class="obj-meta" title="{{ b.region }}">{{ b.file_number }} · {{ b.region|short_region }}</div>
+  </td>
+  <td>
+    <div class="tec-art" title="{{ b.reading_type }}">{{ b.reading_type|reading_type_code|default:"–" }}</div>
+    <div class="tec-typ">{{ b.hkv_variant|default:"–" }}</div>
+    <div class="mt-1"><span class="tag {{ b.source_system }}">{% if b.source_system == "bfw_main" %}BFW{% else %}{{ b.get_source_system_display }}{% endif %}</span></div>
+  </td>
+  <td><span class="anl {{ b.installation_type|installation_css }}" title="{{ b.get_installation_type_display }}">{{ b.installation_type|installation_short }}</span></td>
+  <td class="num">
+    <span class="hkv-z {% if not b.hkv_count %}null{% endif %}">{{ b.hkv_count }}</span>
+    <div class="obj-meta">{{ b.apartments }} Whg</div>
+  </td>
+  <td title="{{ b.detail_heat }}{% if b.detail_heat and b.detail_cold_water %} · {% endif %}{{ b.detail_cold_water }}">
+    {% with groups=b|device_chips %}
+      {% for group in groups %}
+        <span class="gr-slot">{% for text, css in group %}<span class="chip {{ css }}">{{ text }}</span>{% endfor %}</span>{% if not forloop.last %}<span class="gr-sep"></span>{% endif %}
+      {% empty %}<span class="na" style="font-size:11.5px">nur Heizkostenverteiler</span>{% endfor %}
+    {% endwith %}
+  </td>
+  <td>{{ b.order_reference|default:"" }}</td>
+  <td><span class="gw {% if b.has_gateway %}on{% endif %}">{% if b.has_gateway %}⬤ ja{% else %}nein{% endif %}</span></td>
+  <td>
+    {# Ablesung und Montage: what happens first is on top #}
+    <div class="tm {{ s.css }}">
+      {% if s.installation_first %}{% include "buildings/_tm_installation.html" %}{% include "buildings/_tm_reading.html" %}
+      {% else %}{% include "buildings/_tm_reading.html" %}{% include "buildings/_tm_installation.html" %}{% endif %}
+      {% if not s.order_count %}<span class="tm-note info">nur Ablesung</span>
+      {% else %}<span class="tm-note {{ s.note_css }}">{% if s.note_css == "crit" or s.note_css == "warn" %}⚠{% elif s.note_css == "ok" %}✓{% endif %} {{ s.check.message }}</span>{% endif %}
+    </div>
+  </td>
+  <td class="num">
+    <span class="zeit {% if b.reading_minutes_manual %}manual{% endif %}"
+          title="{% if b.reading_minutes_manual %}manuell eingetragen – berechnet wären {{ b.reading_minutes_calculated }} min{% else %}berechnet{% endif %}">{{ b.reading_minutes }}</span><span class="zeit-e">min</span>
+  </td>
+  <td><span class="st {{ b.status }}">{% if b.status == "released" %}✓{% elif b.status == "open" %}●{% else %}▲{% endif %} {{ b.get_status_display }}</span></td>
+  <td>{% if b.cost_documents %}<span class="ul-date" title="Unterlagen erhalten am">{{ b.cost_documents.received_on|date:"d.m.Y" }}</span>{% else %}<span class="na">–</span>{% endif %}</td>
+  <td><div class="hv">{{ b.property_manager.name|default:"" }}</div></td>
+  <td><div class="notiz">{{ b.note|truncatechars:60 }}</div></td>
+  <td>
+    <button class="note-btn {% if b.remark or b.handwritten_note %}has{% endif %}" type="button" title="Details / Vermerke"
+            hx-get="{% url 'buildings:row' b.pk %}?open={% if open %}0{% else %}1{% endif %}"
+            hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">{% if open %}▾{% else %}▸{% endif %}</button>
+  </td>
+</tr>
+{% endwith %}

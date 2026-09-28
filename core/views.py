@@ -1,5 +1,5 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 # Shown on the start page so everyone can check what their role allows.
 PERMISSION_LABELS = [
@@ -20,6 +20,9 @@ PERMISSION_LABELS = [
 
 @login_required
 def home(request):
+    # Office roles start directly in the building list (like the prototype).
+    if request.user.has_perm("buildings.view_building"):
+        return redirect("buildings:list")
     permissions = [
         (label, request.user.has_perm(codename)) for codename, label in PERMISSION_LABELS
     ]

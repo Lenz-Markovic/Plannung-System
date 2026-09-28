@@ -1,0 +1,34 @@
+{# Details of a building (detHtml() in the prototype), loaded only when opened. #}
+{% load core_tags %}
+<tr id="det-{{ b.pk }}" class="det">
+  <td colspan="14">
+    <dl>
+      <dt>Deckblatt</dt><dd>{{ b.get_source_system_display }}{% if b.cover_sheet.source_file %} · {{ b.cover_sheet.source_file }}{% endif %}{% if b.cover_sheet.page %}, Seite {{ b.cover_sheet.page }}{% endif %}</dd>
+      <dt>Volle Adresse</dt><dd>{{ b.full_address }}</dd>
+      <dt>Region</dt><dd>{{ b.region|default:"–" }}</dd>
+      <dt>Stichtag</dt><dd>{{ b.stichtag|date:"d.m.Y" }}{% if b.billing_period_start %} (Abrechnungszeitraum {{ b.billing_period_start|date:"d.m.Y" }} – {{ b.billing_period_end|date:"d.m.Y" }}){% endif %}</dd>
+      <dt>Ableseart</dt><dd>{{ b.reading_type|default:"–" }}</dd>
+      <dt>HKV-Typ (Original)</dt><dd>{{ b.hkv_type|default:"–" }}</dd>
+      <dt>Anlagenstatus</dt><dd>{{ b.get_installation_type_display|default:"–" }}</dd>
+      {% if b.detail_heat %}<dt>WWZ zusammengesetzt</dt><dd>{{ b.detail_heat }}</dd>{% endif %}
+      {% if b.detail_cold_water %}<dt>KWZ zusammengesetzt</dt><dd>{{ b.detail_cold_water }}</dd>{% endif %}
+      {% if b.rwm_count %}<dt>Rauchwarnmelder (Stück)</dt><dd>{{ b.rwm_count }}</dd>{% endif %}
+      {% if b.handwritten_note %}<dt>Handschriftlich</dt><dd>{{ b.handwritten_note }}</dd>{% endif %}
+      {% if b.remark %}<dt>Vermerke / Bemerkungen</dt><dd>{{ b.remark }}</dd>{% endif %}
+      {% if b.note %}<dt>Eigene Notiz</dt><dd>{{ b.note }}</dd>{% endif %}
+      <dt>Hausverwaltung</dt><dd>{{ b.property_manager.name|default:"– nicht eingetragen" }}{% if b.cover_sheet.property_manager_text and b.cover_sheet.property_manager_text != b.property_manager.name %}  (Deckblatt: {{ b.cover_sheet.property_manager_text }}){% endif %}</dd>
+      {% if b.cover_sheet.owner_text %}<dt>Eigentümer laut Deckblatt</dt><dd>{{ b.cover_sheet.owner_text }}{% if b.cover_sheet.source_label %}  [{{ b.cover_sheet.source_label }}]{% endif %}</dd>{% endif %}
+      <dt>Unterlagen (Kosten) erhalten</dt><dd>{% if b.cost_documents %}{{ b.cost_documents.received_on|date:"d.m.Y" }}{% else %}– noch nicht erhalten{% endif %}</dd>
+      <dt>Geplanter Ablesetag</dt><dd>{% if b.schedule.reading.date %}{{ b.schedule.reading.date|date:"d.m.Y" }} ({{ b.schedule.reading.people|join:", " }}){% else %}– noch nicht geplant{% endif %}</dd>
+      <dt>Geschätzte Ablesezeit</dt><dd>{{ b.reading_minutes|minutes }} ({{ b.reading_minutes|hours }}){% if b.reading_minutes_manual %} – manuell eingetragen, berechnet wären {{ b.reading_minutes_calculated|minutes }}{% else %} – berechnet{% endif %}</dd>
+      {% for order in b.list_orders %}
+        <dt>Montageauftrag {{ order.re_number }}</dt>
+        <dd>{% with stop=order.tour_stops.all.0 %}{% if stop %}Termin {{ stop.tour.date|date:"d.m.Y" }}, {{ stop.start_time|default:stop.tour.start_time|time:"H:i" }} Uhr{% else %}noch kein Termin{% endif %}{% endwith %}
+          · {{ order.get_status_display }}{% if order.priority %} · {{ order.get_priority_display }}{% endif %}{% if order.summary %} · {{ order.summary }}{% endif %} · Montagezeit {{ order.duration_minutes|minutes }}</dd>
+      {% endfor %}
+      {% with last=b.history.first %}{% if last %}
+        <dt>Letzte Änderung</dt><dd>{{ last.history_date|date:"d.m.Y H:i" }}{% if last.history_user %} von {{ last.history_user }}{% endif %}{% if last.history_change_reason %} ({{ last.history_change_reason }}){% endif %}</dd>
+      {% endif %}{% endwith %}
+    </dl>
+  </td>
+</tr>

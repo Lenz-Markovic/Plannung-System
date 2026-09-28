@@ -1,4 +1,6 @@
-{# Base layout for all pages. Bootstrap and HTMX come from a CDN, no build step. #}
+{# Base layout for all pages. Bootstrap and HTMX come from a CDN (no build step); #}
+{# our own look (colours, tiles, table) is in static/css/app.css.                  #}
+{% load static %}
 <!doctype html>
 <html lang="de">
 <head>
@@ -6,30 +8,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Planungssystem{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="{% static 'css/app.css' %}" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js"></script>
 </head>
 {# The CSRF token is sent with every HTMX request (needed for POST). #}
-<body class="bg-light" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-  <nav class="navbar navbar-expand navbar-dark bg-primary mb-4">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="{% url 'home' %}">Planungssystem</a>
-      {% if user.is_authenticated %}
-        <div class="navbar-nav ms-auto align-items-center">
-          {% if user.is_staff %}<a class="nav-link" href="{% url 'admin:index' %}">Verwaltung</a>{% endif %}
-          <span class="navbar-text mx-3">{{ user.get_full_name|default:user.username }}</span>
-          <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button class="btn btn-outline-light btn-sm">Abmelden</button>
-          </form>
-        </div>
-      {% endif %}
-    </div>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  {% if DEMO_BANNER %}<div class="demo-band">DEMO – alle Liegenschaften, Personen und Aufträge sind frei erfunden</div>{% endif %}
+
+  {% if user.is_authenticated %}
+  <nav class="appnav">
+    <a class="brand" href="{% url 'home' %}">Planungssystem</a>
+    {% if perms.buildings.view_building %}
+      <a class="tab {% if request.resolver_match.app_name == 'buildings' %}on{% endif %}" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>
+    {% endif %}
+    {# Montageaufträge, Kalender, Tagesplan: follow in the next steps #}
+    {% if user.is_staff %}<a class="tab" href="{% url 'admin:index' %}">⚙ Verwaltung</a>{% endif %}
+    <span class="user">{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %}</span>
+    <form method="post" action="{% url 'logout' %}" class="m-0">
+      {% csrf_token %}
+      <button class="btn mini">Abmelden</button>
+    </form>
   </nav>
-  <main class="container">
+  {% endif %}
+
+  <div class="wrap">
     {% for message in messages %}
       <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
     {% endfor %}
     {% block content %}{% endblock %}
-  </main>
+  </div>
 </body>
 </html>

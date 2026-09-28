@@ -1,0 +1,1 @@
+{% load core_tags %}<th class="{{ css }}"{% if style %} style="{{ style }}"{% endif %}><a hx-get="?{% sort_query request key %}" hx-target="#results" hx-push-url="true" href="?{% sort_query request key %}">{{ label }} <span class="ar">{% sort_arrow request key %}</span></a></th>

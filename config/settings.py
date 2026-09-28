@@ -44,6 +44,9 @@ if not SECRET_KEY:
 # value to a template or to JavaScript.
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
 
+# Red stripe "DEMO - alle Daten frei erfunden" at the top (as in the prototype)
+DEMO_BANNER = env_bool("DEMO_BANNER", True)
+
 
 # --- Applications -------------------------------------------------------------
 
@@ -54,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.humanize",  # number formatting (9.734)
     # third party
     "django_filters",
     "simple_history",
@@ -75,6 +79,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Stores the logged-in user in every history entry ("who changed it").
     "simple_history.middleware.HistoryRequestMiddleware",
+    # request.htmx / request.htmx_target (see core/middleware.py)
+    "core.middleware.HtmxMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -89,6 +95,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.site",
             ],
         },
     },
