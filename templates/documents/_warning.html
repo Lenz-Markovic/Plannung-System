@@ -1,0 +1,51 @@
+{# 14-day warning (prioFensterZeigen() in the prototype). No close button, Escape does nothing. #}
+{# Always updates the counter in the navigation ("out of band" swap). #}
+<span id="ul-badge" hx-swap-oob="true">{% if counts.open %}<span class="ul-badge {% if counts.overdue %}red{% endif %}">{% if counts.overdue %}{{ counts.overdue }} ⚠{% else %}{{ counts.open }}{% endif %}</span>{% endif %}</span>
+
+{% if shown %}
+<div class="dlg-back" role="alertdialog" aria-modal="true" aria-labelledby="deadline-title">
+  <div class="dlg prio-dlg">
+    <h3 id="deadline-title">{% if total == 1 %}Seit 14 Tagen nicht freigegeben{% else %}{{ total }} Liegenschaften seit 14 Tagen nicht freigegeben{% endif %}</h3>
+    <p class="dlg-sub">Die Unterlagen sind da. Das Fenster verschwindet, sobald die Liegenschaft neu geplant oder ihr Status geändert wurde.</p>
+
+    {% for e in shown %}
+    {% with b=e.building %}
+    <div class="prio-karte {{ e.colour }}">
+      <div class="prio-kopf">
+        <span class="prio-ic" aria-hidden="true">{% if e.planned_date %}⏰{% else %}⚠{% endif %}</span>
+        <div>
+          <b>Frist abgelaufen – seit {{ e.info.days_overdue }} Tag{{ e.info.days_overdue|pluralize:"en" }} überfällig</b>
+          <div class="prio-sub">AZ {{ b.file_number }} · {{ b.street }}, {{ b.zip_code }} {{ b.city }}{% if b.property_manager %} · {{ b.property_manager.name }}{% endif %}</div>
+          <div class="prio-sub">Unterlagen seit {{ e.receipt.received_on|date:"d.m.Y" }}{% if e.receipt.reset_reason %} · zuletzt bearbeitet {{ e.receipt.deadline_start|date:"d.m.Y" }}{% endif %}
+            · Status <b>{{ b.get_status_display }}</b> ·
+            {% if e.planned_date %}Termin am <b>{{ e.planned_date|date:"d.m.Y" }}</b>{% if e.planned_reader %} ({{ e.planned_reader }}){% endif %} – vorziehen?{% else %}<b>noch kein Ablesetermin</b>{% endif %}</div>
+        </div>
+      </div>
+      <div class="prio-btns">
+        {# Planning and calendar follow in the next steps; the buttons are already in place. #}
+        {% if e.planned_date %}
+          <button class="btn primary" type="button" disabled title="kommt mit dem Kalender">Termin im Kalender verschieben</button>
+          <button class="btn" type="button" disabled title="kommt mit der Tourenplanung">Neu planen</button>
+        {% else %}
+          <button class="btn primary" type="button" disabled title="kommt mit der Tourenplanung">Jetzt planen</button>
+        {% endif %}
+        {% if perms.buildings.set_status_open_rework %}
+          {% if b.status != "rework" %}
+            <button class="btn" hx-post="{% url 'documents:warning_status' b.pk %}" hx-vals='{"status": "rework"}' hx-target="#deadline-warning">Status: Nacharbeit</button>
+          {% else %}
+            <button class="btn" hx-post="{% url 'documents:warning_status' b.pk %}" hx-vals='{"status": "open"}' hx-target="#deadline-warning">Status: offen</button>
+          {% endif %}
+        {% endif %}
+        {% if perms.buildings.release_building %}
+          <button class="btn" hx-post="{% url 'documents:warning_status' b.pk %}" hx-vals='{"status": "released"}' hx-target="#deadline-warning">Status: freigegeben</button>
+        {% endif %}
+        <button class="btn prio-leise" hx-post="{% url 'documents:warning_show' b.pk %}"
+                title="Öffnet die Liegenschaft in der Liste; die Warnung kommt nach 15 Minuten wieder">In der Liste ansehen</button>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+    {% if more %}<p class="prio-sub mt-2">… und {{ more }} weitere.</p>{% endif %}
+  </div>
+</div>
+{% endif %}

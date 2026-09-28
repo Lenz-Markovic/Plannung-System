@@ -49,6 +49,19 @@ HTMX swaps only the results and keeps the filters in the URL. Rows are
 loaded 100 at a time while scrolling. Readers (role Ableser/Monteur) cannot
 open the list; they will get their own day plan.
 
+## Status workflow and 14-day deadline
+
+- Status (offen / Nacharbeit / freigegeben), property manager, note and the
+  received date of the cost documents are edited directly in the table.
+  Who may set which status: `buildings/rules/status.py` (spec section 5).
+- 14-day rule: `documents/rules.py`. The deadline starts when the documents
+  arrive and restarts on every status change or new appointment.
+- The warning pop-up (`templates/documents/_warning.html`) is checked on
+  every page load, every 30 seconds and right after changes. It has no
+  close button; it disappears only when the building is replanned or its
+  status changes. Red = no appointment, yellow = appointment exists.
+- `/unterlagen/`: list of all received documents with their deadlines.
+
 ## Project layout
 
 | Folder | Contents |

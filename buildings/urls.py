@@ -8,4 +8,5 @@ urlpatterns = [
     path("", views.building_list, name="list"),
     path("zeilen/", views.building_rows, name="rows"),
     path("<int:pk>/zeile/", views.building_row, name="row"),
+    path("<int:pk>/speichern/", views.building_update, name="update"),
 ]

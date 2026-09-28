@@ -39,10 +39,52 @@
     <span class="zeit {% if b.reading_minutes_manual %}manual{% endif %}"
           title="{% if b.reading_minutes_manual %}manuell eingetragen – berechnet wären {{ b.reading_minutes_calculated }} min{% else %}berechnet{% endif %}">{{ b.reading_minutes }}</span><span class="zeit-e">min</span>
   </td>
-  <td><span class="st {{ b.status }}">{% if b.status == "released" %}✓{% elif b.status == "open" %}●{% else %}▲{% endif %} {{ b.get_status_display }}</span></td>
-  <td>{% if b.cost_documents %}<span class="ul-date" title="Unterlagen erhalten am">{{ b.cost_documents.received_on|date:"d.m.Y" }}</span>{% else %}<span class="na">–</span>{% endif %}</td>
-  <td><div class="hv">{{ b.property_manager.name|default:"" }}</div></td>
-  <td><div class="notiz">{{ b.note|truncatechars:60 }}</div></td>
+  {# ---- editable cells: each element saves itself via HTMX and gets the new row back ---- #}
+  <td>
+    {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
+      {% status_choices b.status as options %}
+      <select class="st {{ b.status }}" name="status" aria-label="Status ändern"
+              hx-post="{% url 'buildings:update' b.pk %}" hx-trigger="change" hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">
+        {% for value, label, allowed in options %}
+          <option value="{{ value }}" {% if value == b.status %}selected{% endif %} {% if not allowed %}disabled{% endif %}>{{ value|status_icon }} {{ label }}</option>
+        {% endfor %}
+      </select>
+    {% else %}
+      <span class="st {{ b.status }}">{{ b.status|status_icon }} {{ b.get_status_display }}</span>
+    {% endif %}
+    {% if b.proposed_status %}<div class="obj-meta" title="Vorschlag vom Ableser">Vorschlag: {{ b.get_proposed_status_display }}{% if b.proposed_status_by %} ({{ b.proposed_status_by }}){% endif %}</div>{% endif %}
+  </td>
+  <td>
+    {% if perms.documents.change_costdocumentreceipt %}
+      <span class="ul-box {% if b.cost_documents %}set{% endif %}">
+        <input type="date" class="udat" name="received_on" value="{{ b.cost_documents.received_on|date:'Y-m-d' }}"
+               aria-label="Unterlagen (Kosten) erhalten am" title="Datum, an dem die Kostenunterlagen eingegangen sind"
+               hx-post="{% url 'buildings:update' b.pk %}" hx-trigger="change" hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">
+        {% if not b.cost_documents %}
+          <button class="uheute" type="button" title="Heute als Eingangsdatum eintragen"
+                  hx-post="{% url 'buildings:update' b.pk %}" hx-vals='{"received_on": "{% now "Y-m-d" %}"}'
+                  hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">heute</button>
+        {% endif %}
+      </span>
+    {% elif b.cost_documents %}
+      <span class="ul-date">{{ b.cost_documents.received_on|date:"d.m.Y" }}</span>
+    {% else %}<span class="na">–</span>{% endif %}
+    {% if b.deadline %}{% include "documents/_deadline_badge.html" with info=b.deadline %}{% endif %}
+  </td>
+  <td>
+    {% if perms.buildings.change_building %}
+      <input class="hvin {% if b.property_manager %}set{% endif %}" name="property_manager" list="hv-names"
+             value="{{ b.property_manager.name|default:'' }}" placeholder="Hausverwaltung…" aria-label="Hausverwaltung"
+             hx-post="{% url 'buildings:update' b.pk %}" hx-trigger="change" hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">
+    {% else %}<div class="hv">{{ b.property_manager.name|default:"" }}</div>{% endif %}
+  </td>
+  <td>
+    {% if perms.buildings.change_building %}
+      <input class="notiz {% if b.note %}set{% endif %}" name="note" value="{{ b.note }}" placeholder="eigene Notiz…"
+             aria-label="Notiz" title="{{ b.note }}"
+             hx-post="{% url 'buildings:update' b.pk %}" hx-trigger="change" hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">
+    {% else %}<div class="notiz">{{ b.note|truncatechars:60 }}</div>{% endif %}
+  </td>
   <td>
     <button class="note-btn {% if b.remark or b.handwritten_note %}has{% endif %}" type="button" title="Details / Vermerke"
             hx-get="{% url 'buildings:row' b.pk %}?open={% if open %}0{% else %}1{% endif %}"

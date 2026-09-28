@@ -1,0 +1,6 @@
+{# Deadline state of one building: expects "info" (documents.rules.DeadlineInfo). #}
+<div class="frist {{ info.state }}" title="Frist bis {{ info.deadline_end|date:'d.m.Y' }}">
+  {% if info.state == "released" %}✓ freigegeben
+  {% elif info.state == "overdue" %}Frist abgelaufen seit {{ info.days_overdue }} Tag{{ info.days_overdue|pluralize:"en" }}
+  {% else %}noch {{ info.days_left }} Tag{{ info.days_left|pluralize:"e" }}{% endif %}
+</div>

@@ -3,26 +3,7 @@
 {# Current sort column; belongs to the filter form via form="filter-form". #}
 <input type="hidden" name="sort" value="{{ request.GET.sort }}" form="filter-form">
 
-<div class="kpis">
-  <div class="tile"><div class="lbl">Liegenschaften · {{ request.GET.region|default:"alle Regionen" }}</div><div class="val">{{ summary.total|intcomma }}</div></div>
-  {# The status tiles work as a filter: click = only this status, click again = all #}
-  <a class="tile t-good {% if request.GET.status == 'released' %}on{% endif %}" href="?{% toggle_query request 'status' 'released' %}">
-    <div class="lbl"><span class="ic t-good">✓</span>freigegeben</div><div class="val">{{ summary.released }}<span class="pct">· {{ summary.released_pct }} %</span></div></a>
-  <a class="tile t-warn {% if request.GET.status == 'open' %}on{% endif %}" href="?{% toggle_query request 'status' 'open' %}">
-    <div class="lbl"><span class="ic t-warn">●</span>offen</div><div class="val">{{ summary.open }}<span class="pct">· {{ summary.open_pct }} %</span></div></a>
-  <a class="tile t-crit {% if request.GET.status == 'rework' %}on{% endif %}" href="?{% toggle_query request 'status' 'rework' %}">
-    <div class="lbl"><span class="ic t-crit">▲</span>Nacharbeit</div><div class="val">{{ summary.rework }}<span class="pct">· {{ summary.rework_pct }} %</span></div></a>
-  <div class="tile"><div class="lbl">Heizkostenverteiler</div><div class="val">{{ summary.hkv|intcomma }}</div></div>
-  <div class="tile"><div class="lbl">Wohnungen</div><div class="val">{{ summary.apartments|intcomma }}</div></div>
-  <div class="tile"><div class="lbl">Gateway-Anlagen</div><div class="val">{{ summary.gateways }}</div></div>
-  <a class="tile t-crit {% if request.GET.montage == 'krit' %}on{% endif %}" href="?{% toggle_query request 'montage' 'krit' %}" title="Montagetermin am oder nach dem Ablesetag">
-    <div class="lbl"><span class="ic t-crit">🔧</span>Montageaufträge</div><div class="val">{{ summary.with_orders }}<span class="pct">· Liegenschaften</span></div></a>
-</div>
-<div class="bar">
-  {% if summary.released %}<span style="flex:{{ summary.released }};background:var(--good)" title="freigegeben: {{ summary.released }}"></span>{% endif %}
-  {% if summary.open %}<span style="flex:{{ summary.open }};background:var(--warning)" title="offen: {{ summary.open }}"></span>{% endif %}
-  {% if summary.rework %}<span style="flex:{{ summary.rework }};background:var(--critical)" title="Nacharbeit: {{ summary.rework }}"></span>{% endif %}
-</div>
+{% include "buildings/_kpis.html" %}
 
 <div class="tablecard">
   <div class="tbar">

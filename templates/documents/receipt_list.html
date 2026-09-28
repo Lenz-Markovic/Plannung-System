@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Unterlagen erhalten{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📄 Unterlagen erhalten</h1>
+  <span class="sub">Frist 14 Tage bis zur Freigabe · danach erscheint die Warnung</span>
+</header>
+
+{# Filter chips and search: HTMX reloads only the list below. #}
+<form id="receipt-filter" class="filters" hx-get="{% url 'documents:list' %}" hx-target="#receipt-entries"
+      hx-trigger="change, input changed delay:300ms from:[name=q]" hx-push-url="true">
+  <div class="ul-zahlen">
+    <label class="ul-f {% if chosen == 'offen' %}an{% endif %}"><input type="radio" name="f" value="offen" {% if chosen == 'offen' %}checked{% endif %} hidden><b>{{ counts.open }}</b> offen</label>
+    <label class="ul-f red {% if chosen == 'ueber' %}an{% endif %}"><input type="radio" name="f" value="ueber" {% if chosen == 'ueber' %}checked{% endif %} hidden><b>{{ counts.overdue }}</b> überfällig</label>
+    <label class="ul-f yellow {% if chosen == 'bald' %}an{% endif %}"><input type="radio" name="f" value="bald" {% if chosen == 'bald' %}checked{% endif %} hidden><b>{{ counts.soon }}</b> ≤ 3 Tage</label>
+    <label class="ul-f green {% if chosen == 'frei' %}an{% endif %}"><input type="radio" name="f" value="frei" {% if chosen == 'frei' %}checked{% endif %} hidden><b>{{ counts.released }}</b> freigegeben</label>
+    <label class="ul-f {% if chosen == 'alle' %}an{% endif %}"><input type="radio" name="f" value="alle" {% if chosen == 'alle' %}checked{% endif %} hidden><b>{{ counts.all }}</b> alle</label>
+  </div>
+  <div class="f"><label for="ul-q">Suchen</label><input id="ul-q" type="search" name="q" value="{{ request.GET.q }}" placeholder="Adresse, AZ, Verwaltung"></div>
+  <div class="f"><label for="ul-sort">Sortierung</label>
+    <select id="ul-sort" name="sort">
+      <option value="frist" {% if sort == 'frist' %}selected{% endif %}>nach Frist</option>
+      <option value="eingang" {% if sort == 'eingang' %}selected{% endif %}>nach Eingang</option>
+      <option value="hv" {% if sort == 'hv' %}selected{% endif %}>nach Hausverwaltung</option>
+      <option value="ort" {% if sort == 'ort' %}selected{% endif %}>nach Ort</option>
+    </select></div>
+</form>
+
+<div id="receipt-entries" class="ul-liste">
+  {% include "documents/_receipt_entries.html" %}
+</div>
+<p class="na small mt-3">Neue Eingänge trägst du in der Liegenschaftsliste in der Spalte „Unterlagen (Kosten)“ ein.</p>
+{% endblock %}

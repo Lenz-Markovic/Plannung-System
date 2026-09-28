@@ -1,0 +1,34 @@
+{# One card in the "Unterlagen erhalten" list. Changes are saved via HTMX and return this card. #}
+{% load building_tags %}
+{% if e %}{% with b=e.building %}
+<div class="ul-eintrag {{ e.info.state }}" id="receipt-{{ b.pk }}">
+  <div class="ul-z1">
+    <div class="ul-adr"><b>{{ b.street }}</b> <span>{{ b.zip_code }} {{ b.city }}</span><br>
+      <span>AZ {{ b.file_number }}{% if b.property_manager %} · {{ b.property_manager.name }}{% endif %}</span></div>
+    <span class="ul-frist {{ e.info.state }}" title="Frist bis {{ e.info.deadline_end|date:'d.m.Y' }}{% if e.receipt.reset_reason %} (neue Frist nach {{ e.receipt.get_reset_reason_display }} am {{ e.receipt.deadline_start|date:'d.m.Y' }}){% endif %}">
+      {% if e.info.state == "released" %}✓ freigegeben{% elif e.info.state == "overdue" %}Frist abgelaufen seit {{ e.info.days_overdue }} Tag{{ e.info.days_overdue|pluralize:"en" }}{% else %}noch {{ e.info.days_left }} Tag{{ e.info.days_left|pluralize:"e" }}{% endif %}
+    </span>
+  </div>
+  <div class="ul-z2">
+    <label>Eingang
+      {% if perms.documents.change_costdocumentreceipt %}
+        <input type="date" name="received_on" value="{{ e.receipt.received_on|date:'Y-m-d' }}"
+               hx-post="{% url 'documents:update' b.pk %}" hx-trigger="change" hx-target="#receipt-{{ b.pk }}" hx-swap="outerHTML">
+      {% else %}{{ e.receipt.received_on|date:"d.m.Y" }}{% endif %}
+    </label>
+    <label>Status
+      {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
+        {% status_choices b.status as options %}
+        <select name="status" hx-post="{% url 'documents:update' b.pk %}" hx-trigger="change" hx-target="#receipt-{{ b.pk }}" hx-swap="outerHTML">
+          {% for value, label, allowed in options %}<option value="{{ value }}" {% if value == b.status %}selected{% endif %} {% if not allowed %}disabled{% endif %}>{{ value|status_icon }} {{ label }}</option>{% endfor %}
+        </select>
+      {% else %}{{ b.get_status_display }}{% endif %}
+    </label>
+    <span class="ul-termin">{% if e.planned_date %}📅 {{ e.planned_date|date:"d.m.Y" }}{% if e.planned_reader %} · {{ e.planned_reader }}{% endif %}{% else %}<i>kein Termin</i>{% endif %}</span>
+    <a class="btn mini" href="{% url 'buildings:list' %}?q={{ b.file_number }}">↧ In Tabelle</a>
+  </div>
+</div>
+{% endwith %}{% else %}
+  {# Documents date was removed: the card disappears #}
+  <div id="receipt-{{ removed_pk }}" hidden></div>
+{% endif %}

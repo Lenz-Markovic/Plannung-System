@@ -1,0 +1,5 @@
+{% for e in entries %}
+  {% include "documents/_receipt_entry.html" %}
+{% empty %}
+  <div class="empty">Keine Liegenschaft in dieser Ansicht.</div>
+{% endfor %}

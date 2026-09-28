@@ -26,6 +26,9 @@
   <a class="btn" href="{% url 'buildings:list' %}">Filter zurücksetzen</a>
 </form>
 
+{# Suggestions for the "Hausverwaltung" input in every row #}
+<datalist id="hv-names">{% for name in property_managers %}<option value="{{ name }}">{% endfor %}</datalist>
+
 <div id="results">
   {% include "buildings/_results.html" %}
 </div>

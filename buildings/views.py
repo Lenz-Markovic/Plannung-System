@@ -10,12 +10,23 @@ How HTMX is used here (no own JavaScript needed):
 - The ▸ button in a row fetches the same row plus a detail row (building_row).
 """
 
-from django.contrib.auth.decorators import permission_required
-from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404, render
+import datetime
 
+from django.contrib.auth.decorators import permission_required
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
+from django.http import HttpResponseBadRequest
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from documents.rules import deadline_info
+from documents.services import set_received_on
+
+from . import services
 from .display import building_schedule
 from .filters import BuildingFilter, sort_buildings
+from .models import Building, BuildingStatus, PropertyManager
 from .selectors import building_list_queryset, building_summary, source_summary, with_schedule_details
 
 PAGE_SIZE = 100
@@ -35,18 +46,31 @@ def clean_url(request):
     return f"{request.path}?{params.urlencode()}" if params else request.path
 
 
+def prepare_row(building, today):
+    """Attach what the row template needs: schedule column and deadline."""
+    building.schedule = building_schedule(building)
+    # A missing one-to-one raises an AttributeError subclass, so getattr's default works.
+    receipt = getattr(building, "cost_documents", None)
+    building.deadline = (
+        deadline_info(receipt.deadline_start, building.status == BuildingStatus.RELEASED, today) if receipt else None
+    )
+    return building
+
+
 def page_rows(buildings, page_number):
     """One page of rows, with the schedule column prepared for each row."""
     page = Paginator(buildings, PAGE_SIZE).get_page(page_number)
-    rows = list(with_schedule_details(page.object_list))
-    for building in rows:
-        building.schedule = building_schedule(building)
+    today = timezone.localdate()
+    rows = [prepare_row(building, today) for building in with_schedule_details(page.object_list)]
     return page, rows
 
 
 @permission_required("buildings.view_building", raise_exception=True)
 def building_list(request):
     building_filter, buildings = filtered_buildings(request)
+    if request.htmx_target == "kpis":
+        # Only the tiles, after a change in a row (see _kpis.html).
+        return render(request, "buildings/_kpis.html", {"summary": building_summary(building_filter.qs)})
     page, rows = page_rows(buildings, 1)
     context = {
         "filter": building_filter,
@@ -54,6 +78,7 @@ def building_list(request):
         "rows": rows,
         "summary": building_summary(building_filter.qs),
         "sources": source_summary(),
+        "property_managers": PropertyManager.objects.values_list("name", flat=True),
     }
     if request.htmx_target == "results":
         response = render(request, "buildings/_results.html", context)
@@ -75,6 +100,44 @@ def building_rows(request):
 @permission_required("buildings.view_building", raise_exception=True)
 def building_row(request, pk):
     """One row, opened (?open=1: with detail row) or closed again."""
+    return render_row(request, pk, opened=request.GET.get("open") == "1")
+
+
+def render_row(request, pk, opened=False):
     building = get_object_or_404(with_schedule_details(building_list_queryset()), pk=pk)
-    building.schedule = building_schedule(building)
-    return render(request, "buildings/_row_toggle.html", {"b": building, "open": request.GET.get("open") == "1"})
+    prepare_row(building, timezone.localdate())
+    return render(request, "buildings/_row_toggle.html", {"b": building, "open": opened})
+
+
+@require_POST
+@permission_required("buildings.view_building", raise_exception=True)
+def building_update(request, pk):
+    """Save one field edited directly in the table and return the new row.
+
+    The form elements in the row send exactly one of these values:
+    status, note, property_manager, received_on.
+    """
+    building = get_object_or_404(Building, pk=pk)
+    data = request.POST
+    try:
+        if "status" in data:
+            services.change_status(building, data["status"], request.user)
+        elif "note" in data:
+            services.set_note(building, data["note"], request.user)
+        elif "property_manager" in data:
+            services.set_property_manager(building, data["property_manager"], request.user)
+        elif "received_on" in data:
+            if not request.user.has_perm("documents.change_costdocumentreceipt"):
+                raise PermissionDenied("Den Unterlagen-Eingang darf deine Rolle nicht eintragen.")
+            value = data["received_on"].strip()
+            set_received_on(building, datetime.date.fromisoformat(value) if value else None, request.user)
+        else:
+            return HttpResponseBadRequest("Kein Feld angegeben.")
+    except (ValidationError, ValueError) as error:
+        return HttpResponseBadRequest(str(error))
+
+    response = render_row(request, pk)
+    # Tells the warning pop-up (base.html) to check the deadlines again and
+    # the KPI tiles to reload their numbers.
+    response["HX-Trigger"] = "deadlines-changed, buildings-changed"
+    return response
