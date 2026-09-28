@@ -79,6 +79,8 @@ ordering) and `conflicts/rules.py` (`planning_findings`). TomTom is only
 called from `planning/tomtom.py` with `TOMTOM_API_KEY` from `.env`; every
 address is geocoded once and stored. Without a key the preview uses
 estimates (postcode centres from the prototype).
+`python manage.py check_tomtom` checks the key step by step (never prints it).
+After changing `.env`, restart the server.
 
 ## Calendar
 

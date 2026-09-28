@@ -4,7 +4,8 @@
 
 {% if draft.moved_from %}<div class="pr-status warn">↷ Verschiebung: bisher <b>{{ draft.moved_from }}</b> → neu <b>{{ preview.employee }} am {{ preview.date|date:"d.m.Y" }}</b>. Der alte Termin bleibt bestehen, bis du übernimmst.</div>{% endif %}
 {% if preview.error %}<div class="pr-status fehler">⛔ {{ preview.error }} – für die übrigen Strecken wurde geschätzt.</div>
-{% elif not preview.has_tomtom %}<div class="pr-status warn">⚠ Kein TomTom-Schlüssel hinterlegt: alle Fahrzeiten sind <b>geschätzt</b> (Luftlinie). Der Plan kann nur <b>vorläufig</b> gespeichert werden.</div>
+{% elif not preview.has_tomtom %}<div class="pr-status warn">⚠ Kein TomTom-Schlüssel geladen: alle Fahrzeiten sind <b>geschätzt</b> (Luftlinie), der Plan kann nur <b>vorläufig</b> gespeichert werden.
+  <br>Schlüssel in die Datei <code>.env</code> eintragen (<code>TOMTOM_API_KEY=…</code>), den Server neu starten und mit <code>python manage.py check_tomtom</code> prüfen.</div>
 {% elif preview.all_from_tomtom %}<div class="pr-status ok">✓ Alle Fahrzeiten von TomTom. Bitte prüfen und dann übernehmen.</div>
 {% endif %}
 
