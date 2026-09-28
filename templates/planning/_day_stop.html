@@ -1,0 +1,49 @@
+{# One stop of "Mein Tag". Buttons save via HTMX and return this card again. #}
+{% load core_tags %}
+{% with b=s.building o=s.installation_order %}
+<article id="stop-{{ s.pk }}" class="day-stop {% if s.done_at %}done{% endif %}">
+  <div class="day-stop-head">
+    <span class="day-time">{{ s.start_time|time:"H:i"|default:"–" }}<small>{{ s.end_time|time:"H:i" }}</small></span>
+    <div class="flex-grow-1">
+      <a class="day-address" href="{{ navigation_url }}" target="_blank" rel="noopener" title="Navigation starten">
+        {% if s.kind == "installation" %}🔧 {% endif %}{{ address }} <span aria-hidden="true">🧭</span></a>
+      <div class="na small">{% if b %}AZ {{ b.file_number }} · {{ b.reading_type|default:'–' }}{% endif %}{% if o %} · Montage {{ o.re_number }}{% endif %} · {{ s.work_minutes }} min</div>
+    </div>
+    {% if s.done_at %}<span class="day-check" title="erledigt {{ s.done_at|date:'H:i' }}">✓</span>{% endif %}
+  </div>
+
+  {% if b %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+  {% if o %}<div class="day-hint">{{ o.summary }}</div>{% endif %}
+  {% if b %}
+    <div class="day-devices">{% if b.hkv_count %}<span class="chip">{{ b.hkv_count }} HKV</span>{% endif %}{% if b.wmz_count %}<span class="chip heat">{{ b.wmz_count }} WMZ</span>{% endif %}{% if b.wwz_count %}<span class="chip water">{{ b.wwz_count }} WWZ</span>{% endif %}{% if b.kwz_count %}<span class="chip water">{{ b.kwz_count }} KWZ</span>{% endif %}{% if b.has_rwm %}<span class="chip safety">{% if b.rwm_count %}{{ b.rwm_count }} {% endif %}RWM</span>{% endif %}</div>
+    {% if b.remark %}<div class="day-hint">{{ b.remark|phone_links }}</div>{% endif %}
+    {% if b.note %}<div class="day-hint"><b>Büro:</b> {{ b.note|phone_links }}</div>{% endif %}
+    <div class="day-hint">Status: <b>{{ b.get_status_display }}</b>{% if b.proposed_status %} · dein Vorschlag: <b>{{ b.get_proposed_status_display }}</b> (wartet auf das Büro){% endif %}</div>
+  {% endif %}
+  {% for w in s.route_warnings %}<div class="pr-warn ms-0">⚠ {{ w }}</div>{% endfor %}
+
+  {% if can_work %}
+    {# Note on site: saved when leaving the field #}
+    <textarea class="day-note" name="field_note" rows="2" placeholder="Notiz vor Ort (z. B. Mieter nicht da, Zähler defekt) …"
+              hx-post="{% url 'planning:stop_note' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">{{ s.field_note }}</textarea>
+    <div class="day-actions">
+      {% if s.done_at %}
+        <button class="btn" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "0"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">↺ doch nicht erledigt</button>
+        <span class="na small">erledigt {{ s.done_at|date:"H:i" }}{% if s.done_by %} von {{ s.done_by }}{% endif %}</span>
+      {% else %}
+        <button class="btn day-done" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "1"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">✓ Stopp erledigt</button>
+      {% endif %}
+      {% if b and perms.buildings.propose_status %}
+        {# Readers may only suggest a status; the office decides. #}
+        <select class="day-propose" name="status" hx-post="{% url 'planning:stop_propose' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML" aria-label="Status vorschlagen">
+          <option value="" disabled selected>Status vorschlagen …</option>
+          {% for value, label in status_choices %}{% if value != b.status %}<option value="{{ value }}">{{ label }}</option>{% endif %}{% endfor %}
+          {% if b.proposed_status %}<option value="{{ b.status }}">Vorschlag zurücknehmen</option>{% endif %}
+        </select>
+      {% endif %}
+    </div>
+  {% elif s.field_note %}<div class="day-hint"><b>Notiz vor Ort:</b> {{ s.field_note }}</div>{% endif %}
+</article>
+{% endwith %}
+{% if oob_progress %}{% include "planning/_day_progress.html" %}{% endif %}
+{% if message %}{% include "core/_toast.html" %}{% endif %}

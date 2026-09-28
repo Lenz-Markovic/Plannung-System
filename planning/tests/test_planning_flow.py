@@ -227,3 +227,13 @@ def test_a_failing_route_does_not_stop_the_other_drives(demo, monkeypatch):
     preview = services.calculate_preview(draft_for(demo, unplanned(3)))
     assert [s.drive_source for s in preview.stops[:-1]] == ["estimate", "tomtom"]
     assert preview.stops[0].drive_reason == "TomTom-Fehler: TomTom-Fehler HTTP 400: Invalid request"
+
+
+def test_demo_day_gives_the_demo_reader_a_tour(demo, no_tomtom):
+    call_command("create_demo_users", password="LongDemoPassword1", stdout=io.StringIO())
+    out = io.StringIO()
+    call_command("demo_day", stdout=out)
+    tour = Tour.objects.get(employee__short_name="Demo-Ableser", date=datetime.date(2026, 9, 28))
+    assert tour.stops.count() == 5 and tour.status == TourStatus.PROVISIONAL and "angelegt" in out.getvalue()
+    call_command("demo_day", stdout=out)  # second call: nothing new
+    assert "schon einen Fahrplan" in out.getvalue()

@@ -24,6 +24,9 @@ def home(request):
     # Office roles start directly in the building list (like the prototype).
     if request.user.has_perm("buildings.view_building"):
         return redirect("buildings:list")
+    # Readers / installers start with their own day plan (mobile).
+    if request.user.has_perm("planning.view_own_tours") and hasattr(request.user, "employee"):
+        return redirect("planning:my_day")
     permissions = [
         (label, request.user.has_perm(codename)) for codename, label in PERMISSION_LABELS
     ]

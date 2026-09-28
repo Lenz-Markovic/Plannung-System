@@ -1,7 +1,7 @@
 {# One building in the list (columns as in rowHtml() of the prototype). #}
 {% load building_tags %}
 {% with s=b.schedule %}
-<tr id="row-{{ b.pk }}" class="{% if b.pk in request.session.plan_selection %}gewaehlt{% endif %}">
+<tr id="row-{{ b.pk }}" {% if oob %}hx-swap-oob="true"{% endif %} class="{% if b.pk in request.session.plan_selection %}gewaehlt{% endif %}">
   <td class="selcol">
     {% if perms.planning.add_tour %}
       {# Sends the click to the server; the answer updates "Fahrplan erstellen (n)" in the header. #}
@@ -62,7 +62,15 @@
     {% else %}
       <span class="st {{ b.status }}">{{ b.status|status_icon }} {{ b.get_status_display }}</span>
     {% endif %}
-    {% if b.proposed_status %}<div class="obj-meta" title="Vorschlag vom Ableser">Vorschlag: {{ b.get_proposed_status_display }}{% if b.proposed_status_by %} ({{ b.proposed_status_by }}){% endif %}</div>{% endif %}
+    {% if b.proposed_status %}
+      <div class="obj-meta" title="Vorschlag vom Ableser">Vorschlag: {{ b.get_proposed_status_display }}{% if b.proposed_status_by %} ({{ b.proposed_status_by }}){% endif %}
+        {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
+          {# One click takes over the reader's suggestion (same permission rules as the select). #}
+          <button class="btn mini" name="accept_proposal" value="1" hx-post="{% url 'buildings:update' b.pk %}"
+                  hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">✓ übernehmen</button>
+        {% endif %}
+      </div>
+    {% endif %}
   </td>
   <td>
     {% if perms.documents.change_costdocumentreceipt %}

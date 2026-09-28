@@ -77,4 +77,10 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("cal-side").innerHTML = "";
     calendar.updateSize();
   });
+
+  // Near-live: fetch the tours again every 60 s (only while the tab is visible),
+  // so tours planned or moved by colleagues - or stops ticked off by readers - show up.
+  setInterval(function () {
+    if (document.visibilityState === "visible") { calendar.refetchEvents(); }
+  }, 60000);
 });

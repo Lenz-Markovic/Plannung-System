@@ -31,6 +31,7 @@
 {# Suggestions for the "Hausverwaltung" input in every row #}
 <datalist id="hv-names">{% for name in property_managers %}<option value="{{ name }}">{% endfor %}</datalist>
 
+{% include "buildings/_live.html" with rows=None message="" since=live_since %}
 <div id="results">
   {% include "buildings/_results.html" %}
 </div>

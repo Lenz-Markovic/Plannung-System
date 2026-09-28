@@ -106,6 +106,23 @@ The only JavaScript is `static/js/calendar.js` (commented).
   after saving a plan; also "📄 Excel" in the calendar side panel and
   "📄 Alle Fahrpläne (Excel)" in the calendar.
 
+## Mobile day plan ("Mein Tag") and near-live updates
+
+- Readers and installers land on **📱 Mein Tag** after login (`/planung/mein-tag/`):
+  one card per stop, tap the address to start the navigation, phone numbers are
+  clickable, "✓ Stopp erledigt", a note on site and a status *suggestion*.
+  When all stops are done the tour becomes "erledigt".
+- Readers only see and change their OWN stops. Office roles can open any person's day
+  with the person selector.
+- If the office changes the tour, the reader's page reloads itself within a minute.
+- The office sees the suggestion in the building list ("Vorschlag: …") and takes it
+  over with one click on **✓ übernehmen**.
+- The building list checks every 20 s for rows changed by colleagues (also stops ticked
+  off by readers), replaces them and shows who changed them. The calendar reloads its
+  tours every 60 s.
+- Try it: `python manage.py demo_day` gives the demo reader a plan for today, then log
+  in as `ableser_demo`.
+
 ## Project layout
 
 | Folder | Contents |

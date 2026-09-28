@@ -377,3 +377,41 @@ tr.gewaehlt { background: var(--good-wash); }
 .fp-zg { font-size: 11px; padding: 2px 6px; border-radius: 5px; background: var(--surface-2); color: var(--ink-2); margin: 2px 0; }
 
 @media print { .filters, .appnav, .demo-band { display: none; } .scroll { max-height: none; } }
+
+/* ---- "Mein Tag": mobile day plan for readers / installers ------------------ */
+/* Mobile first: one column, big buttons that are easy to hit with a thumb. */
+.day { max-width: 640px; margin: 0 auto; padding: 12px 12px 40px; }
+.day-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.day-head .btn { font-size: 22px; line-height: 1; padding: 8px 14px; }
+.day-title { flex: 1; text-align: center; }
+.day-title h1 { font-size: 19px; margin: 0; }
+.day-title .sub { color: var(--ink-2); font-size: 13px; }
+.day-person { margin-bottom: 10px; }
+.day-person select { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--grid); background: var(--surface); }
+.day-empty { padding: 18px; text-align: center; }
+.day-progress { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+.day-progress .bar { height: 10px; border-radius: 5px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+.day-progress .bar span { display: block; height: 100%; background: var(--good); transition: width .4s; }
+.day-stops { display: flex; flex-direction: column; }
+.day-stop { background: var(--surface); border: 1px solid var(--grid); border-left: 5px solid var(--accent);
+  border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.day-stop.done { border-left-color: var(--good); background: var(--good-wash); }
+.day-stop.done .day-address { text-decoration: line-through; color: var(--ink-2); }
+.day-stop-head { display: flex; gap: 12px; align-items: flex-start; }
+.day-time { font-weight: 700; font-size: 17px; min-width: 52px; display: flex; flex-direction: column; }
+.day-time small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.day-address { font-weight: 600; font-size: 16px; text-decoration: none; color: var(--ink); display: block; }
+.day-check { font-size: 26px; color: var(--good); font-weight: 700; }
+.day-hint { font-size: 13.5px; color: var(--ink-2); white-space: pre-line; }
+.day-hint a[href^="tel:"] { font-weight: 600; }
+.day-devices { display: flex; flex-wrap: wrap; gap: 4px; }
+.day-note { width: 100%; border: 1px solid var(--grid); border-radius: 8px; padding: 8px; font-size: 14px; background: #fff; }
+.day-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.day-actions .btn { padding: 10px 16px; font-size: 15px; }
+.day-done { background: var(--good); color: #fff; border-color: var(--good); font-weight: 600; flex: 1; }
+.day-propose { padding: 9px; border-radius: 8px; border: 1px solid var(--grid); background: var(--surface); font-size: 14px; max-width: 100%; }
+.day-drive { text-align: center; color: var(--muted); font-size: 13px; padding: 6px 0; }
+@media (max-width: 700px) {
+  .appnav { flex-wrap: wrap; padding: 6px 10px; }
+  .appnav .user { display: none; }
+}

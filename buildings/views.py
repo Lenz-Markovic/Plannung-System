@@ -20,9 +20,11 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from documents.models import CostDocumentReceipt
 from documents.rules import deadline_info
-from planning.services import plan_bar_context
 from documents.services import set_received_on
+from planning.models import TourStop
+from planning.services import plan_bar_context
 
 from . import services
 from .display import building_schedule
@@ -88,6 +90,7 @@ def building_list(request):
         # (?region=Region+Calw instead of ?q=&stichtag=&region=Region+Calw&...).
         response["HX-Push-Url"] = clean_url(request)
         return response
+    context["live_since"] = timezone.now().timestamp()
     return render(request, "buildings/list.html", context)
 
 
@@ -116,6 +119,7 @@ SAVED_MESSAGES = {
     "note": "Notiz gespeichert",
     "property_manager": "Hausverwaltung gespeichert",
     "received_on": "Unterlagen-Eingang gespeichert",
+    "accept_proposal": "Vorschlag übernommen",
 }
 
 
@@ -136,6 +140,8 @@ def building_update(request, pk):
             services.set_note(building, data["note"], request.user)
         elif "property_manager" in data:
             services.set_property_manager(building, data["property_manager"], request.user)
+        elif "accept_proposal" in data:
+            services.accept_proposal(building, request.user)
         elif "received_on" in data:
             if not request.user.has_perm("documents.change_costdocumentreceipt"):
                 raise PermissionDenied("Den Unterlagen-Eingang darf deine Rolle nicht eintragen.")
@@ -151,4 +157,59 @@ def building_update(request, pk):
     # Tells the warning pop-up (base.html) to check the deadlines again and
     # the KPI tiles to reload their numbers.
     response["HX-Trigger"] = "deadlines-changed, buildings-changed"
+    return response
+
+
+LIVE_MAX_ROWS = 50  # more changes at once: only the toast, the user can reload
+
+
+def changed_by_others(since, user):
+    """{building pk: {names of the people}} changed after `since` by someone else.
+
+    Uses the change history (django-simple-history), so we also know WHO changed it:
+    buildings, cost document receipts and stops of tours (e.g. a reader ticks "erledigt").
+    """
+    changes = {}
+    sources = [
+        (Building.history, "id"),
+        (CostDocumentReceipt.history, "building_id"),
+        (TourStop.history, "building_id"),
+    ]
+    for history, field in sources:
+        rows = (history.filter(history_date__gt=since).exclude(history_user=user)
+                .exclude(**{f"{field}__isnull": True}).values_list(field, "history_user__username"))
+        for pk, name in rows:
+            changes.setdefault(pk, set()).add(name or "System")
+    return changes
+
+
+@permission_required("buildings.view_building", raise_exception=True)
+def building_changes(request):
+    """Near-live list: polled every 20 s by the #live element in list.html.
+
+    Answers with a new #live element (next check starts from "now"), the changed
+    rows as "out of band" swaps (rows not on the page are simply ignored) and a toast.
+    """
+    now = timezone.now()
+    try:
+        since = datetime.datetime.fromtimestamp(float(request.GET.get("seit", "")), tz=datetime.timezone.utc)
+    except ValueError:
+        since = now
+    changes = changed_by_others(since, request.user)
+    rows = []
+    if changes and len(changes) <= LIVE_MAX_ROWS:
+        today = timezone.localdate()
+        queryset = with_schedule_details(building_list_queryset().filter(pk__in=changes))
+        rows = [prepare_row(building, today) for building in queryset]
+    message = ""
+    if changes:
+        names = sorted({name for people in changes.values() for name in people})
+        message = f"{len(changes)} Liegenschaft{'en' if len(changes) > 1 else ''} von {', '.join(names)} geändert"
+        if not rows:
+            message += " – Seite neu laden zum Anzeigen"
+    response = render(request, "buildings/_live.html", {
+        "rows": rows, "message": message, "since": now.timestamp(),
+    })
+    if changes:
+        response["HX-Trigger"] = "buildings-changed"  # KPI tiles reload their numbers
     return response

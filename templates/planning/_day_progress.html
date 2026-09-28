@@ -1,0 +1,5 @@
+{# "3 von 6 erledigt" bar; also sent "out of band" after every click on "erledigt". #}
+<div id="day-progress" class="day-progress" {% if oob_progress %}hx-swap-oob="true"{% endif %}>
+  <div class="d-flex justify-content-between"><b>{{ progress.done }} von {{ progress.total }} erledigt</b><span class="na">{{ progress.percent }} %</span></div>
+  <div class="bar" role="progressbar" aria-valuenow="{{ progress.percent }}" aria-valuemin="0" aria-valuemax="100"><span style="width:{{ progress.percent }}%"></span></div>
+</div>

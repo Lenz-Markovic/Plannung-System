@@ -1,0 +1,8 @@
+{# Near-live updates of the list (buildings/views.py: building_changes).           #}
+{# Checks every 20 s while the tab is visible; the answer replaces this element.  #}
+{% load l10n %}
+<div id="live" hx-get="{% url 'buildings:changes' %}?seit={% localize off %}{{ since }}{% endlocalize %}"
+     hx-trigger="every 20s [document.visibilityState === 'visible']" hx-swap="outerHTML"></div>
+{# Rows changed by colleagues: "out of band" into the table (a <template> keeps the <tr> intact). #}
+{% for b in rows %}<template>{% include "buildings/_row.html" with oob=True %}</template>{% endfor %}
+{% if message %}{% include "core/_toast.html" %}{% endif %}

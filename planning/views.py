@@ -9,18 +9,22 @@ All pages work with HTMX:
 """
 
 import datetime
+from urllib.parse import quote_plus
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
-from buildings.models import Building
+from buildings.models import Building, BuildingStatus
+from buildings.services import propose_status
 
-from . import services
+from . import dayplan, services
 from .calendar import calendar_events
 from .display import route_sketch
 from .excel import build_workbook
@@ -299,3 +303,95 @@ def tours_excel(request):
         messages.info(request, "Keine Fahrpläne für diese Auswahl.")
         return redirect("planning:calendar")
     return _excel_response(list(tours))
+
+
+# =============================================================================
+# "Mein Tag": mobile day plan for readers / installers
+# =============================================================================
+
+
+def _day_employee(request):
+    """The person whose day is shown: yourself, or (office) the chosen person."""
+    office = request.user.has_perm("planning.view_tour")
+    if request.GET.get("person") and office:
+        return get_object_or_404(Employee, pk=request.GET["person"])
+    own = Employee.objects.filter(user=request.user).first()
+    if own is None and office:
+        return Employee.objects.filter(active=True).first()  # office without own day: first person
+    return own
+
+
+def _stop_context(stop):
+    target = stop.building or stop.installation_order
+    address = f"{target.street}, {target.zip_code} {target.city}"
+    return {"s": stop, "address": address, "status_choices": BuildingStatus.choices,
+            "navigation_url": "https://www.google.com/maps/dir/?api=1&destination=" + quote_plus(address)}
+
+
+@login_required
+def my_day(request):
+    if not (request.user.has_perm("planning.view_own_tours") or request.user.has_perm("planning.view_tour")):
+        raise PermissionDenied
+    employee = _day_employee(request)
+    if employee is None:
+        messages.info(request, "Für deinen Benutzer sind keine Mitarbeiterdaten hinterlegt – bitte an einen Admin wenden.")
+        return redirect("home")
+    date = datetime.date.fromisoformat(request.GET["datum"]) if request.GET.get("datum") else timezone.localdate()
+    tour = dayplan.tour_of(employee, date)
+    stops = list(tour.stops.select_related("building", "installation_order", "done_by").order_by("position")) if tour else []
+    return render(request, "planning/my_day.html", {
+        "employee": employee, "date": date, "today": timezone.localdate(), "tour": tour,
+        "stops": [_stop_context(s) for s in stops],
+        "progress": dayplan.progress(stops),
+        "previous_day": date - datetime.timedelta(days=1), "next_day": date + datetime.timedelta(days=1),
+        "next_tour": Tour.objects.filter(employee=employee, date__gt=date).order_by("date").first(),
+        "employees": Employee.objects.filter(active=True) if request.user.has_perm("planning.view_tour") else [],
+        "can_work": tour is not None and dayplan.may_work_on(request.user, tour),
+    })
+
+
+def _stop_answer(request, stop, message):
+    stops = list(stop.tour.stops.order_by("position"))
+    response = render(request, "planning/_day_stop.html", {
+        **_stop_context(stop), "can_work": True, "progress": dayplan.progress(stops), "oob_progress": True,
+        "message": message,
+    })
+    return response
+
+
+@require_POST
+@login_required
+def stop_done(request, pk):
+    stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
+    done = request.POST.get("done") == "1"
+    dayplan.set_stop_done(stop, request.user, done)
+    return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
+
+
+@require_POST
+@login_required
+def stop_note(request, pk):
+    stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
+    dayplan.save_field_note(stop, request.POST.get("field_note", ""), request.user)
+    return _stop_answer(request, stop, "Notiz gespeichert")
+
+
+@require_POST
+@login_required
+def stop_propose(request, pk):
+    stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
+    if not stop.building or not dayplan.may_work_on(request.user, stop.tour):
+        raise PermissionDenied
+    propose_status(stop.building, request.POST.get("status", ""), request.user)
+    return _stop_answer(request, stop, "Vorschlag an das Büro geschickt")
+
+
+@login_required
+def my_day_check(request, pk):
+    """Polling every minute: reload the page only if the office changed the tour."""
+    tour = Tour.objects.filter(pk=pk).first()
+    if tour is None or str(tour.version) != request.GET.get("version"):
+        response = HttpResponse("")
+        response["HX-Refresh"] = "true"
+        return response
+    return HttpResponse(status=204)  # nothing changed

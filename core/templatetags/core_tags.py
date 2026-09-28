@@ -6,9 +6,14 @@ Small template helpers used on many pages.
     <a href="?{% sort_query request 'nr' %}">        click on a column header
     {% sort_arrow request 'nr' %}                    ▲ / ▼ for the current sort column
     {{ 80|minutes }}                                 "1h 20min"
+    {{ b.remark|phone_links }}                       phone numbers become tel: links
 """
 
+import re
+
 from django import template
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
@@ -62,3 +67,13 @@ def minutes(value):
 def hours(value):
     """90 -> '1,5 Std'."""
     return f"{(value or 0) / 60:.1f} Std".replace(".", ",")
+
+
+@register.filter
+def phone_links(text):
+    """Make phone numbers in notes clickable on the phone: 'Tel. 0711/000000' -> tel: link."""
+    def link(match):
+        number = match.group(1)
+        return f'<a href="tel:{re.sub(r"[^0-9+]", "", number)}">{number}</a>'
+
+    return mark_safe(re.sub(r"(\+?\d[\d /\-]{5,}\d)", link, escape(text or "")))

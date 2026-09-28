@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Mein Tag – {{ date|date:"d.m.Y" }}{% endblock %}
+{% block content %}
+<div class="day">
+  <header class="day-head">
+    <a class="btn mini" href="?datum={{ previous_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Vortag">‹</a>
+    <div class="day-title">
+      <h1>{% if date == today %}Heute{% else %}{{ date|date:"l" }}{% endif %}, {{ date|date:"d.m.Y" }}</h1>
+      <span class="sub">{{ employee }}{% if tour %} · {{ tour.start_time|time:"H:i" }}–{{ tour.end_time|time:"H:i"|default:"?" }} · {{ tour.get_status_display }}{% endif %}</span>
+    </div>
+    <a class="btn mini" href="?datum={{ next_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Folgetag">›</a>
+  </header>
+
+  {% if employees %}
+    {# Office: look at the day of any reader #}
+    <form class="day-person" method="get">
+      <input type="hidden" name="datum" value="{{ date|date:'Y-m-d' }}">
+      <select name="person" onchange="this.form.submit()" aria-label="Person">
+        {% for e in employees %}<option value="{{ e.pk }}" {% if e.pk == employee.pk %}selected{% endif %}>{{ e.short_name }}</option>{% endfor %}
+      </select>
+      <noscript><button class="btn mini">anzeigen</button></noscript>
+    </form>
+  {% endif %}
+
+  {% if not tour %}
+    <div class="card-lite day-empty">
+      <p class="mb-2">Für diesen Tag ist kein Fahrplan geplant.</p>
+      {% if next_tour %}<a class="btn primary" href="?datum={{ next_tour.date|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}">Nächster Termin: {{ next_tour.date|date:"D, d.m.Y" }} →</a>{% endif %}
+    </div>
+  {% else %}
+    {# Polling: if the office changes this tour, the page reloads itself (within 1 minute). #}
+    <div hx-get="{% url 'planning:my_day_check' tour.pk %}?version={{ tour.version }}" hx-trigger="every 60s" hx-swap="none"></div>
+
+    {% include "planning/_day_progress.html" %}
+    {% if tour.status == "provisional" %}<div class="pr-status warn">⏳ Dieser Fahrplan ist noch vorläufig – Zeiten können sich ändern.</div>{% endif %}
+
+    <div class="day-stops">
+      {% for item in stops %}
+        {% include "planning/_day_stop.html" with s=item.s address=item.address navigation_url=item.navigation_url status_choices=item.status_choices %}
+        {% if item.s.drive_to_next_minutes and not forloop.last %}<div class="day-drive">↓ {{ item.s.drive_to_next_minutes }} min Fahrt{% if item.s.drive_to_next_km %} · {{ item.s.drive_to_next_km|floatformat:1 }} km{% endif %}</div>{% endif %}
+        {% if tour.break_after_position == forloop.counter %}<div class="day-drive">☕ Pause {{ tour.break_minutes }} min</div>{% endif %}
+      {% endfor %}
+    </div>
+    <p class="na small mt-3">Tipp: Auf die Adresse tippen startet die Navigation. Telefonnummern in den Hinweisen sind anklickbar.</p>
+  {% endif %}
+</div>
+{% endblock %}

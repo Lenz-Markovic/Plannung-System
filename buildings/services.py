@@ -69,3 +69,24 @@ def set_property_manager(building, name, user):
         building.property_manager = manager
     building.save()
     return building
+
+
+def propose_status(building, new_status, user):
+    """A reader suggests a status ("Vorschlag" in the role table); the office decides."""
+    if not user.has_perm("buildings.propose_status"):
+        raise PermissionDenied("Deine Rolle darf keinen Status vorschlagen.")
+    if new_status not in BuildingStatus.values:
+        raise ValidationError(f"Unbekannter Status: {new_status}")
+    if new_status == building.status:
+        building.proposed_status, building.proposed_status_by, building.proposed_status_at = "", None, None
+    else:
+        building.proposed_status, building.proposed_status_by, building.proposed_status_at = new_status, user, timezone.now()
+    building.save()
+    return building
+
+
+def accept_proposal(building, user):
+    """Office: take over the reader's suggestion (normal permission rules apply)."""
+    if not building.proposed_status:
+        return building
+    return change_status(building, building.proposed_status, user)
