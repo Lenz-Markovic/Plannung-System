@@ -42,7 +42,8 @@ if not SECRET_KEY:
 
 # TomTom: used only by our backend (planning/tomtom.py). Never pass this
 # value to a template or to JavaScript.
-TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "")
+# strip(): removes spaces, line breaks and quotes that easily sneak in when copying.
+TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "").strip().strip("\"'").strip()
 
 # Red stripe "DEMO - alle Daten frei erfunden" at the top (as in the prototype)
 DEMO_BANNER = env_bool("DEMO_BANNER", True)

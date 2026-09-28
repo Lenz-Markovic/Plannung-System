@@ -73,6 +73,15 @@ class Command(BaseCommand):
                       "Zeile in .env prüfen: genau TOMTOM_API_KEY=… am Zeilenanfang.")
             return
         self.ok(f"Schlüssel geladen ({describe(key)})")
+        odd = sorted({repr(c) for c in key if not c.isascii() or not c.isalnum()})
+        if odd:
+            self.fail(f"Der Schlüssel enthält ungewöhnliche Zeichen: {', '.join(odd)}",
+                      "Beim Kopieren sind unsichtbare Zeichen mitgekommen. Schlüssel auf developer.tomtom.com "
+                      "mit dem Kopier-Symbol neu kopieren und in .env ersetzen.")
+            return
+        if len(key) != 32:
+            self.stdout.write(f"    Hinweis: TomTom-Schlüssel sind normalerweise 32 Zeichen lang, dieser hat {len(key)}. "
+                              "Vielleicht nicht vollständig kopiert?")
         self.stdout.write("    Wichtig: Nach jeder Änderung an .env den Server neu starten "
                           "(Strg + C, dann python manage.py runserver).")
 
@@ -86,7 +95,9 @@ class Command(BaseCommand):
             leg = client.route((place.latitude, place.longitude), (48.7758, 9.1829), tomorrow_9)
             self.ok(f"Routenberechnung funktioniert: Nufringen → Stuttgart {round(leg.seconds / 60)} min, {leg.meters / 1000:.1f} km")
         except TomTomError as error:
-            hint = "Schlüssel auf developer.tomtom.com prüfen (gültig? neu erstellt? richtig kopiert?)."
+            hint = ("TomTom kennt diesen Schlüssel nicht (mehr). Auf developer.tomtom.com → Keys den AKTUELLEN "
+                    "Schlüssel mit dem Kopier-Symbol kopieren (nach dem Neu-Erstellen gilt der alte nicht mehr) "
+                    "und prüfen, dass „Search API“ und „Routing API“ freigeschaltet sind.")
             if "nicht erreichbar" in str(error):
                 hint = "Internetverbindung / Firmen-Netzwerk prüfen (api.tomtom.com muss erreichbar sein)."
             self.fail(str(error), hint)

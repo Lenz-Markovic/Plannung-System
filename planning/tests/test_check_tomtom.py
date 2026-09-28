@@ -36,3 +36,9 @@ def test_everything_ok(settings, tmp_path, monkeypatch):
     monkeypatch.setattr(TomTomClient, "route", lambda self, a, b, d: Leg(seconds=1500, meters=24000))
     output = run(settings, tmp_path, "TOMTOM_API_KEY=abcdefgh\n")
     assert "Alles in Ordnung" in output and "abcdefgh" not in output
+
+
+def test_invisible_characters_are_reported(settings, tmp_path):
+    settings.TOMTOM_API_KEY = "abcd​efgh"  # zero-width space that came along when copying
+    output = run(settings, tmp_path, "TOMTOM_API_KEY=abcdefgh\n")
+    assert "ungewöhnliche Zeichen" in output
