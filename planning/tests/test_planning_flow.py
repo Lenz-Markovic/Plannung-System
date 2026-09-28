@@ -184,3 +184,46 @@ def test_route_sketch_uses_dots_not_german_commas(client, demo, no_tomtom):
     html = client.get(reverse("planning:draft")).content.decode()
     circles = [part.split('"')[1] for part in html.split('cx=')[1:]]
     assert circles and all("," not in value for value in circles)
+
+
+class PartlyFailingTomTom(FakeTomTom):
+    """Does not find one address and fails for one route, everything else works."""
+
+    def __init__(self, missing_street, failing_after=None):
+        super().__init__()
+        self.missing_street, self.failing_after = missing_street, failing_after
+
+    def geocode(self, address):
+        from planning.tomtom import TomTomError
+        if address.startswith(self.missing_street):
+            raise TomTomError(f"TomTom findet die Adresse nicht: {address}")
+        return super().geocode(address)
+
+
+def test_only_the_affected_drives_are_estimated_and_the_reason_is_shown(demo, monkeypatch):
+    buildings = unplanned(4)
+    draft = draft_for(demo, buildings)
+    missing = Building.objects.get(pk=draft["stops"][1]["building"])  # the 2nd stop in driving order
+    monkeypatch.setattr(services, "get_client", lambda: PartlyFailingTomTom(missing.street))
+    preview = services.calculate_preview(draft)
+    sources = [s.drive_source for s in preview.stops[:-1]]
+    # drive 1->2 and 2->3 touch the unknown address, 3->4 is still calculated by TomTom
+    assert sources == ["estimate", "estimate", "tomtom"]
+    assert "nicht gefunden" in preview.stops[0].drive_reason
+    assert preview.estimated_count == 2 and not preview.can_confirm
+
+
+def test_a_failing_route_does_not_stop_the_other_drives(demo, monkeypatch):
+    from planning.tomtom import TomTomError
+
+    class OneRouteFails(FakeTomTom):
+        def route(self, origin, destination, departure):
+            if not self.routes:
+                self.routes.append(departure)
+                raise TomTomError("TomTom-Fehler HTTP 400: Invalid request")
+            return super().route(origin, destination, departure)
+
+    monkeypatch.setattr(services, "get_client", lambda: OneRouteFails())
+    preview = services.calculate_preview(draft_for(demo, unplanned(3)))
+    assert [s.drive_source for s in preview.stops[:-1]] == ["estimate", "tomtom"]
+    assert preview.stops[0].drive_reason == "TomTom-Fehler: TomTom-Fehler HTTP 400: Invalid request"

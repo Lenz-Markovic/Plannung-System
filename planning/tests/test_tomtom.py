@@ -88,3 +88,10 @@ def test_without_key_the_postcode_centre_is_used():
     building = Building(zip_code="71154", street="x", city="y")
     point, source, _ = position(building, None)
     assert source == "zip" and point == zip_centre("71154")
+
+
+def test_tomtom_error_text_is_passed_on():
+    answer = FakeResponse({"detailedError": {"message": "departAt must be in the future"}}, 400)
+    client = TomTomClient("KEY", FakeSession({"calculateRoute": answer}))
+    with pytest.raises(TomTomError, match="HTTP 400: departAt must be in the future"):
+        client.route((48.6, 8.9), (48.7, 9.0), datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc))

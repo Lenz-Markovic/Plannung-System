@@ -198,6 +198,7 @@ class PreviewStop:
     drive_seconds: int | None = None
     drive_km: Decimal | None = None
     drive_source: str = DriveSource.NONE
+    drive_reason: str = ""  # why this drive is only estimated
     points: list = field(default_factory=list)
 
 
@@ -218,6 +219,10 @@ class Preview:
     @property
     def all_from_tomtom(self):
         return all(s.drive_source == DriveSource.TOMTOM for s in self.stops[:-1])
+
+    @property
+    def estimated_count(self):
+        return sum(1 for s in self.stops[:-1] if s.drive_source != DriveSource.TOMTOM)
 
     @property
     def can_confirm(self):
@@ -242,21 +247,34 @@ def _load_targets(stops):
     return targets
 
 
-def _drive(client, origin, destination, departure, stop):
-    """Fill the drive fields of `stop` (TomTom if possible, else estimate)."""
-    if client and origin and destination and stop.point_source == "tomtom":
-        leg = client.route(origin, destination, departure)
-        stop.drive_seconds = leg.seconds
-        stop.drive_minutes = planned_drive_minutes(leg.seconds, leg.meters)
-        stop.drive_km = Decimal(round(leg.meters / 1000, 1)).quantize(Decimal("0.1"))
-        stop.drive_source = DriveSource.TOMTOM
-        stop.points = leg.points
-        stop.warnings = stop.warnings + [w for w in leg.warnings if w not in stop.warnings]
+def _drive(client, origin, destination, departure, stop, next_stop=None):
+    """Fill the drive fields of `stop` (TomTom if possible, else estimate + reason)."""
+    reason = ""
+    if client is None:
+        reason = "kein TomTom-Schlüssel geladen"
+    elif not origin or not destination:
+        reason = "Adresse ohne Position"
+    elif stop.point_source != "tomtom" or (next_stop is not None and next_stop.point_source != "tomtom"):
+        reason = "Adresse bei TomTom nicht gefunden – Position nur geschätzt (PLZ-Mitte)"
     else:
-        stop.drive_seconds = None
-        stop.drive_minutes = estimate_drive_minutes(origin, destination)
-        stop.drive_km = None
-        stop.drive_source = DriveSource.ESTIMATE
+        try:
+            leg = client.route(origin, destination, departure)
+        except TomTomError as error:
+            reason = f"TomTom-Fehler: {error}"
+        else:
+            stop.drive_seconds = leg.seconds
+            stop.drive_minutes = planned_drive_minutes(leg.seconds, leg.meters)
+            stop.drive_km = Decimal(round(leg.meters / 1000, 1)).quantize(Decimal("0.1"))
+            stop.drive_source = DriveSource.TOMTOM
+            stop.drive_reason = ""
+            stop.points = leg.points
+            stop.warnings = stop.warnings + [w for w in leg.warnings if w not in stop.warnings]
+            return
+    stop.drive_seconds = None
+    stop.drive_minutes = estimate_drive_minutes(origin, destination)
+    stop.drive_km = None
+    stop.drive_source = DriveSource.ESTIMATE
+    stop.drive_reason = reason
 
 
 def calculate_preview(draft):
@@ -293,7 +311,7 @@ def calculate_preview(draft):
         error = str(tomtom_error)
         for i, stop in enumerate(stops[:-1]):
             if stop.drive_minutes is None:
-                _drive(None, stop.point, stops[i + 1].point, None, stop)
+                _drive(None, stop.point, stops[i + 1].point, None, stop, stops[i + 1])
     plan = schedule_day(start, work, [s.drive_minutes for s in stops[:-1]], draft["break"])
     for stop, times in zip(stops, plan.stops):
         stop.start, stop.end, stop.departure, stop.break_after = times.start, times.end, times.departure, times.break_after
@@ -315,7 +333,7 @@ def _calculate_legs(client, stops, date, start, work, break_after, break_minutes
         if break_after is not None and i == break_after:
             t += datetime.timedelta(minutes=break_minutes)
         if break_after is None or i >= break_after or stop.drive_minutes is None:
-            _drive(client, stop.point, stops[i + 1].point, t, stop)
+            _drive(client, stop.point, stops[i + 1].point, t, stop, stops[i + 1])
         t += datetime.timedelta(minutes=stop.drive_minutes)
 
 

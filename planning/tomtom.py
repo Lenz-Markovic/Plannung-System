@@ -69,7 +69,7 @@ class TomTomClient:
         if response.status_code in (401, 403):
             raise TomTomError(f"TomTom lehnt den API-Schlüssel ab (HTTP {response.status_code}). Schlüssel in der .env prüfen.")
         if not response.ok:
-            raise TomTomError(f"TomTom-Fehler HTTP {response.status_code}.")
+            raise TomTomError(f"TomTom-Fehler HTTP {response.status_code}{_error_text(response)}.")
         return response.json()
 
     # --- geocoding ------------------------------------------------------------
@@ -136,6 +136,17 @@ class TomTomClient:
         for waypoint in waypoints:
             order[waypoint["optimizedIndex"]] = waypoint["providedIndex"]
         return order
+
+
+def _error_text(response):
+    """TomTom's own error message, e.g. ': departAt must be in the future'."""
+    try:
+        data = response.json()
+    except ValueError:
+        return ""
+    message = ((data.get("detailedError") or {}).get("message") or (data.get("error") or {}).get("description")
+               or data.get("errorText") or "")
+    return f": {message}" if message else ""
 
 
 def traffic_warnings(sections):
