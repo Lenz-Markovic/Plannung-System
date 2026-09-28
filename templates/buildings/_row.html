@@ -1,7 +1,14 @@
 {# One building in the list (columns as in rowHtml() of the prototype). #}
 {% load building_tags %}
 {% with s=b.schedule %}
-<tr id="row-{{ b.pk }}">
+<tr id="row-{{ b.pk }}" class="{% if b.pk in request.session.plan_selection %}gewaehlt{% endif %}">
+  <td class="selcol">
+    {% if perms.planning.add_tour %}
+      {# Sends the click to the server; the answer updates "Fahrplan erstellen (n)" in the header. #}
+      <input type="checkbox" name="checked" aria-label="Für Planung auswählen" {% if b.pk in request.session.plan_selection %}checked{% endif %}
+             hx-post="{% url 'planning:select' %}" hx-vals='{"building": "{{ b.pk }}"}' hx-target="#plan-bar" hx-swap="outerHTML">
+    {% endif %}
+  </td>
   <td>
     <div class="obj-str" title="{{ b.full_address }}">{{ b.street }}</div>
     <div class="obj-sub">{{ b.zip_code }} {{ b.city }}</div>

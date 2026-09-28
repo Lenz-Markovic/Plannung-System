@@ -25,6 +25,7 @@ class TimeStampedModel(models.Model):
 class GeocodeStatus(models.TextChoices):
     PENDING = "pending", "noch nicht gesucht"
     OK = "ok", "gefunden"
+    APPROXIMATE = "approximate", "ungefähr (ohne Hausnummer)"
     FAILED = "failed", "nicht gefunden"
 
 
@@ -43,7 +44,7 @@ class GeocodedAddress(models.Model):
     latitude = models.FloatField("Breitengrad", null=True, blank=True)
     longitude = models.FloatField("Längengrad", null=True, blank=True)
     geocode_status = models.CharField(
-        "Geocoding", max_length=10, choices=GeocodeStatus.choices, default=GeocodeStatus.PENDING
+        "Geocoding", max_length=20, choices=GeocodeStatus.choices, default=GeocodeStatus.PENDING
     )
     geocoded_at = models.DateTimeField("geocodiert am", null=True, blank=True)
     geocoded_address = models.CharField("geocodierte Adresse", max_length=320, blank=True)

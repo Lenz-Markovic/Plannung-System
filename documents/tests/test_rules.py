@@ -56,3 +56,14 @@ def test_removing_the_appointment_does_not_restart():
 def test_warning_colour():
     assert warning_colour(None) == "red"
     assert warning_colour(datetime.date(2026, 12, 3)) == "yellow"
+
+
+def test_remind_again_at():
+    from documents.rules import remind_again_at
+
+    now = datetime.datetime(2026, 9, 28, 14, 10, tzinfo=datetime.timezone.utc)
+    assert remind_again_at("15", now) == now + datetime.timedelta(minutes=15)
+    assert remind_again_at("60", now) == now + datetime.timedelta(hours=1)
+    assert remind_again_at("morgen", now) == datetime.datetime(2026, 9, 29, 7, 30, tzinfo=datetime.timezone.utc)
+    # anything else: 15 minutes - the warning always comes back
+    assert remind_again_at("nie", now) == now + datetime.timedelta(minutes=15)

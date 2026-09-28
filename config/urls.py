@@ -8,6 +8,8 @@ urlpatterns = [
     # login/, logout/, password_change/ ... (templates in templates/registration/)
     path("liegenschaften/", include("buildings.urls")),
     path("unterlagen/", include("documents.urls")),
+    path("planung/", include("planning.urls")),
+    path("leer/", core_views.empty, name="empty"),
     path("konto/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),
 ]

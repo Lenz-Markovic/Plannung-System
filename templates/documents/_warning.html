@@ -1,12 +1,15 @@
-{# 14-day warning (prioFensterZeigen() in the prototype). No close button, Escape does nothing. #}
+{# 14-day warning (prioFensterZeigen() in the prototype). ✕ / "Später erinnern" only puts it aside: #}
+{# it comes back by itself, and the reminder bar below stays visible in the meantime.              #}
 {# Always updates the counter in the navigation ("out of band" swap). #}
 <span id="ul-badge" hx-swap-oob="true">{% if counts.open %}<span class="ul-badge {% if counts.overdue %}red{% endif %}">{% if counts.overdue %}{{ counts.overdue }} ⚠{% else %}{{ counts.open }}{% endif %}</span>{% endif %}</span>
 
 {% if shown %}
 <div class="dlg-back" role="alertdialog" aria-modal="true" aria-labelledby="deadline-title">
   <div class="dlg prio-dlg">
+    <button class="dlg-x" type="button" title="Später erinnern (in 15 Minuten)" aria-label="Später erinnern"
+            hx-post="{% url 'documents:warning_snooze' %}" hx-vals='{"until": "15"}' hx-target="#deadline-warning">✕</button>
     <h3 id="deadline-title">{% if total == 1 %}Seit 14 Tagen nicht freigegeben{% else %}{{ total }} Liegenschaften seit 14 Tagen nicht freigegeben{% endif %}</h3>
-    <p class="dlg-sub">Die Unterlagen sind da. Das Fenster verschwindet, sobald die Liegenschaft neu geplant oder ihr Status geändert wurde.</p>
+    <p class="dlg-sub">Die Unterlagen sind da. Die Warnung verschwindet erst, wenn die Liegenschaft neu geplant oder ihr Status geändert wurde. Mit ✕ oder „Später erinnern“ kannst du sie kurz beiseitelegen – sie kommt von selbst wieder.</p>
 
     {% for e in shown %}
     {% with b=e.building %}
@@ -46,6 +49,20 @@
     {% endwith %}
     {% endfor %}
     {% if more %}<p class="prio-sub mt-2">… und {{ more }} weitere.</p>{% endif %}
+
+    <div class="dlg-foot">
+      <span class="na">⏰ Später erinnern:</span>
+      {% for value, label in snooze_choices.items %}
+        <button class="btn mini" hx-post="{% url 'documents:warning_snooze' %}" hx-vals='{"until": "{{ value }}"}' hx-target="#deadline-warning">{{ label }}</button>
+      {% endfor %}
+      <a class="btn mini ms-auto" href="{% url 'documents:list' %}?f=ueber">Alle überfälligen ansehen</a>
+    </div>
   </div>
+</div>
+{% elif snoozed_until %}
+{# Put aside: a small bar in the corner keeps the problem visible. #}
+<div class="remind-bar" role="status">
+  ⏰ <b>{{ total }} Liegenschaft{{ total|pluralize:"en" }}</b> über der 14-Tage-Frist · Erinnerung um {{ snoozed_until|time:"H:i" }}{% if snoozed_until.hour == 7 and snoozed_until.minute == 30 %} (morgen){% endif %}
+  <button class="btn mini" hx-post="{% url 'documents:warning_snooze' %}" hx-vals='{"until": "jetzt"}' hx-target="#deadline-warning">jetzt anzeigen</button>
 </div>
 {% endif %}

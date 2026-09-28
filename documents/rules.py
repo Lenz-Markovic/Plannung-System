@@ -87,3 +87,26 @@ def deadline_info(deadline_start, is_released, today):
 def warning_colour(planned_date):
     """Red = no appointment yet, yellow = appointment exists (pull it forward?)."""
     return "yellow" if planned_date else "red"
+
+
+# "Später erinnern": the user may put the warning aside, but it always comes back.
+SNOOZE_CHOICES = {
+    "15": "in 15 Minuten",
+    "60": "in 1 Stunde",
+    "morgen": "morgen früh",
+}
+MORNING = datetime.time(7, 30)
+
+
+def remind_again_at(choice, now):
+    """When the warning comes back after 'Später erinnern'.
+
+    now is a timezone-aware local datetime. Unknown choices use 15 minutes,
+    so the warning can never be switched off for good.
+    """
+    if choice == "morgen":
+        tomorrow = (now + datetime.timedelta(days=1)).date()
+        return now.replace(year=tomorrow.year, month=tomorrow.month, day=tomorrow.day,
+                           hour=MORNING.hour, minute=MORNING.minute, second=0, microsecond=0)
+    minutes = 60 if choice == "60" else 15
+    return now + datetime.timedelta(minutes=minutes)

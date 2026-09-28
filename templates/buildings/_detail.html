@@ -1,7 +1,7 @@
 {# Details of a building (detHtml() in the prototype), loaded only when opened. #}
 {% load core_tags %}
 <tr id="det-{{ b.pk }}" class="det">
-  <td colspan="14">
+  <td colspan="15">
     <dl>
       <dt>Deckblatt</dt><dd>{{ b.get_source_system_display }}{% if b.cover_sheet.source_file %} · {{ b.cover_sheet.source_file }}{% endif %}{% if b.cover_sheet.page %}, Seite {{ b.cover_sheet.page }}{% endif %}</dd>
       <dt>Volle Adresse</dt><dd>{{ b.full_address }}</dd>

@@ -60,7 +60,25 @@ open the list; they will get their own day plan.
   every page load, every 30 seconds and right after changes. It has no
   close button; it disappears only when the building is replanned or its
   status changes. Red = no appointment, yellow = appointment exists.
+  ✕ / "Später erinnern" (15 min, 1 hour, tomorrow morning) only puts it
+  aside; a reminder bar in the navigation stays visible until it returns.
 - `/unterlagen/`: list of all received documents with their deadlines.
+
+## Tour planning
+
+1. Tick buildings in the list → "🗺 Fahrplan erstellen (n)".
+2. Dialog: reader, day, start, break, order ("weitester Termin zuerst" /
+   "kürzeste Gesamtstrecke").
+3. Preview `/planung/entwurf/`: times, driving times, conflicts, rules;
+   ▲ ▼ ✕ and new sorting recalculate at once. Nothing is saved yet.
+4. "✓ Fahrplan übernehmen" only with real TomTom times and ≤ 7.5 h net;
+   otherwise "Vorläufig speichern".
+
+Rules: `planning/rules/` (5-minute rounding, working time and break,
+ordering) and `conflicts/rules.py` (`planning_findings`). TomTom is only
+called from `planning/tomtom.py` with `TOMTOM_API_KEY` from `.env`; every
+address is geocoded once and stored. Without a key the preview uses
+estimates (postcode centres from the prototype).
 
 ## Project layout
 

@@ -1,0 +1,10 @@
+{# SVG content of the route sketch: lines between the stops, numbered dots (planning/display.py). #}
+{# "localize off": SVG needs 123.4, not the German 123,4 #}
+{% load l10n %}{% localize off %}
+{% for x1, y1, x2, y2 in sketch.lines %}<line x1="{{ x1 }}" y1="{{ y1 }}" x2="{{ x2 }}" y2="{{ y2 }}" class="sk-line"/>{% endfor %}
+{% for p in sketch.points reversed %}{# reversed: the start is drawn last, i.e. on top #}
+  <g><title>{{ p.number }}. {{ p.label }}</title>
+    <circle cx="{{ p.x }}" cy="{{ p.y }}" r="11" fill="{{ p.colour }}"/>
+    <text x="{{ p.x }}" y="{{ p.y }}" dy="4" text-anchor="middle" class="sk-num">{{ p.number }}</text></g>
+{% endfor %}
+{% endlocalize %}

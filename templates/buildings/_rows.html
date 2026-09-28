@@ -3,18 +3,18 @@
 {% for b in rows %}
   {% include "buildings/_row.html" with open=False %}
 {% empty %}
-  <tr><td colspan="14" class="empty">Keine Liegenschaft entspricht den Filtern.</td></tr>
+  <tr><td colspan="15" class="empty">Keine Liegenschaft entspricht den Filtern.</td></tr>
 {% endfor %}
 {% if page.has_next %}
   {# Loads the next page as soon as this row scrolls into view (or on click). #}
   <tr class="more" id="load-more"
       hx-get="{% url 'buildings:rows' %}?{% query_with request page=page.next_page_number %}"
       hx-trigger="intersect root:.scroll once, click" hx-swap="outerHTML" hx-target="this">
-    <td colspan="14">
+    <td colspan="15">
       <strong>{{ page.end_index|intcomma }}</strong> von {{ page.paginator.count|intcomma }} Zeilen geladen — beim Scrollen wird automatisch nachgeladen
       <button class="btn mini ms-2" type="button">weitere laden</button>
     </td>
   </tr>
 {% elif page.paginator.count %}
-  <tr class="more"><td colspan="14" class="na">alle {{ page.paginator.count|intcomma }} Zeilen angezeigt</td></tr>
+  <tr class="more"><td colspan="15" class="na">alle {{ page.paginator.count|intcomma }} Zeilen angezeigt</td></tr>
 {% endif %}

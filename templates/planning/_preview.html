@@ -1,0 +1,89 @@
+{# Preview of a tour (planBestaetigen() in the prototype). Every button recalculates only #preview. #}
+{% load core_tags %}
+{% with plan=preview.day_plan %}
+
+{% if preview.error %}<div class="pr-status fehler">⛔ {{ preview.error }} – für die übrigen Strecken wurde geschätzt.</div>
+{% elif not preview.has_tomtom %}<div class="pr-status warn">⚠ Kein TomTom-Schlüssel hinterlegt: alle Fahrzeiten sind <b>geschätzt</b> (Luftlinie). Der Plan kann nur <b>vorläufig</b> gespeichert werden.</div>
+{% elif preview.all_from_tomtom %}<div class="pr-status ok">✓ Alle Fahrzeiten von TomTom. Bitte prüfen und dann übernehmen.</div>
+{% endif %}
+
+<div class="pr-kopfzeile">
+  <span>{{ preview.stops|length }} Stopps · {{ preview.start|time:"H:i" }}–{{ plan.end|time:"H:i" }} ·
+    Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="t-crit">– {{ plan.over_limit_minutes|hours }} über 7,5 h</b>{% endif %}</span>
+  <span class="spacer"></span>
+  {# change start / break / order: recalculates the preview #}
+  <form class="pr-settings" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview" hx-trigger="change">
+    <input type="hidden" name="action" value="settings">
+    <label>Beginn {{ settings_form.start }}</label>
+    <label>Pause {{ settings_form.break_minutes }}</label>
+  </form>
+  {% for key, label in strategies.items %}
+    <button class="btn mini {% if draft.strategy == key %}primary{% endif %}" hx-post="{% url 'planning:draft_action' %}"
+            hx-vals='{"action": "sort", "strategy": "{{ key }}"}' hx-target="#preview">↻ {{ label }}</button>
+  {% endfor %}
+</div>
+
+<div class="pr-body">
+  <div class="pr-liste">
+    {% for s in preview.stops %}
+      <div class="pr-stopp {% if forloop.first %}erst{% endif %} {% if forloop.last %}letzt{% endif %}">
+        <div class="pr-zeile">
+          <span class="pr-nr">{{ forloop.counter }}</span>
+          <span class="pr-zeit">{{ s.start|time:"H:i" }}–{{ s.end|time:"H:i" }}</span>
+          <span class="pr-adr">
+            <b>{% if s.kind == "installation" %}🔧 {% endif %}{{ s.target.street }}</b>
+            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min</span>
+            {% if s.order %}<br><span class="o">Montage {{ s.order.re_number }}: {{ s.order.summary }}</span>{% endif %}
+          </span>
+          <span class="pr-knopf">
+            <button class="btn mini" title="nach oben" {% if forloop.first %}disabled{% endif %}
+                    hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "up", "index": {{ s.index }}}' hx-target="#preview">▲</button>
+            <button class="btn mini" title="nach unten" {% if forloop.last %}disabled{% endif %}
+                    hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "down", "index": {{ s.index }}}' hx-target="#preview">▼</button>
+            <button class="btn mini" title="aus dem Plan nehmen" {% if preview.stops|length == 1 %}disabled{% endif %}
+                    hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "remove", "index": {{ s.index }}}' hx-target="#preview">✕</button>
+          </span>
+        </div>
+        {% for f in s.findings %}<div class="kf-{{ f.severity }}">{% if f.severity == "critical" %}⛔{% else %}⚠{% endif %} {{ f.message }}</div>{% endfor %}
+        {% for w in s.warnings %}<div class="pr-warn">⚠ {{ w }}</div>{% endfor %}
+        {% if s.point_source == "zip" %}<div class="pr-warn">⚠ Position nur ungefähr (PLZ-Mitte).</div>{% elif not s.point %}<div class="pr-warn">⚠ Adresse ohne Position – Fahrzeit grob geschätzt.</div>{% endif %}
+        {% if s.building.remark %}<div class="pr-hinw">{{ s.building.remark }}</div>{% endif %}
+      </div>
+      {% if s.break_after %}<div class="pr-pause">☕ Pause {{ plan.break_minutes }} min</div>{% endif %}
+      {% if not forloop.last %}
+        <div class="pr-fahrt">↓ <b>{{ s.drive_minutes }} min</b> im Plan
+          {% if s.drive_source == "tomtom" %}· TomTom {% widthratio s.drive_seconds 60 1 %} min · {{ s.drive_km|floatformat:1 }} km{% else %}· <span class="t-warn">geschätzt</span>{% endif %}
+          · Abfahrt {{ s.departure|time:"H:i" }}</div>
+      {% endif %}
+    {% endfor %}
+  </div>
+
+  {# Simple route sketch (the real TomTom map follows in the next step) #}
+  <div class="pr-karte">
+    <svg viewBox="0 0 460 340" role="img" aria-label="Skizze der Route">
+      <rect x="0" y="0" width="460" height="340" rx="10" class="sk-bg"/>
+      {% include "planning/_sketch.html" %}
+    </svg>
+    <div class="na small mt-1">Skizze nach Koordinaten · grün = Start, blau = Stopps, rot = Ende · die TomTom-Karte folgt im nächsten Schritt</div>
+  </div>
+</div>
+
+<div class="pr-fuss">
+  {% if plan.work_minutes %}Ablesezeit {{ plan.work_minutes }} min · Fahrzeit {{ plan.drive_minutes }} min{% if preview.distance_km %} · {{ preview.distance_km|floatformat:1 }} km{% endif %} · Pause {{ plan.break_minutes }} min{% endif %}
+  {% if preview.commute_minutes %}<br>Anfahrt von zu Hause: {{ preview.commute_minutes }} min · {{ preview.commute_km|floatformat:1 }} km (zählt nicht zur Arbeitszeit){% endif %}
+  <br><span class="na">Fahrzeit im Plan auf 5 min aufgerundet. Max. 7,5 h netto (Ablesung + Fahrt); Pause 30 min ab 6 h nach der ersten Liegenschaft, die nach 12:00 endet.</span>
+</div>
+
+{% if preview.critical_count %}<div class="pr-status warn">⚠ {{ preview.critical_count }} Konflikt{{ preview.critical_count|pluralize:"e" }} – Liegenschaften aus anderen Fahrplänen werden beim Speichern hierher verschoben, der alte Plan wird zum Neurechnen markiert.</div>{% endif %}
+{% for problem in preview.problems %}<div class="pr-status fehler">⛔ {{ problem }}</div>{% endfor %}
+
+<div class="dlg-btns">
+  <form method="post" action="{% url 'planning:draft_discard' %}">{% csrf_token %}<button class="btn">Verwerfen</button></form>
+  <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="0">
+    <button class="btn" title="Speichern ohne Bestätigung – z. B. ohne echte Fahrzeiten">Vorläufig speichern</button></form>
+  {% if perms.planning.confirm_tour %}
+  <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="1">
+    <button class="btn primary" {% if not preview.can_confirm %}disabled title="{{ preview.problems|join:' ' }}"{% endif %}>✓ Fahrplan übernehmen</button></form>
+  {% endif %}
+</div>
+{% endwith %}

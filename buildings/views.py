@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from documents.rules import deadline_info
+from planning.services import plan_bar_context
 from documents.services import set_received_on
 
 from . import services
@@ -79,6 +80,7 @@ def building_list(request):
         "summary": building_summary(building_filter.qs),
         "sources": source_summary(),
         "property_managers": PropertyManager.objects.values_list("name", flat=True),
+        **plan_bar_context(request.session),
     }
     if request.htmx_target == "results":
         response = render(request, "buildings/_results.html", context)
@@ -103,10 +105,18 @@ def building_row(request, pk):
     return render_row(request, pk, opened=request.GET.get("open") == "1")
 
 
-def render_row(request, pk, opened=False):
+def render_row(request, pk, opened=False, message=""):
     building = get_object_or_404(with_schedule_details(building_list_queryset()), pk=pk)
     prepare_row(building, timezone.localdate())
-    return render(request, "buildings/_row_toggle.html", {"b": building, "open": opened})
+    return render(request, "buildings/_row_toggle.html", {"b": building, "open": opened, "message": message})
+
+
+SAVED_MESSAGES = {
+    "status": "Status gespeichert",
+    "note": "Notiz gespeichert",
+    "property_manager": "Hausverwaltung gespeichert",
+    "received_on": "Unterlagen-Eingang gespeichert",
+}
 
 
 @require_POST
@@ -136,7 +146,8 @@ def building_update(request, pk):
     except (ValidationError, ValueError) as error:
         return HttpResponseBadRequest(str(error))
 
-    response = render_row(request, pk)
+    field = next(key for key in SAVED_MESSAGES if key in data)
+    response = render_row(request, pk, message=f"{SAVED_MESSAGES[field]} · {building.file_number}")
     # Tells the warning pop-up (base.html) to check the deadlines again and
     # the KPI tiles to reload their numbers.
     response["HX-Trigger"] = "deadlines-changed, buildings-changed"

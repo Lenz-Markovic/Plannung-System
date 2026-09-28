@@ -22,6 +22,7 @@
   <div class="scroll">
     <table class="list">
       <thead><tr>
+        <th class="selcol" title="Für die Planung auswählen">🗺</th>
         {# Clicking a header sorts; clicking again reverses. #}
         <th style="min-width:168px"><a hx-get="?{% sort_query request 'nr' %}" hx-target="#results" hx-push-url="true" href="?{% sort_query request 'nr' %}">Objekt <span class="ar">{% sort_arrow request 'nr' %}</span></a>
             · <a hx-get="?{% sort_query request 'adresse' %}" hx-target="#results" hx-push-url="true" href="?{% sort_query request 'adresse' %}">Adr.<span class="ar">{% sort_arrow request 'adresse' %}</span></a>

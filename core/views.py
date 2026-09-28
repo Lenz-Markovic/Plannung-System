@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 # Shown on the start page so everyone can check what their role allows.
@@ -27,3 +28,8 @@ def home(request):
         (label, request.user.has_perm(codename)) for codename, label in PERMISSION_LABELS
     ]
     return render(request, "core/home.html", {"permissions": permissions})
+
+
+def empty(request):
+    """Empty answer: used by "Abbrechen" buttons to clear a dialog via HTMX."""
+    return HttpResponse("")

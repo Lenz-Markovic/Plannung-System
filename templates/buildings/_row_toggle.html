@@ -6,3 +6,4 @@
   {# Removes the detail row that is still on the page (HTMX "out of band" swap). #}
   <tr id="det-{{ b.pk }}" hx-swap-oob="delete"></tr>
 {% endif %}
+{% if message %}{% include "core/_toast.html" %}{% endif %}

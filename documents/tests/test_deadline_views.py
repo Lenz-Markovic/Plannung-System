@@ -115,3 +115,26 @@ def test_receipt_list_counts(client):
     assert (counts["all"], counts["overdue"]) == (19, 10)
     shown = client.get(reverse("documents:list"), {"f": "ueber"}).context["entries"]
     assert len(shown) == 10 and all(e.info.state == "overdue" for e in shown)
+
+
+def test_snooze_puts_warning_aside_and_it_comes_back(client, monkeypatch):
+    login(client, roles.PROCESSING)
+    response = client.post(reverse("documents:warning_snooze"), {"until": "60"})
+    html = response.content.decode()
+    assert response.context["shown"] == [] and "Erinnerung um" in html  # only the reminder bar
+    # 61 minutes later the pop-up is back
+    later = timezone.now() + datetime.timedelta(minutes=61)
+    monkeypatch.setattr(timezone, "now", lambda: later)
+    assert len(client.get(reverse("documents:warning")).context["shown"]) == 3
+
+
+def test_show_now_ends_the_snooze(client):
+    login(client, roles.PROCESSING)
+    client.post(reverse("documents:warning_snooze"), {"until": "morgen"})
+    assert len(client.post(reverse("documents:warning_snooze"), {"until": "jetzt"}).context["shown"]) == 3
+
+
+def test_saving_in_table_shows_confirmation(client):
+    login(client, roles.PROCESSING)
+    building = Building.objects.get(file_number="0798615")
+    assert "✓ Notiz gespeichert · 0798615" in post_row(client, building, note="x").content.decode()

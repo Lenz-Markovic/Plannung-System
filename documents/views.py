@@ -3,10 +3,13 @@ Received cost documents ("Unterlagen") and the 14-day warning.
 
 The warning pop-up is loaded by every page (see base.html) with HTMX:
 on page load, every 30 seconds, and right after a change in the table.
-It has no close button and ignores Escape. It only disappears when the
-building gets a new appointment or its status changes (spec section 7).
-"In der Liste ansehen" hides one card for 15 minutes, like the prototype
-hides it until the page is opened again.
+
+It cannot be switched off (spec section 7): the problem is only solved
+when the building gets a new appointment or its status changes. But the
+user can put it aside with ✕ / "Später erinnern" so they can keep working;
+it comes back automatically (15 min, 1 hour or tomorrow morning) and a
+small reminder bar stays visible meanwhile. "In der Liste ansehen" hides
+one card for 15 minutes.
 """
 
 import datetime
@@ -22,11 +25,24 @@ from django.views.decorators.http import require_POST
 from buildings.models import Building
 from buildings.services import change_status
 
-from .rules import OVERDUE, RELEASED, SOON
+from .rules import OVERDUE, RELEASED, SNOOZE_CHOICES, SOON, remind_again_at
 from .services import deadline_entries, set_received_on
 
 HIDE_MINUTES = 15
 SESSION_KEY = "deadline_hidden_until"
+SNOOZE_KEY = "deadline_snoozed_until"
+
+
+def _snoozed_until(request):
+    """Datetime until which the whole pop-up is put aside, or None."""
+    value = request.session.get(SNOOZE_KEY)
+    if not value:
+        return None
+    until = datetime.datetime.fromtimestamp(value, tz=datetime.timezone.utc)
+    if until <= timezone.now():
+        del request.session[SNOOZE_KEY]
+        return None
+    return timezone.localtime(until)
 
 
 def sees_deadline_warning(user):
@@ -62,10 +78,25 @@ def deadline_warning(request):
         (e for e in entries if e.info.state == OVERDUE and e.building.pk not in hidden),
         key=lambda e: (e.info.days_left, e.building.file_number),
     )
+    snoozed_until = _snoozed_until(request)
     return render(request, "documents/_warning.html", {
-        "shown": overdue[:3], "more": max(0, len(overdue) - 3), "total": len(overdue),
-        "counts": _counts(entries),
+        "shown": [] if snoozed_until else overdue[:3],
+        "more": max(0, len(overdue) - 3), "total": len(overdue),
+        "counts": _counts(entries), "snoozed_until": snoozed_until if overdue else None,
+        "snooze_choices": SNOOZE_CHOICES,
     })
+
+
+@require_POST
+@login_required
+def warning_snooze(request):
+    """✕ / 'Später erinnern': put the pop-up aside; 'jetzt' shows it again at once."""
+    choice = request.POST.get("until", "15")
+    if choice == "jetzt":
+        request.session.pop(SNOOZE_KEY, None)
+    else:
+        request.session[SNOOZE_KEY] = remind_again_at(choice, timezone.localtime()).timestamp()
+    return deadline_warning(request)
 
 
 @require_POST
@@ -78,7 +109,8 @@ def warning_status(request, pk):
     except ValidationError as error:
         return HttpResponseBadRequest(str(error))
     response = deadline_warning(request)
-    response["HX-Trigger"] = "deadlines-changed"
+    response.write(render(request, "core/_toast.html", {"message": f"Status gespeichert · {building.file_number}"}).content)
+    response["HX-Trigger"] = "buildings-changed"
     return response
 
 

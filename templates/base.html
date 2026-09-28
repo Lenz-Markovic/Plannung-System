@@ -26,6 +26,12 @@
     {% endif %}
     {# Montageaufträge, Kalender, Tagesplan: follow in the next steps #}
     {% if user.is_staff %}<a class="tab" href="{% url 'admin:index' %}">⚙ Verwaltung</a>{% endif %}
+    {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
+      {# 14-day warning: checked on load, every 30 s and right after changes (documents/views.py). #}
+      {# The pop-up itself is a fixed overlay; the reminder bar appears right here in the navigation. #}
+      <div id="deadline-warning" hx-get="{% url 'documents:warning' %}"
+           hx-trigger="load, every 30s, deadlines-changed from:body"></div>
+    {% endif %}
     <span class="user">{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %}</span>
     <form method="post" action="{% url 'logout' %}" class="m-0">
       {% csrf_token %}
@@ -35,16 +41,14 @@
   {% endif %}
 
   <div class="wrap">
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
-    {% endfor %}
     {% block content %}{% endblock %}
   </div>
 
-  {% if user.is_authenticated and perms.buildings.set_status_open_rework or user.is_authenticated and perms.buildings.release_building %}
-    {# 14-day warning: checked on load, every 30 s and right after changes (documents/views.py). #}
-    <div id="deadline-warning" hx-get="{% url 'documents:warning' %}"
-         hx-trigger="load, every 30s, deadlines-changed from:body"></div>
-  {% endif %}
+  {# Messages after a page load (e.g. "Fahrplan gespeichert") appear as a short note at the bottom. #}
+  <div id="toast">{% for message in messages %}<div class="toast-msg {{ message.tags }}">{% if message.tags == "error" %}⛔{% else %}✓{% endif %} {{ message }}</div>{% endfor %}</div>
+  {# Dialogs (e.g. "Ableseroute planen") are loaded into here with HTMX. #}
+  <div id="modal"></div>
+
+
 </body>
 </html>

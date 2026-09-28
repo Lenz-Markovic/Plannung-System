@@ -8,7 +8,8 @@
     · {{ sources.total }} Liegenschaften · {{ sources.bfw }} BFW / {{ sources.ceos }} CEOS
   </span>
   <span class="spacer"></span>
-  {# Kalender, Fahrplan erstellen, Excel: follow in the next steps #}
+  {% if perms.planning.add_tour %}{% include "planning/_plan_bar.html" %}{% endif %}
+  {# Kalender and Excel: follow in the next steps #}
   <span id="loading" class="htmx-indicator">wird geladen …</span>
 </header>
 
