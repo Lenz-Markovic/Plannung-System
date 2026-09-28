@@ -108,6 +108,36 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy):
     return sort_draft(draft)
 
 
+def draft_from_tour(tour, date=None, employee=None):
+    """Draft to recalculate or move an existing tour (calendar drag & drop).
+
+    Nothing changes until the draft is confirmed or saved; the old tour stays
+    where it is meanwhile.
+    """
+    date = date or tour.date
+    employee = employee or tour.employee
+    if (employee.pk, date) != (tour.employee_id, tour.date) and Tour.objects.filter(employee=employee, date=date).exists():
+        raise ValueError(f"{employee} hat am {date:%d.%m.%Y} schon einen Fahrplan. Bitte dort ergänzen oder zuerst diesen Tag leeren.")
+    stops = []
+    for stop in tour.stops.order_by("position"):
+        if stop.kind == StopKind.READING:
+            stops.append({"kind": StopKind.READING, "building": stop.building_id})
+        else:
+            stops.append({"kind": StopKind.INSTALLATION, "order": stop.installation_order_id, "building": stop.building_id})
+    moved = (employee.pk, date) != (tour.employee_id, tour.date)
+    return {
+        "employee": employee.pk,
+        "date": date.isoformat(),
+        "start": tour.start_time.strftime("%H:%M"),
+        "break": tour.break_minutes or 30,
+        "strategy": "far",
+        "tour_id": tour.pk,
+        "tour_version": tour.version,
+        "moved_from": f"{tour.employee} am {tour.date:%d.%m.%Y}" if moved else "",
+        "stops": stops,
+    }
+
+
 def sort_draft(draft):
     """Put the stops in driving order using the chosen strategy."""
     client = get_client()
@@ -289,12 +319,20 @@ def _calculate_legs(client, stops, date, start, work, break_after, break_minutes
         t += datetime.timedelta(minutes=stop.drive_minutes)
 
 
+def _stops_in_other_tours(preview, draft, buildings):
+    """Reading stops of these buildings in OTHER tours (not the day being planned,
+    and not the tour that is being moved)."""
+    stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings)
+             .exclude(tour__employee=preview.employee, tour__date=preview.date))
+    if draft.get("tour_id"):
+        stops = stops.exclude(tour_id=draft["tour_id"])
+    return stops.select_related("tour__employee")
+
+
 def _add_findings(preview, draft):
     """Conflicts of every reading stop (conflicts/rules.py)."""
     reading = [s for s in preview.stops if s.kind == StopKind.READING]
-    others = (TourStop.objects.filter(kind=StopKind.READING, building__in=[s.building for s in reading])
-              .exclude(tour__employee=preview.employee, tour__date=preview.date)
-              .select_related("tour__employee"))
+    others = _stops_in_other_tours(preview, draft, [s.building for s in reading])
     other_plans = {}
     for stop in others:
         other_plans.setdefault(stop.building_id, []).append(
@@ -344,9 +382,10 @@ def save_draft(draft, user, confirm):
     if tour is None:
         tour = Tour(employee=preview.employee, date=preview.date, created_by=user)
 
-    _move_buildings_out_of_other_tours(preview, user)
+    _move_buildings_out_of_other_tours(preview, draft)
 
     plan = preview.day_plan
+    tour.employee, tour.date = preview.employee, preview.date  # a moved tour gets its new day
     tour.start_time = preview.start
     tour.status = TourStatus.CONFIRMED if confirm else TourStatus.PROVISIONAL
     tour.needs_recalculation, tour.change_reason = False, ""
@@ -387,17 +426,20 @@ def _lock_tour(draft):
         updated = Tour.objects.filter(pk=draft["tour_id"], version=draft["tour_version"]).update(version=F("version") + 1)
         if not updated:
             raise ConcurrentChange("Der Fahrplan wurde inzwischen von jemand anderem geändert.")
-        return Tour.objects.get(pk=draft["tour_id"])
+        tour = Tour.objects.get(pk=draft["tour_id"])
+        target_taken = (Tour.objects.filter(employee_id=draft["employee"], date=draft["date"]).exclude(pk=tour.pk).exists())
+        if target_taken:
+            raise ConcurrentChange("Für den neuen Tag gibt es inzwischen schon einen Fahrplan.")
+        return tour
     if Tour.objects.filter(employee_id=draft["employee"], date=draft["date"]).exists():
         raise ConcurrentChange("Für diesen Tag hat inzwischen jemand anderes einen Fahrplan angelegt.")
     return None
 
 
-def _move_buildings_out_of_other_tours(preview, user):
+def _move_buildings_out_of_other_tours(preview, draft):
     """A building can only be in one tour: take it out of the others (prototype behaviour)."""
-    building_ids = [s.building.pk for s in preview.stops if s.kind == StopKind.READING]
-    old_stops = (TourStop.objects.filter(kind=StopKind.READING, building_id__in=building_ids)
-                 .exclude(tour__employee=preview.employee, tour__date=preview.date).select_related("tour"))
+    buildings = [s.building for s in preview.stops if s.kind == StopKind.READING]
+    old_stops = _stops_in_other_tours(preview, draft, buildings)
     changed_tours = {}
     for stop in old_stops:
         changed_tours.setdefault(stop.tour, 0)
@@ -417,3 +459,11 @@ def _move_buildings_out_of_other_tours(preview, user):
                               f"{preview.date:%d.%m.%Y} verschoben – bitte neu mit TomTom rechnen")
         tour.version += 1  # counts as a change for optimistic locking
         tour.save()
+
+
+def delete_tour(tour):
+    """Delete a tour; its buildings become 'unplanned' again (kept in the history)."""
+    buildings = [stop.building for stop in tour.stops.all() if stop.building]
+    tour.delete()
+    for building in buildings:
+        refresh_deadline(building)

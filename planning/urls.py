@@ -12,4 +12,10 @@ urlpatterns = [
     path("entwurf/aktion/", views.draft_action, name="draft_action"),
     path("entwurf/speichern/", views.draft_save, name="draft_save"),
     path("entwurf/verwerfen/", views.draft_discard, name="draft_discard"),
+    path("kalender/", views.calendar_page, name="calendar"),
+    path("kalender/termine/", views.calendar_feed, name="calendar_feed"),
+    path("fahrplan/<int:pk>/", views.tour_detail, name="tour_detail"),
+    path("fahrplan/<int:pk>/verschieben/", views.tour_move, name="tour_move"),
+    path("fahrplan/<int:pk>/neu-rechnen/", views.tour_recalculate, name="tour_recalculate"),
+    path("fahrplan/<int:pk>/loeschen/", views.tour_delete, name="tour_delete"),
 ]

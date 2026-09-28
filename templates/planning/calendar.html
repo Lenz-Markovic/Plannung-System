@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Kalender – Planungssystem{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📅 Kalender</h1>
+  <span class="sub">Ablesungen und Montage je Person · Fahrplan per Ziehen auf einen anderen Tag verschieben, danach neu rechnen und bestätigen</span>
+</header>
+
+<div class="filters">
+  <div class="f"><label for="cal-person">Person</label>
+    <select id="cal-person">
+      {% if employees|length > 1 %}<option value="">alle Personen</option>{% endif %}
+      {% for e in employees %}<option value="{{ e.pk }}">{{ e.short_name }}{% if e.can_install and not e.can_read %} (Monteur){% endif %}</option>{% endfor %}
+    </select></div>
+  <div class="cal-legend">
+    {% for e in employees %}<span class="cal-pill"><span class="dot" style="background:{{ e.calendar_color }}"></span>{{ e.short_name }}</span>{% endfor %}
+  </div>
+  <div class="legend">
+    <span>⏳ vorläufig</span><span>⟳ neu rechnen</span><span class="t-crit">⚠ Montage-Konflikt</span><span>🏖 abwesend</span>
+  </div>
+</div>
+
+<div class="cal-layout">
+  <div class="card-lite cal-card">
+    {# Settings for static/js/calendar.js come from these data attributes. #}
+    <div id="calendar"
+         data-feed-url="{% url 'planning:calendar_feed' %}"
+         data-editable="{% if editable %}1{% else %}0{% endif %}"
+         data-initial-date="{{ initial_date }}"
+         data-csrf="{{ csrf_token }}"></div>
+  </div>
+  {# Side panel: filled by clicking a tour #}
+  <aside id="cal-side" class="cal-side"></aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales/de.global.min.js"></script>
+<script src="{% static 'js/calendar.js' %}"></script>
+{% endblock %}

@@ -2,6 +2,7 @@
 {% load core_tags %}
 {% with plan=preview.day_plan %}
 
+{% if draft.moved_from %}<div class="pr-status warn">↷ Verschiebung: bisher <b>{{ draft.moved_from }}</b> → neu <b>{{ preview.employee }} am {{ preview.date|date:"d.m.Y" }}</b>. Der alte Termin bleibt bestehen, bis du übernimmst.</div>{% endif %}
 {% if preview.error %}<div class="pr-status fehler">⛔ {{ preview.error }} – für die übrigen Strecken wurde geschätzt.</div>
 {% elif not preview.has_tomtom %}<div class="pr-status warn">⚠ Kein TomTom-Schlüssel hinterlegt: alle Fahrzeiten sind <b>geschätzt</b> (Luftlinie). Der Plan kann nur <b>vorläufig</b> gespeichert werden.</div>
 {% elif preview.all_from_tomtom %}<div class="pr-status ok">✓ Alle Fahrzeiten von TomTom. Bitte prüfen und dann übernehmen.</div>

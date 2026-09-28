@@ -80,6 +80,17 @@ called from `planning/tomtom.py` with `TOMTOM_API_KEY` from `.env`; every
 address is geocoded once and stored. Without a key the preview uses
 estimates (postcode centres from the prototype).
 
+## Calendar
+
+`/planung/kalender/`: FullCalendar (CDN) with month, week and list view,
+one event per tour in the person's colour (⏳ vorläufig, ⟳ neu rechnen,
+⚠ Montage-Konflikt), absences as background. Click = side panel with the
+stops ("Neu rechnen", "Verschieben" to another day/person, "Löschen").
+Drag & drop to another day creates a draft for the new day; the preview
+recalculates it (TomTom with the new day's traffic) and only "übernehmen"
+moves the tour. Readers only see their own tours and cannot move them.
+The only JavaScript is `static/js/calendar.js` (commented).
+
 ## Project layout
 
 | Folder | Contents |

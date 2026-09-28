@@ -9,7 +9,8 @@
   </span>
   <span class="spacer"></span>
   {% if perms.planning.add_tour %}{% include "planning/_plan_bar.html" %}{% endif %}
-  {# Kalender and Excel: follow in the next steps #}
+  {% if perms.planning.view_tour %}<a class="btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>{% endif %}
+  {# Excel export: follows in a later step #}
   <span id="loading" class="htmx-indicator">wird geladen …</span>
 </header>
 

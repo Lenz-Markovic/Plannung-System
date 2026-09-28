@@ -1,0 +1,47 @@
+{# Side panel of one tour in the calendar (cal-side in the prototype). #}
+<div class="card-lite">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {{ tour.employee }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
+      <div class="na small">{{ tour.start_time|time:"H:i" }}–{{ tour.end_time|time:"H:i"|default:"?" }} · {{ stops|length }} Stopps ·
+        Netto {{ tour.net_minutes }} min{% if tour.break_minutes %} · Pause {{ tour.break_minutes }} min{% endif %}</div>
+    </div>
+    <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen">✕</button>
+  </div>
+
+  <div class="mt-2">
+    <span class="st {% if tour.status == 'confirmed' %}released{% elif tour.status == 'provisional' %}open{% else %}released{% endif %}">{{ tour.get_status_display }}</span>
+    <span class="tag">{{ tour.get_routing_source_display }}</span>
+  </div>
+  {% if tour.needs_recalculation %}<div class="pr-status warn mt-2">⟳ {{ tour.change_reason|default:"Plan wurde geändert – bitte neu mit TomTom rechnen" }}</div>{% endif %}
+
+  <table class="fp-tab mt-2">
+    {% for s in stops %}
+      <tr>
+        <td class="z">{{ s.start_time|time:"H:i"|default:"–" }}</td>
+        <td>{% if s.kind == "installation" %}🔧 {% endif %}
+          {% if s.building %}<b>{{ s.building.street }}</b> <span class="o">{{ s.building.city }}</span>
+          {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
+          <div class="g">{% if s.building %}AZ {{ s.building.file_number }}{% endif %}{% if s.installation_order %} · {{ s.installation_order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.done_at %} · ✓ erledigt{% endif %}</div></td>
+        <td class="f">{% if not forloop.last and s.drive_to_next_minutes %}↓ {{ s.drive_to_next_minutes }} min{% endif %}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  {% if perms.planning.change_tour %}
+  <div class="side-actions">
+    <button class="btn primary" hx-post="{% url 'planning:tour_recalculate' tour.pk %}">↻ Neu rechnen / bearbeiten</button>
+    {# Move to another day or person: same as drag & drop, but also allows another person #}
+    <form class="side-move" hx-post="{% url 'planning:tour_move' tour.pk %}" hx-swap="none">
+      <input type="hidden" name="version" value="{{ tour.version }}">
+      <label>Tag <input type="date" name="date" value="{{ tour.date|date:'Y-m-d' }}" required></label>
+      <label>Person <select name="employee">{% for e in employees %}<option value="{{ e.pk }}" {% if e.pk == tour.employee_id %}selected{% endif %}>{{ e.short_name }}</option>{% endfor %}</select></label>
+      <button class="btn">Verschieben …</button>
+    </form>
+    {% if perms.planning.delete_tour %}
+      <button class="btn prio-leise" hx-post="{% url 'planning:tour_delete' tour.pk %}" hx-swap="none"
+              hx-confirm="Fahrplan {{ tour.employee }} am {{ tour.date|date:'d.m.Y' }} wirklich löschen? Die Liegenschaften sind danach wieder ungeplant.">🗑 Löschen</button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

@@ -1,3 +1,3 @@
 {# Short confirmation in the corner ("out of band" swap into #toast in base.html). #}
 {# The CSS animation fades it out after a few seconds - no JavaScript needed.     #}
-<div id="toast" hx-swap-oob="true"><div class="toast-msg">✓ {{ message }}</div></div>
+<div id="toast" hx-swap-oob="true"><div class="toast-msg {% if error %}error{% endif %}">{% if error %}⛔{% else %}✓{% endif %} {{ message }}</div></div>

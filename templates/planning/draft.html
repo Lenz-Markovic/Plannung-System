@@ -5,6 +5,7 @@
   <h1>Fahrplan prüfen</h1>
   <span class="sub"><b>{{ preview.employee }}</b> am {{ preview.date|date:"l, d.m.Y" }} · Beginn {{ preview.start|time:"H:i" }}</span>
   <span class="spacer"></span>
+  <a class="btn" href="{% url 'planning:calendar' %}?datum={{ preview.date|date:'Y-m-d' }}">📅 Kalender</a>
   <a class="btn" href="{% url 'buildings:list' %}">← zurück zur Liste</a>
 </header>
 <div id="preview">

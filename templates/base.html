@@ -24,7 +24,10 @@
     {% if perms.documents.view_costdocumentreceipt %}
       <a class="tab {% if request.resolver_match.app_name == 'documents' %}on{% endif %}" href="{% url 'documents:list' %}">📄 Unterlagen <span id="ul-badge"></span></a>
     {% endif %}
-    {# Montageaufträge, Kalender, Tagesplan: follow in the next steps #}
+    {% if perms.planning.view_tour or perms.planning.view_own_tours %}
+      <a class="tab {% if request.resolver_match.url_name == 'calendar' %}on{% endif %}" href="{% url 'planning:calendar' %}">📅 Kalender</a>
+    {% endif %}
+    {# Montageaufträge and the mobile day plan follow in the next steps #}
     {% if user.is_staff %}<a class="tab" href="{% url 'admin:index' %}">⚙ Verwaltung</a>{% endif %}
     {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
       {# 14-day warning: checked on load, every 30 s and right after changes (documents/views.py). #}
