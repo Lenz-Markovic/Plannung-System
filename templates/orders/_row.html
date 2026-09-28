@@ -1,0 +1,72 @@
+{# One installation order (columns as in orderRowHtml() of the Montage prototype, without prices). #}
+{% with stop=o.planned.0 open_conflicts=o.all_conflicts %}
+<tr id="orow-{{ o.pk }}" class="{% if o.pk in selection %}gewaehlt{% endif %} {% if o.status == 'done' %}erledigt{% endif %}">
+  <td class="selcol">
+    {% if perms.planning.add_tour and o.status != "done" %}
+      <input type="checkbox" name="checked" aria-label="Für Montageplanung auswählen" {% if o.pk in selection %}checked{% endif %}
+             hx-post="{% url 'orders:select' %}" hx-vals='{"order": {{ o.pk }}}' hx-target="#order-plan-bar" hx-swap="outerHTML"
+             onchange="this.closest('tr').classList.toggle('gewaehlt', this.checked)">
+    {% endif %}
+  </td>
+  <td class="mono">{% if o.building %}<a href="{% url 'buildings:list' %}?q={{ o.building.file_number }}" title="Liegenschaft zeigen">{{ o.building_file_number|default:o.building.file_number }}</a>{% else %}{{ o.building_file_number|default:"–" }}{% endif %}</td>
+  <td class="mono"><b>{{ o.re_number }}</b></td>
+  <td class="adr">{{ o.street }}<small>{{ o.zip_code }} {{ o.city }}{% if o.client %} · {{ o.client }}{% endif %}</small>
+    {% if o.summary %}<div class="typ-tag">{{ o.summary }}</div>{% endif %}</td>
+  <td>{{ o.order_date|date:"d.m.Y"|default:"–" }}</td>
+  <td>
+    {% if stop %}
+      <a class="termin" href="{% url 'planning:calendar' %}?datum={{ stop.tour.date|date:'Y-m-d' }}" title="Im Kalender zeigen">
+        {{ stop.tour.date|date:"D d.m.Y" }}{% if stop.start_time %} · {{ stop.start_time|time:"H:i" }}{% endif %}</a>
+      <small class="d-block na">{% for s in o.planned %}{{ s.tour.employee }}{% if not forloop.last %}, {% endif %}{% endfor %}{% if stop.tour.status == "provisional" %} · vorläufig{% endif %}</small>
+    {% elif o.status == "done" %}<span class="na">–</span>
+    {% else %}<span class="t-warn">noch kein Termin</span>{% endif %}
+  </td>
+  <td>{{ o.building.stichtag|date:"d.m."|default:o.raw_data.stichtag|default:"–" }}</td>
+  <td class="num">
+    {% if perms.buildings.change_installationorder %}
+      <input class="zeit-in {% if o.duration_minutes_manual %}manuell{% endif %}" type="number" name="duration" min="1" max="2000" value="{{ o.duration_minutes }}"
+             title="{% if o.duration_minutes_manual %}manuell – berechnet wären {{ o.duration_minutes_calculated }} min{% else %}berechnet aus den Positionen{% endif %}"
+             hx-post="{% url 'orders:update' o.pk %}" hx-trigger="change" hx-target="#orow-{{ o.pk }}" hx-swap="outerHTML" aria-label="Montagezeit in Minuten">
+    {% else %}{{ o.duration_minutes }}{% endif %}<span class="zeit-e">min</span>
+  </td>
+  <td>
+    {% if perms.buildings.change_installationorder %}
+      {# Up to 3 installers: tick and "übernehmen" #}
+      <details class="mon-pick">
+        <summary>{% for e in o.assigned_installers.all %}<span class="chip">{{ e }}</span>{% empty %}<span class="na fst-italic">– auswählen –</span>{% endfor %}</summary>
+        <form hx-post="{% url 'orders:update' o.pk %}" hx-target="#orow-{{ o.pk }}" hx-swap="outerHTML">
+          <input type="hidden" name="installers_sent" value="1">
+          {% for e in installers %}
+            <label><input type="checkbox" name="installers" value="{{ e.pk }}" {% if e in o.assigned_installers.all %}checked{% endif %}> {{ e }}</label>
+          {% endfor %}
+          <div class="na small">höchstens {{ max_installers }}</div>
+          <button class="btn mini primary">übernehmen</button>
+        </form>
+      </details>
+    {% else %}{% for e in o.assigned_installers.all %}<span class="chip">{{ e }}</span>{% empty %}<span class="na">–</span>{% endfor %}{% endif %}
+  </td>
+  <td>
+    {% if perms.buildings.change_installationorder %}
+      <select name="priority" class="prio-sel" hx-post="{% url 'orders:update' o.pk %}" hx-trigger="change" hx-target="#orow-{{ o.pk }}" hx-swap="outerHTML" aria-label="Priorität">
+        <option value="">—</option>
+        {% for value, label in priorities %}<option value="{{ value }}" {% if value == o.priority %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    {% else %}{{ o.get_priority_display|default:"—" }}{% endif %}
+  </td>
+  <td>
+    {% if perms.buildings.change_installationorder %}
+      <select name="status" class="ost {{ o.status }}" hx-post="{% url 'orders:update' o.pk %}" hx-trigger="change" hx-target="#orow-{{ o.pk }}" hx-swap="outerHTML" aria-label="Status">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if value == o.status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    {% else %}<span class="ost {{ o.status }}">{{ o.get_status_display }}</span>{% endif %}
+  </td>
+  <td>
+    {% for c in open_conflicts %}{% if forloop.first %}
+      <span class="cf-sev {{ c.severity }}{% if c.acknowledged_at %} quittiert{% endif %}" title="{% for x in open_conflicts %}• {{ x.message }}{% if x.acknowledged_at %} (bewusst übernommen){% endif %}&#10;{% endfor %}">
+        {% if c.severity == "critical" %}Konflikt{% elif c.severity == "warning" %}prüfen{% else %}Hinweis{% endif %}{% if open_conflicts|length > 1 %} +{{ open_conflicts|length|add:"-1" }}{% endif %}</span>
+    {% endif %}{% empty %}<span class="na">–</span>{% endfor %}
+  </td>
+  <td><button class="btn mini" hx-get="{% url 'orders:row' o.pk %}?open={% if open %}0{% else %}1{% endif %}" hx-target="#orow-{{ o.pk }}" hx-swap="outerHTML"
+              aria-label="Details">{% if open %}▾{% else %}▸{% endif %}</button></td>
+</tr>
+{% endwith %}

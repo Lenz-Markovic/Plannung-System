@@ -23,8 +23,10 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
-from buildings.models import Building, InstallationOrder
-from conflicts.rules import OtherPlan, PlannedBuilding, planning_findings
+from buildings.models import Building, InstallationOrder, OrderStatus
+from conflicts.rules import Finding, OtherPlan, PlannedBuilding, planning_findings
+from conflicts.services import installation_findings
+from conflicts.services import refresh_for as refresh_conflicts_for
 from documents.services import refresh_deadline
 
 from . import geocoding
@@ -36,6 +38,7 @@ from .tomtom import TomTomError, get_client, local_datetime
 
 SELECTION_KEY = "plan_selection"
 DRAFT_KEY = "plan_draft"
+ORDER_SELECTION_KEY = "order_selection"
 
 
 class ConcurrentChange(Exception):
@@ -62,6 +65,31 @@ def clear_selection(session):
     session[SELECTION_KEY] = []
 
 
+# The same for installation orders (checkboxes in the Montageaufträge list)
+
+def get_order_selection(session):
+    return list(session.get(ORDER_SELECTION_KEY, []))
+
+
+def toggle_order_selection(session, order_id, selected):
+    ids = [i for i in get_order_selection(session) if i != order_id]
+    if selected:
+        ids.append(order_id)
+    session[ORDER_SELECTION_KEY] = ids
+    return ids
+
+
+def clear_order_selection(session):
+    session[ORDER_SELECTION_KEY] = []
+
+
+def order_bar_context(session):
+    """Numbers for the "Montage planen (n)" button."""
+    ids = get_order_selection(session)
+    minutes = sum(o.duration_minutes for o in InstallationOrder.objects.filter(pk__in=ids))
+    return {"selected_count": len(ids), "selected_minutes": minutes}
+
+
 def plan_bar_context(session):
     """Numbers for the "Fahrplan erstellen (n)" button in the list header."""
     ids = get_selection(session)
@@ -77,8 +105,11 @@ def _stop_key(stop):
     return (stop["kind"], stop.get("building"), stop.get("order"))
 
 
-def create_draft(building_ids, employee, date, start, break_minutes, strategy):
-    """New draft for one person and day. Existing stops of that day stay in it."""
+def create_draft(building_ids, employee, date, start, break_minutes, strategy, order_ids=()):
+    """New draft for one person and day. Existing stops of that day stay in it.
+
+    building_ids become readings, order_ids installations (Montage).
+    """
     tour = Tour.objects.filter(employee=employee, date=date).first()
     stops = []
     if tour:
@@ -91,6 +122,11 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy):
     existing = {_stop_key(s) for s in stops}
     for building_id in building_ids:
         new = {"kind": StopKind.READING, "building": building_id}
+        if _stop_key(new) not in existing:
+            stops.append(new)
+            existing.add(_stop_key(new))
+    for order in InstallationOrder.objects.filter(pk__in=order_ids).order_by("re_number"):
+        new = {"kind": StopKind.INSTALLATION, "order": order.pk, "building": order.building_id}
         if _stop_key(new) not in existing:
             stops.append(new)
             existing.add(_stop_key(new))
@@ -369,6 +405,14 @@ def _add_findings(preview, draft):
     for stop in reading:
         stop.findings = findings[stop.index]
 
+    # Installation stops: all section-8 rules as if the order were done on this day
+    installing = [s for s in preview.stops if s.kind == StopKind.INSTALLATION]
+    what_if = installation_findings([s.order.pk for s in installing], preview.date, preview.employee.short_name)
+    for stop in installing:
+        stop.findings = [Finding(severity, text) for severity, text in what_if.get(stop.order.pk, [])]
+        if absent:
+            stop.findings.append(Finding("critical", "Mitarbeiter ist an diesem Tag abwesend"))
+
 
 def _add_commute(preview, client):
     """Drive from home to the first stop: shown, but not working time."""
@@ -435,6 +479,13 @@ def save_draft(draft, user, confirm):
             stop.building.save()
         if stop.building:
             refresh_deadline(stop.building)  # new appointment -> new 14-day deadline
+    # A planned order is "Verplant" now (the office can still change the status by hand)
+    for order in InstallationOrder.objects.filter(pk__in=[s.order.pk for s in preview.stops if s.order],
+                                                  status__in=[OrderStatus.OPEN, OrderStatus.WORK_CARD]):
+        order.status = OrderStatus.PLANNED
+        order.save()  # save() (not update) so the change history records it
+    # new dates -> check reading vs. installation again (conflicts/services.py)
+    refresh_conflicts_for([s.building.pk for s in preview.stops if s.building], [s.order.pk for s in preview.stops if s.order])
     return tour
 
 
@@ -481,7 +532,14 @@ def _move_buildings_out_of_other_tours(preview, draft):
 
 def delete_tour(tour):
     """Delete a tour; its buildings become 'unplanned' again (kept in the history)."""
-    buildings = [stop.building for stop in tour.stops.all() if stop.building]
+    stops = list(tour.stops.all())
+    buildings = [stop.building for stop in stops if stop.building]
+    order_ids = [stop.installation_order_id for stop in stops if stop.installation_order_id]
     tour.delete()
     for building in buildings:
         refresh_deadline(building)
+    # orders without any appointment left are open again
+    for order in InstallationOrder.objects.filter(pk__in=order_ids, status=OrderStatus.PLANNED, tour_stops__isnull=True):
+        order.status = OrderStatus.OPEN
+        order.save()
+    refresh_conflicts_for([b.pk for b in buildings], order_ids)

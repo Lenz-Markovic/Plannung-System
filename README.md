@@ -135,6 +135,24 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - In the TomTom developer portal the key needs the **Map Display API** as well
   (next to Search and Routing). Without a key the simple sketch is shown instead.
 
+## Montageaufträge and conflicts
+
+- **🔧 Montage** (`/montage/`): the order list of the Montage dashboard, without prices.
+  Filters (search, priority, installer, status, appointment, conflicts, order date),
+  clickable tiles, ▸ opens positions, appointments and messages. Time, installers
+  (max. 3), priority and status save themselves.
+- Tick orders → **🔧 Montage planen** → installer, day, start → the same preview as for
+  readings. The preview checks each order against the planned readings of its building.
+  Saved orders become "Verplant", and go back to "Offen" when their plan is deleted.
+- **⚠ Konflikte** (`/konflikte/`): all messages of `bewerteMontage()` from the prototype
+  (installation after / on the reading day, less than 7 days between them, radio
+  retrofit with a manual reading type, installer = reader, gateway not marked, no
+  appointment yet). A dispatcher can accept a conflict with a reason
+  (**bewusst übernehmen**). The red number in the navigation counts the open ones.
+- The check is a pure function (`conflicts/rules.py`, verified against the prototype
+  for all 240 demo buildings). `conflicts/services.py` stores the result after every
+  planning change. After an update run `python manage.py update_conflicts` once.
+
 ## Project layout
 
 | Folder | Contents |

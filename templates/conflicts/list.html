@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Konflikte – Planungssystem{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>⚠ Konflikte Ablesung / Montage</h1>
+  <span class="sub">Montagetermine gegen die geplanten Ablesungen · wird nach jeder Planung neu geprüft</span>
+</header>
+
+{# Filter chips and search: HTMX reloads only the list below. #}
+<form class="filters" hx-get="{% url 'conflicts:list' %}" hx-target="#conflict-entries"
+      hx-trigger="change, input changed delay:300ms from:[name=q]" hx-push-url="true">
+  <div class="ul-zahlen">
+    <label class="ul-f {% if chosen == 'offen' %}an{% endif %}"><input type="radio" name="f" value="offen" {% if chosen == 'offen' %}checked{% endif %} hidden><b>{{ counts.open }}</b> offen</label>
+    <label class="ul-f red {% if chosen == 'kritisch' %}an{% endif %}"><input type="radio" name="f" value="kritisch" {% if chosen == 'kritisch' %}checked{% endif %} hidden><b>{{ counts.critical }}</b> Konflikte</label>
+    <label class="ul-f yellow {% if chosen == 'pruefen' %}an{% endif %}"><input type="radio" name="f" value="pruefen" {% if chosen == 'pruefen' %}checked{% endif %} hidden><b>{{ counts.warning }}</b> zu prüfen</label>
+    <label class="ul-f {% if chosen == 'hinweise' %}an{% endif %}"><input type="radio" name="f" value="hinweise" {% if chosen == 'hinweise' %}checked{% endif %} hidden><b>{{ counts.info }}</b> Hinweise</label>
+    <label class="ul-f green {% if chosen == 'uebernommen' %}an{% endif %}"><input type="radio" name="f" value="uebernommen" {% if chosen == 'uebernommen' %}checked{% endif %} hidden><b>{{ counts.acknowledged }}</b> bewusst übernommen</label>
+    <label class="ul-f {% if chosen == 'alle' %}an{% endif %}"><input type="radio" name="f" value="alle" {% if chosen == 'alle' %}checked{% endif %} hidden><b>{{ counts.all }}</b> alle</label>
+  </div>
+  <div class="f"><label for="cf-q">Suchen</label><input id="cf-q" type="search" name="q" value="{{ request.GET.q }}" placeholder="AZ, RE-Nr., Adresse"></div>
+</form>
+
+<div id="conflict-entries" class="cf-liste" hx-get="{% url 'conflicts:list' %}?f={{ chosen }}" hx-trigger="conflicts-changed from:body delay:1500ms" hx-target="this">
+  {% include "conflicts/_entries.html" %}
+</div>
+<p class="na small mt-3">„offen“ = Konflikte und zu Prüfendes, die noch niemand bewusst übernommen hat. Hinweise (z. B. Auftrag ohne Termin) zählen nicht mit.</p>
+{% endblock %}

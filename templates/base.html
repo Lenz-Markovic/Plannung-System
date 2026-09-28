@@ -21,11 +21,19 @@
     {% if perms.buildings.view_building %}
       <a class="tab {% if request.resolver_match.app_name == 'buildings' %}on{% endif %}" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>
     {% endif %}
+    {% if perms.buildings.view_installationorder %}
+      <a class="tab {% if request.resolver_match.app_name == 'orders' %}on{% endif %}" href="{% url 'orders:list' %}">🔧 Montage</a>
+    {% endif %}
     {% if perms.documents.view_costdocumentreceipt %}
       <a class="tab {% if request.resolver_match.app_name == 'documents' %}on{% endif %}" href="{% url 'documents:list' %}">📄 Unterlagen <span id="ul-badge"></span></a>
     {% endif %}
     {% if perms.planning.view_tour or perms.planning.view_own_tours %}
       <a class="tab {% if request.resolver_match.url_name == 'calendar' %}on{% endif %}" href="{% url 'planning:calendar' %}">📅 Kalender</a>
+    {% endif %}
+    {% if perms.conflicts.view_conflict %}
+      {# The number is loaded separately and refreshed after changes (conflicts/views.py). #}
+      <a class="tab {% if request.resolver_match.app_name == 'conflicts' %}on{% endif %}" href="{% url 'conflicts:list' %}">⚠ Konflikte
+        <span id="cf-badge" hx-get="{% url 'conflicts:badge' %}" hx-trigger="load, conflicts-changed from:body, calendar-changed from:body, every 60s"></span></a>
     {% endif %}
     {% if perms.planning.view_own_tours %}
       <a class="tab {% if request.resolver_match.url_name == 'my_day' %}on{% endif %}" href="{% url 'planning:my_day' %}">📱 Mein Tag</a>

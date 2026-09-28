@@ -1,0 +1,36 @@
+{# Detail row: positions (orderExpandHtml() of the prototype, without prices), appointments, conflicts. #}
+<tr id="odet-{{ o.pk }}" class="detail"><td colspan="13">
+  <div class="odet">
+    <div>
+      <h3 class="h6">Positionen</h3>
+      {% if o.items.all %}
+        <table class="itemtable">
+          <thead><tr><th>Art.-Nr.</th><th>Bezeichnung</th><th class="num">Menge</th><th>Kategorie</th><th class="num">min/Stück</th><th class="num">Minuten</th></tr></thead>
+          <tbody>{% for it in o.items.all %}
+            <tr><td class="mono">{{ it.article_number }}</td><td>{{ it.description }}</td><td class="num">{{ it.quantity }}</td>
+                <td>{{ it.category.label|default:"–" }}</td><td class="num">{{ it.category.minutes_per_piece|default:0 }}</td>
+                <td class="num">{% widthratio it.quantity 1 it.category.minutes_per_piece|default:0 %}</td></tr>
+          {% endfor %}</tbody>
+        </table>
+        <div class="na small">Montagezeit berechnet: {{ o.duration_minutes_calculated }} min{% if o.duration_minutes_manual %} · manuell: {{ o.duration_minutes_manual }} min{% endif %}</div>
+      {% else %}
+        <div class="na">Noch keine Positionen erfasst – die Montagezeit bitte von Hand eintragen.</div>
+      {% endif %}
+    </div>
+    <div>
+      <h3 class="h6">Termine</h3>
+      {% for s in o.planned %}
+        <div>🔧 <a href="{% url 'planning:calendar' %}?datum={{ s.tour.date|date:'Y-m-d' }}">{{ s.tour.date|date:"l, d.m.Y" }}</a>{% if s.start_time %} {{ s.start_time|time:"H:i" }}–{{ s.end_time|time:"H:i" }}{% endif %} · {{ s.tour.employee }} · {{ s.tour.get_status_display }}</div>
+      {% empty %}<div class="na">Noch kein Montagetermin. Zum Planen links ankreuzen und oben „Montage planen“.</div>{% endfor %}
+      {% if o.building %}<div class="mt-2">Liegenschaft: <a href="{% url 'buildings:list' %}?q={{ o.building.file_number }}">{{ o.building.file_number }} {{ o.building.street }}, {{ o.building.city }}</a></div>{% endif %}
+      <div class="na small mt-1">Vorgang {{ o.process_number|default:"–" }}{% if o.client %} · Auftraggeber {{ o.client }}{% endif %}</div>
+
+      <h3 class="h6 mt-3">Meldungen</h3>
+      {% for c in o.all_conflicts %}
+        <div class="odet-msg"><span class="cf-sev {{ c.severity }}">{% if c.severity == "critical" %}Konflikt{% elif c.severity == "warning" %}prüfen{% else %}Hinweis{% endif %}</span>
+          {{ c.message }}{% if c.acknowledged_at %} <span class="t-good">✓ bewusst übernommen: {{ c.acknowledged_note }}</span>{% endif %}</div>
+      {% empty %}<div class="t-good">✓ Keine Konflikte mit geplanten Ablesungen.</div>{% endfor %}
+      {% if o.all_conflicts %}<a class="small" href="{% url 'conflicts:list' %}?f=alle&q={{ o.re_number }}">→ auf der Konflikt-Seite bearbeiten</a>{% endif %}
+    </div>
+  </div>
+</td></tr>

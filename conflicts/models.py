@@ -1,7 +1,8 @@
 """
 Stored conflict results.
 
-The rules themselves are a pure function in conflicts/rules.py (later step).
+The rules themselves are pure functions in conflicts/rules.py, the
+database part is conflicts/services.py.
 This table only holds the current result, so all users see the same
 conflicts. After each plan, move or new order the open conflicts of the
 affected buildings are replaced. No history: the rows are recalculated all
@@ -23,6 +24,7 @@ class ConflictRule(models.TextChoices):
     SAME_PERSON = "same_person", "Monteur = Ableser, Termine ≤ 3 Tage auseinander"
     GATEWAY_NOT_MARKED = "gateway_not_marked", "Gateway-Montage, Liegenschaft nicht als Gateway markiert"
     ORDER_WITHOUT_DATE = "order_without_date", "Auftrag ohne Montagetermin"
+    NO_READING_DATE = "no_reading_date", "Montage geplant, aber kein Ablesetag"
     # Spec section 6 (planning)
     ALREADY_IN_OTHER_TOUR = "already_in_other_tour", "Liegenschaft steht schon in einem anderen Plan"
     ALREADY_HAS_DATE = "already_has_date", "Liegenschaft hat schon einen Termin"

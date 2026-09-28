@@ -8,6 +8,7 @@ urlpatterns = [
     path("auswahl/", views.select, name="select"),
     path("auswahl/leeren/", views.select_clear, name="select_clear"),
     path("neu/", views.plan_dialog, name="dialog"),
+    path("montage/neu/", views.montage_dialog, name="montage_dialog"),
     path("entwurf/", views.draft, name="draft"),
     path("entwurf/aktion/", views.draft_action, name="draft_action"),
     path("entwurf/speichern/", views.draft_save, name="draft_save"),

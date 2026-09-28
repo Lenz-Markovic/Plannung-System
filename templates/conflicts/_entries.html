@@ -1,0 +1,7 @@
+{# The list of conflicts (reloaded by the filters). #}
+{% for c in conflicts %}
+  {% include "conflicts/_entry.html" %}
+{% empty %}
+  <div class="cf-zeile"><span class="cf-sev ok">passt</span><span></span><span>Keine Einträge für diesen Filter{% if chosen == "offen" %} – keine offenen Konflikte zwischen Montageterminen und Ablesungen{% endif %}.</span></div>
+{% endfor %}
+{% if total > conflicts|length %}<div class="na small p-2">… {{ total|add:"-300" }} weitere – über die Suche eingrenzen</div>{% endif %}

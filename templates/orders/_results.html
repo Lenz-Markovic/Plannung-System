@@ -1,0 +1,45 @@
+{# Tiles and table (returned alone after a filter change). #}
+{% load core_tags %}
+{# The tiles work as filters: click = only these orders, click again = all #}
+<div class="kpis">
+  <div class="tile"><div class="lbl">Aufträge{% if count != all_count %} (gefiltert){% endif %}</div><div class="val">{{ summary.total }}</div></div>
+  <a class="tile t-warn {% if request.GET.status == 'work_card' %}on{% endif %}" href="?{% toggle_query request 'status' 'work_card' %}">
+    <div class="lbl">Arbeitskarte / offen</div><div class="val">{{ summary.open }}</div></a>
+  <a class="tile {% if request.GET.status == 'planned' %}on{% endif %}" href="?{% toggle_query request 'status' 'planned' %}">
+    <div class="lbl">verplant</div><div class="val">{{ summary.planned }}</div></a>
+  <a class="tile t-good {% if request.GET.status == 'done' %}on{% endif %}" href="?{% toggle_query request 'status' 'done' %}">
+    <div class="lbl"><span class="ic t-good">✓</span>erledigt</div><div class="val">{{ summary.done }}</div></a>
+  <a class="tile t-warn {% if request.GET.termin == 'ohne' %}on{% endif %}" href="?{% toggle_query request 'termin' 'ohne' %}">
+    <div class="lbl">noch ohne Termin</div><div class="val">{{ summary.without_date }}</div></a>
+  <a class="tile t-crit {% if request.GET.konflikt == 'offen' %}on{% endif %}" href="?{% toggle_query request 'konflikt' 'offen' %}">
+    <div class="lbl"><span class="ic t-crit">▲</span>mit offenem Konflikt</div><div class="val">{{ summary.conflicts }}</div></a>
+  <div class="tile"><div class="lbl">Montagezeit</div><div class="val">{{ summary.minutes|hours }}</div></div>
+</div>
+
+<div class="tablecard">
+  <div class="tbar">
+    <strong>{{ count }} von {{ all_count }} Aufträgen</strong>
+    <span class="legend">
+      <span><span class="cf-sev critical">Konflikt</span> Montage nach / am Ablesetag</span>
+      <span><span class="cf-sev warning">prüfen</span> ≤ 7 Tage Puffer</span>
+      <span><span class="cf-sev info">Hinweis</span></span>
+      <span>Zeit, Monteure, Priorität und Status speichern sich sofort</span>
+    </span>
+  </div>
+  <div class="scroll">
+    <table class="list orders">
+      <thead><tr>
+        <th class="selcol" title="Für die Planung auswählen">🔧</th>
+        <th>Liegenschaft</th><th>RE-Nr.</th><th style="min-width:200px">Adresse</th><th>Auftrag</th>
+        <th style="min-width:150px">Montagetermin</th><th>Stichtag</th><th class="num">Zeit</th>
+        <th style="min-width:130px">Monteure</th><th>Priorität</th><th>Status</th><th>Konflikt</th><th></th>
+      </tr></thead>
+      <tbody>
+        {% for o in orders %}{% include "orders/_row.html" %}{% empty %}
+          <tr><td colspan="13" class="na p-3">Keine Aufträge für diese Filter.</td></tr>
+        {% endfor %}
+        {% if count > orders|length %}<tr><td colspan="13" class="na p-2">… {{ count|add:"-300" }} weitere – bitte über die Filter eingrenzen</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>

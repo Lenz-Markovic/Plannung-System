@@ -21,14 +21,14 @@ from django.utils import timezone
 from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
-from buildings.models import Building, BuildingStatus
+from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 
 from . import dayplan, services
 from .calendar import calendar_events
 from .display import preview_map_data, route_sketch, tour_map_data
 from .excel import build_workbook
-from .forms import DraftSettingsForm, PlanForm
+from .forms import DraftSettingsForm, MontagePlanForm, PlanForm
 from .models import Employee, Tour, TourStop
 from .rules.ordering import STRATEGIES
 from .tomtom import TomTomError, current_api_key, get_client
@@ -71,6 +71,25 @@ def plan_dialog(request):
         return response
     return render(request, "planning/_plan_dialog.html", {
         "form": form, "buildings": buildings, "minutes": sum(b.reading_minutes for b in buildings),
+    })
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def montage_dialog(request):
+    """"Montage planen": the selected orders for one installer and day (same preview as readings)."""
+    ids = services.get_order_selection(request.session)
+    orders = list(InstallationOrder.objects.filter(pk__in=ids).order_by("re_number"))
+    form = MontagePlanForm(request.POST or None)
+    if request.method == "POST" and form.is_valid() and orders:
+        data = form.cleaned_data
+        request.session[services.DRAFT_KEY] = services.create_draft(
+            [], data["employee"], data["date"], data["start"], data["break_minutes"], data["strategy"],
+            order_ids=[o.pk for o in orders])
+        response = HttpResponse("")
+        response["HX-Redirect"] = reverse("planning:draft")
+        return response
+    return render(request, "planning/_montage_dialog.html", {
+        "form": form, "orders": orders, "minutes": sum(o.duration_minutes for o in orders),
     })
 
 
@@ -141,6 +160,7 @@ def draft_save(request):
         return redirect("planning:draft")
     del request.session[services.DRAFT_KEY]
     services.clear_selection(request.session)
+    services.clear_order_selection(request.session)
     state = "bestätigt" if confirm else "vorläufig gespeichert"
     count = tour.stops.count()
     messages.success(request, f"Fahrplan {tour.employee} am {tour.date:%d.%m.%Y} {state} ({count} Stopp{'s' if count != 1 else ''}).")

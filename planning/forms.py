@@ -36,3 +36,10 @@ class DraftSettingsForm(forms.Form):
 
     start = PlanForm.base_fields["start"]
     break_minutes = PlanForm.base_fields["break_minutes"]
+
+
+class MontagePlanForm(PlanForm):
+    """The same dialog for installation orders: an installer instead of a reader."""
+
+    employee = forms.ModelChoiceField(label="Monteur", queryset=Employee.objects.filter(can_install=True, active=True),
+                                      empty_label="– bitte wählen –")

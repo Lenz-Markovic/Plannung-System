@@ -1,0 +1,1452 @@
+[
+ {
+  "nr": "0798615",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098611",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "info",
+    "RE90414",
+    "Liegenschaftsnummer",
+    "RE90414: Umrüstung noch ohne Montagetermin (20× Wasserzähler) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798393",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798964",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798480",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798827",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798664",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798045",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798745",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798262",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798327",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798709",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798707",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798455",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798590",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798875",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798771",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798251",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798287",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798926",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798389",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798078",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098855",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "70098854",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "info",
+    "RE90281",
+    "Liegenschaftsnummer",
+    "RE90281: Umrüstung noch ohne Montagetermin (47× EHKV, 3× Funkmodul) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798582",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798845",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798246",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798206",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "ok",
+    "RE90298",
+    "RE-Nr.",
+    "RE90298: Montage 26.10.2026, 08:00 Uhr · Monteur Lorenz, 30 Tage vor der Ablesung 25.11.2026 — Reihenfolge passt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798101",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798113",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798245",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798543",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798497",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798683",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798158",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798012",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098447",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798978",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798967",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798580",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798882",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098642",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798207",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098316",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798135",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798219",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798916",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798591",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798277",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798367",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098808",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "krit",
+    "RE90368",
+    "Liegenschaftsnummer",
+    "RE90368: Montage 21.12.2026, 08:00 Uhr · Monteur Kaiser liegt 10 Tag(e) NACH der geplanten Ablesung 11.12.2026 (Hofmann) (1× Wärmezähler, 5× Wasserzähler) — Ablesetour verschieben oder Zwischenablesung einplanen."
+   ]
+  ]
+ },
+ {
+  "nr": "70098744",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798237",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90248",
+    "RE-Nr.",
+    "RE90248: Umrüstung noch ohne Montagetermin (20× Rauchwarnmelder) — Ablesetag ist der 2.2.2027 (Albrecht); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798861",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798844",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798019",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798284",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798585",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798302",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798519",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798357",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798618",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798297",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098051",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798380",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798599",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798368",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798939",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "ok",
+    "RE90432",
+    "RE-Nr.",
+    "RE90432: Montage 14.12.2026, 08:00 Uhr · Monteur Kaiser, 28 Tage vor der Ablesung 11.1.2027 — Reihenfolge passt."
+   ],
+   [
+    "info",
+    "RE90432",
+    "RE-Nr.",
+    "RE90432: nach der Umrüstung auf Funk ist die Ableseart „MANU“ evtl. nicht mehr nötig — Ablesetour und Zeitansatz (50min) prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798510",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798704",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098475",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798385",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798092",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798504",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098388",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798043",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798546",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798052",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798072",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90329",
+    "RE-Nr.",
+    "RE90329: Umrüstung noch ohne Montagetermin (11× Wasserzähler) — Ablesetag ist der 30.12.2026 (Becker); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "70098260",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "info",
+    "RE90279",
+    "Liegenschaftsnummer",
+    "RE90279: Umrüstung noch ohne Montagetermin (27× Wasserzähler) — Ablesetag ist der 9.2.2027 (Neumann); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798415",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798068",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798228",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798577",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098176",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "70098991",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "ok",
+    "RE90395",
+    "Liegenschaftsnummer",
+    "RE90395: Montage 9.11.2026, 08:00 Uhr · Monteur Lorenz, 11 Tage vor der Ablesung 20.11.2026 — Reihenfolge passt."
+   ],
+   [
+    "info",
+    "RE90395",
+    "Liegenschaftsnummer",
+    "RE90395: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798294",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798891",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798937",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798301",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098109",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "70098326",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798843",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798178",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798250",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098059",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "info",
+    "RE90348",
+    "Liegenschaftsnummer",
+    "RE90348: Umrüstung noch ohne Montagetermin (18× Wasserzähler) — Ablesetag ist der 29.12.2026 (Hofmann); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798332",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798239",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798962",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90422",
+    "RE-Nr.",
+    "RE90422: Umrüstung noch ohne Montagetermin (1× Wärmezähler, 6× Wasserzähler) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798088",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798614",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798573",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798181",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798670",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798074",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798334",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798435",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798972",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798716",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798464",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798373",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798509",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798792",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "krit",
+    "RE90108",
+    "RE-Nr.",
+    "RE90108: Montage 7.12.2026, 08:00 Uhr · Monteur Kaiser liegt 4 Tag(e) NACH der geplanten Ablesung 3.12.2026 (Hofmann) (17× EHKV, 4× Funkmodul, 1× Gateway) — Ablesetour verschieben oder Zwischenablesung einplanen."
+   ],
+   [
+    "info",
+    "RE90108",
+    "RE-Nr.",
+    "RE90108: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "70098022",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798793",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798121",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798402",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798747",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798144",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798885",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798126",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798100",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90458",
+    "RE-Nr.",
+    "RE90458: Umrüstung noch ohne Montagetermin (30× EHKV, 4× Funkmodul, 1× Gateway) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ],
+   [
+    "info",
+    "RE90458",
+    "RE-Nr.",
+    "RE90458: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798909",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798617",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798644",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798044",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798710",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098440",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798243",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798220",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798489",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798677",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798409",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798846",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798363",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90259",
+    "RE-Nr.",
+    "RE90259: Umrüstung noch ohne Montagetermin (9× Rauchwarnmelder) — Ablesetag ist der 7.12.2026 (Fischer); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "70098397",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798278",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798652",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798372",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798236",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798821",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798628",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798703",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798804",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098172",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798799",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098826",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "info",
+    "RE90200",
+    "Liegenschaftsnummer",
+    "RE90200: Umrüstung noch ohne Montagetermin (1× Wärmezähler, 8× Wasserzähler) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "70098823",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798650",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798166",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798425",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90453",
+    "RE-Nr.",
+    "RE90453: Umrüstung noch ohne Montagetermin (15× EHKV, 4× Funkmodul, 1× Gateway) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ],
+   [
+    "info",
+    "RE90453",
+    "RE-Nr.",
+    "RE90453: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798394",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798559",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798354",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798777",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798244",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798295",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "krit",
+    "RE90121",
+    "RE-Nr.",
+    "RE90121: Montage 15.2.2027, 08:00 Uhr · Monteur Fischer liegt 4 Tag(e) NACH der geplanten Ablesung 11.2.2027 (Fischer) (22× EHKV, 3× Funkmodul, 1× Gateway) — Ablesetour verschieben oder Zwischenablesung einplanen."
+   ],
+   [
+    "info",
+    "RE90121",
+    "RE-Nr.",
+    "RE90121: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798850",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798004",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798944",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798935",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798871",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798403",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798609",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798070",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "ok",
+    "RE90138",
+    "RE-Nr.",
+    "RE90138: Montage 19.10.2026, 08:00 Uhr · Monteur Lorenz, 28 Tage vor der Ablesung 16.11.2026 — Reihenfolge passt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798954",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798706",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798112",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098502",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798594",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798596",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798254",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798684",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798339",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "krit",
+    "RE90243",
+    "RE-Nr.",
+    "RE90243: Montage 19.2.2027, 08:00 Uhr · Monteur Lorenz liegt 8 Tag(e) NACH der geplanten Ablesung 11.2.2027 (Albrecht) (22× EHKV, 3× Funkmodul) — Ablesetour verschieben oder Zwischenablesung einplanen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798171",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098970",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "warn",
+    "RE90166",
+    "RE-Nr.",
+    "RE90166: nur 5 Tag(e) zwischen Montage 20.1.2027, 08:00 Uhr · Monteur Kaiser und Ablesung 25.1.2027 — Puffer knapp, Verschiebung würde die Tour treffen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798674",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798199",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90423",
+    "RE-Nr.",
+    "RE90423: Umrüstung noch ohne Montagetermin (1× Wärmezähler, 22× Wasserzähler) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "0798419",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798420",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798183",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798897",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798598",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798314",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90467",
+    "RE-Nr.",
+    "RE90467: Umrüstung noch ohne Montagetermin (36× EHKV, 2× Funkmodul) — Ablesetag ist der 12.1.2027 (Hofmann); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798687",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798025",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798478",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798106",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798958",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798672",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798556",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798806",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798330",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798453",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798995",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798537",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798253",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90446",
+    "RE-Nr.",
+    "RE90446: Umrüstung noch ohne Montagetermin (20× Wasserzähler) — für diese Liegenschaft ist auch kein Ablesetag hinterlegt."
+   ]
+  ]
+ },
+ {
+  "nr": "70098149",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "ok",
+    "RE90381",
+    "Liegenschaftsnummer",
+    "RE90381: Montage erledigt am 16.9.2026, 09:00 Uhr (33× EHKV, 2× Funkmodul, 1× Gateway)."
+   ],
+   [
+    "info",
+    "RE90381",
+    "Liegenschaftsnummer",
+    "RE90381: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798848",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798993",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798682",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798182",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098627",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798811",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798275",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "info",
+    "RE90483",
+    "RE-Nr.",
+    "RE90483: Umrüstung noch ohne Montagetermin (16× Wasserzähler) — Ablesetag ist der 23.12.2026 (Schäfer); sobald der Montagetermin steht, hier prüfen."
+   ]
+  ]
+ },
+ {
+  "nr": "0798931",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798870",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798375",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798422",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098862",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798345",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798820",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798583",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798499",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098701",
+  "quelle": "CEOS",
+  "msgs": [
+   [
+    "ok",
+    "RE90240",
+    "Liegenschaftsnummer",
+    "RE90240: Montage erledigt am 16.9.2026, 09:00 Uhr (65× EHKV, 3× Funkmodul)."
+   ]
+  ]
+ },
+ {
+  "nr": "0798554",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798486",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798191",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798280",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798257",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798732",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798927",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798033",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798786",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798758",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "70098495",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "70098296",
+  "quelle": "CEOS",
+  "msgs": []
+ },
+ {
+  "nr": "0798028",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798925",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798202",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798552",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798203",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798437",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798671",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798323",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798169",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "ok",
+    "RE90194",
+    "RE-Nr.",
+    "RE90194: Montage 28.10.2026, 08:00 Uhr · Monteur Brandt, 20 Tage vor der Ablesung 17.11.2026 — Reihenfolge passt."
+   ],
+   [
+    "info",
+    "RE90194",
+    "RE-Nr.",
+    "RE90194: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798031",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798208",
+  "quelle": "BFW",
+  "msgs": []
+ },
+ {
+  "nr": "0798132",
+  "quelle": "BFW",
+  "msgs": [
+   [
+    "ok",
+    "RE90445",
+    "RE-Nr.",
+    "RE90445: Montage 30.11.2026, 08:00 Uhr · Monteur Fischer, 30 Tage vor der Ablesung 30.12.2026 — Reihenfolge passt."
+   ],
+   [
+    "info",
+    "RE90445",
+    "RE-Nr.",
+    "RE90445: Gateway-Montage vorgesehen, die Liegenschaft ist hier noch nicht als Gateway-Anlage markiert."
+   ]
+  ]
+ },
+ {
+  "nr": "0798960",
+  "quelle": "BFW",
+  "msgs": []
+ }
+]

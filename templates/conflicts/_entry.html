@@ -1,0 +1,27 @@
+{# One conflict. "bewusst übernehmen" saves via HTMX and returns this entry again. #}
+{% with b=c.building o=c.installation_order %}
+<div id="cf-{{ c.pk }}" class="cf-zeile {% if c.acknowledged_at %}quittiert{% endif %}">
+  <span class="cf-sev {{ c.severity }}">{% if c.severity == "critical" %}Konflikt{% elif c.severity == "warning" %}prüfen{% else %}Hinweis{% endif %}</span>
+  <a class="cf-obj" href="{% url 'buildings:list' %}?q={{ b.file_number }}" title="In der Liegenschaftsliste zeigen">{{ b.file_number }}<small>{{ b.street }}, {{ b.city }}</small></a>
+  <div>
+    <div>{{ c.message }}</div>
+    <div class="cf-termine">
+      {% if c.other_stop %}📖 Ablesung <a href="{% url 'planning:calendar' %}?datum={{ c.other_stop.tour.date|date:'Y-m-d' }}">{{ c.other_stop.tour.date|date:"D d.m.Y" }}</a> · {{ c.other_stop.tour.employee }}{% else %}📖 kein Ablesetag{% endif %}
+      &nbsp; {% if c.stop %}🔧 Montage <a href="{% url 'planning:calendar' %}?datum={{ c.stop.tour.date|date:'Y-m-d' }}">{{ c.stop.tour.date|date:"D d.m.Y" }}</a> · {{ c.stop.tour.employee }}{% else %}🔧 {{ o.re_number }} ohne Termin{% endif %}
+    </div>
+    {% if c.acknowledged_at %}
+      <div class="cf-quittung">✓ bewusst übernommen von {{ c.acknowledged_by|default:"?" }} am {{ c.acknowledged_at|date:"d.m.Y H:i" }}: „{{ c.acknowledged_note }}“
+        {% if perms.conflicts.acknowledge_conflict %}
+          <button class="btn mini" hx-post="{% url 'conflicts:acknowledge' c.pk %}" hx-vals='{"reopen": "1"}' hx-target="#cf-{{ c.pk }}" hx-swap="outerHTML">wieder öffnen</button>
+        {% endif %}
+      </div>
+    {% elif perms.conflicts.acknowledge_conflict and c.severity != "info" %}
+      <form class="cf-form" hx-post="{% url 'conflicts:acknowledge' c.pk %}" hx-target="#cf-{{ c.pk }}" hx-swap="outerHTML">
+        <input name="note" maxlength="300" placeholder="Begründung, z. B. „mit Kunde abgesprochen“" aria-label="Begründung" {% if error %}class="is-invalid"{% endif %}>
+        <button class="btn mini">bewusst übernehmen</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endwith %}
+{% if message %}{% include "core/_toast.html" %}{% endif %}

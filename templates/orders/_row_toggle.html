@@ -1,0 +1,8 @@
+{# Answer to ▸/▾ and to every saved cell: the row, plus the detail row when opened. #}
+{% include "orders/_row.html" %}
+{% if open %}
+  {% include "orders/_detail.html" %}
+{% else %}
+  <tr id="odet-{{ o.pk }}" hx-swap-oob="delete"></tr>
+{% endif %}
+{% if message %}{% include "core/_toast.html" %}{% endif %}

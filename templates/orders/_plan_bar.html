@@ -1,0 +1,10 @@
+{# "Montage planen (n)" in the page header; replaced after every checkbox click. #}
+<span id="order-plan-bar" class="plan-bar">
+  <button class="btn primary" {% if not selected_count %}disabled{% endif %}
+          hx-get="{% url 'planning:montage_dialog' %}" hx-target="#modal"
+          title="Die ausgewählten Aufträge einem Monteur für einen Tag einplanen">🔧 Montage planen{% if selected_count %} <b>({{ selected_count }})</b>{% endif %}</button>
+  {% if selected_count %}
+    <span class="na small">{{ selected_minutes }} min Montagezeit</span>
+    <button class="btn mini" hx-post="{% url 'orders:select_clear' %}">Auswahl leeren</button>
+  {% endif %}
+</span>

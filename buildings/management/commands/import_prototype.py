@@ -18,6 +18,7 @@ from django.core.management.base import BaseCommand, CommandError
 from buildings.importers.prototype import PrototypeFormatError, import_prototype_data, read_prototypes
 from buildings.models import Building, InstallationOrder, PropertyManager
 from conflicts.models import Conflict
+from conflicts.services import refresh_conflicts
 from planning.models import Tour
 
 DEFAULT_DIR = Path(settings.BASE_DIR) / "docs" / "prototype"
@@ -56,6 +57,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING(f"{montage} nicht gefunden: ohne Auftragspositionen."))
 
         result = import_prototype_data(data)
+        conflicts = refresh_conflicts()  # reading vs. installation (conflicts/services.py)
+        result.counts["Konflikte / Hinweise Montage"] = conflicts
 
         for key, number in result.counts.items():
             self.stdout.write(f"  {key}: {number}")

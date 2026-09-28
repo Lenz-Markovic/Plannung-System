@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Montageaufträge{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🔧 Montageaufträge</h1>
+  <span class="sub">{{ all_count }} Aufträge · Termine kommen aus den Fahrplänen · keine Preise</span>
+  <span class="spacer"></span>
+  {% if perms.planning.add_tour %}{% include "orders/_plan_bar.html" %}{% endif %}
+  {% if perms.planning.view_tour %}<a class="btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>{% endif %}
+  <span id="loading" class="htmx-indicator">wird geladen …</span>
+</header>
+
+{# Every change sends the form via HTMX; only #order-results is replaced and the URL is updated. #}
+<form id="order-filter" class="filters" method="get" action="{% url 'orders:list' %}"
+      hx-get="{% url 'orders:list' %}" hx-target="#order-results" hx-indicator="#loading"
+      hx-trigger="change, input changed delay:400ms from:[name=q], submit">
+  {% for field in filter.form %}
+    <div class="f"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>
+  {% endfor %}
+  <a class="btn" href="{% url 'orders:list' %}">Filter zurücksetzen</a>
+</form>
+
+<div id="order-results" hx-get="{% url 'orders:list' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}"
+     hx-trigger="calendar-changed from:body" hx-target="this">
+  {% include "orders/_results.html" %}
+</div>
+{% endblock %}
