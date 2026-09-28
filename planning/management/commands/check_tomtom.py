@@ -20,14 +20,22 @@ from planning.tomtom import TomTomClient, TomTomError
 TEST_ADDRESS = "Mörikeweg 8, 71154 Nufringen"
 
 
-def key_line(path):
-    """The TOMTOM_API_KEY line of a file, or None."""
+def key_lines(path):
+    """All TOMTOM_API_KEY lines of a file (the LAST one counts)."""
     if not path.exists():
-        return None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip().startswith("TOMTOM_API_KEY"):
-            return line.strip()
-    return None
+        return []
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("TOMTOM_API_KEY")]
+
+
+def key_line(path):
+    """The TOMTOM_API_KEY line that counts (the last one), or None."""
+    lines = key_lines(path)
+    return lines[-1] if lines else None
+
+
+def clean(value):
+    return value.strip().strip("\"'").strip()
 
 
 def describe(value):
@@ -62,9 +70,14 @@ class Command(BaseCommand):
             self.fail("In .env steht kein TOMTOM_API_KEY.", hint)
             return
         raw = line.split("=", 1)[1].strip()
-        self.ok(f"TOMTOM_API_KEY in .env gefunden ({describe(raw.strip(chr(34) + chr(39)))})")
+        from_file = clean(raw)
+        self.ok(f"TOMTOM_API_KEY in .env gefunden ({describe(from_file)})")
         if " " in raw or raw != raw.strip("\"'"):
             self.stdout.write("    Hinweis: Leerzeichen oder Anführungszeichen um den Schlüssel sind unnötig.")
+        if len(key_lines(env_file)) > 1:
+            self.stdout.write(self.style.WARNING(
+                f"    Achtung: TOMTOM_API_KEY steht {len(key_lines(env_file))}× in .env – es gilt nur die LETZTE Zeile. "
+                "Bitte alle anderen TOMTOM_API_KEY-Zeilen löschen."))
 
         self.stdout.write("2. Einstellungen des Servers")
         key = settings.TOMTOM_API_KEY
@@ -72,8 +85,17 @@ class Command(BaseCommand):
             self.fail("Die Einstellungen haben keinen Schlüssel geladen.",
                       "Zeile in .env prüfen: genau TOMTOM_API_KEY=… am Zeilenanfang.")
             return
-        self.ok(f"Schlüssel geladen ({describe(key)})")
-        odd = sorted({repr(c) for c in key if not c.isascii() or not c.isalnum()})
+        if key != from_file:
+            # load_dotenv() never overwrites a variable that already exists in the environment.
+            self.fail(f"Der Server benutzt einen ANDEREN Schlüssel ({describe(key)}) als in .env ({describe(from_file)}).",
+                      "Eine Umgebungsvariable TOMTOM_API_KEY überdeckt die Datei .env – z. B. ein Codespaces-Secret "
+                      "(github.com → Settings → Codespaces → Secrets) oder ein früheres „export“. "
+                      "Im Terminal einmal: unset TOMTOM_API_KEY – bzw. das Secret löschen oder dort den neuen Schlüssel "
+                      "eintragen und den Codespace neu starten.")
+            return
+        self.ok(f"Schlüssel geladen ({describe(key)}) – derselbe wie in .env")
+        self.stdout.write("    Vergleiche die ersten 2 Zeichen mit dem Schlüssel auf developer.tomtom.com.")
+        odd =sorted({repr(c) for c in key if not c.isascii() or not c.isalnum()})
         if odd:
             self.fail(f"Der Schlüssel enthält ungewöhnliche Zeichen: {', '.join(odd)}",
                       "Beim Kopieren sind unsichtbare Zeichen mitgekommen. Schlüssel auf developer.tomtom.com "

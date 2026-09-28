@@ -40,5 +40,21 @@ def test_everything_ok(settings, tmp_path, monkeypatch):
 
 def test_invisible_characters_are_reported(settings, tmp_path):
     settings.TOMTOM_API_KEY = "abcd​efgh"  # zero-width space that came along when copying
-    output = run(settings, tmp_path, "TOMTOM_API_KEY=abcdefgh\n")
+    output = run(settings, tmp_path, "TOMTOM_API_KEY=abcd​efgh\n")
     assert "ungewöhnliche Zeichen" in output
+
+
+def test_environment_variable_hides_the_env_file(settings, tmp_path):
+    """E.g. an old key in a Codespaces secret: the new key in .env is ignored."""
+    settings.TOMTOM_API_KEY = "OLDoldoldold"
+    output = run(settings, tmp_path, "TOMTOM_API_KEY=NEWnewnewnew\n")
+    assert "ANDEREN Schlüssel" in output and "unset TOMTOM_API_KEY" in output
+    assert "oldold" not in output and "newnew" not in output
+
+
+def test_two_key_lines_are_reported(settings, tmp_path, monkeypatch):
+    settings.TOMTOM_API_KEY = "NEWnewnewnew"
+    monkeypatch.setattr(TomTomClient, "geocode", lambda self, a: GeocodeResult(48.6, 8.9, a, "Point Address", ""))
+    monkeypatch.setattr(TomTomClient, "route", lambda self, a, b, d: Leg(seconds=1500, meters=24000))
+    output = run(settings, tmp_path, "TOMTOM_API_KEY=OLDoldoldold\nTOMTOM_API_KEY=NEWnewnewnew\n")
+    assert "2× in .env" in output
