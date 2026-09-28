@@ -1,0 +1,8 @@
+{# TomTom map of a route (static/js/route_map.js).                                 #}
+{# The browser only loads map IMAGES from our server (planning:map_tile), which     #}
+{# fetches them from TomTom with the key. The key never appears in this page.      #}
+{# Without a key the simple sketch (_sketch.html) is shown instead.                 #}
+{% url 'planning:map_tile' 0 0 0 as tile_url %}
+{{ map_data|json_script:"map-data" }}
+<div class="route-map {{ map_class }}" data-source="map-data" data-tiles="{{ tile_url }}" role="img" aria-label="Karte der Route"></div>
+<div class="na small mt-1">grün = Start · blau = Stopps · rot = Ende{% if road_lines %} · Linie = Straßenverlauf laut TomTom{% endif %}{% if pin_hint %} · Nummer anklicken zeigt den Stopp{% endif %}</div>

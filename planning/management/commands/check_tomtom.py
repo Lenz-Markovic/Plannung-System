@@ -5,7 +5,7 @@ Check the TomTom connection step by step:
 
 1. Is there a .env file, and does it contain TOMTOM_API_KEY?
 2. Did the server settings load the key? (the key itself is never printed)
-3. Does TomTom accept the key? (one address search, one route)
+3. Does TomTom accept the key? (one address search, one route, one map image)
 """
 
 import datetime
@@ -119,4 +119,12 @@ class Command(BaseCommand):
                 hint = "Internetverbindung / Firmen-Netzwerk prüfen (api.tomtom.com muss erreichbar sein)."
             self.fail(str(error), hint)
             return
+        try:
+            client.map_tile(8, 134, 88)  # a map image around Stuttgart
+            self.ok("Kartenbilder funktionieren (Karte in Vorschau, Kalender und „Mein Tag“)")
+        except TomTomError as error:
+            # Not fatal: planning works without the map (a sketch is shown instead)
+            self.fail(f"Kartenbilder: {error}",
+                      "Auf developer.tomtom.com beim Schlüssel auch die „Map Display API“ freischalten. "
+                      "Die Planung funktioniert trotzdem, statt der Karte erscheint die Skizze.")
         self.stdout.write(self.style.SUCCESS("\nAlles in Ordnung – TomTom ist bereit."))

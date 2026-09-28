@@ -26,11 +26,12 @@ from buildings.services import propose_status
 
 from . import dayplan, services
 from .calendar import calendar_events
-from .display import route_sketch
+from .display import preview_map_data, route_sketch, tour_map_data
 from .excel import build_workbook
 from .forms import DraftSettingsForm, PlanForm
 from .models import Employee, Tour, TourStop
 from .rules.ordering import STRATEGIES
+from .tomtom import TomTomError, current_api_key, get_client
 
 PLAN_PERMISSION = "planning.add_tour"
 
@@ -81,7 +82,8 @@ def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     return render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
-                                      "strategies": STRATEGIES, "sketch": route_sketch(preview.stops)})
+                                      "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
+                                      "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
 
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
@@ -206,7 +208,7 @@ def tour_detail(request, pk):
         return HttpResponse(status=403)
     stops = TourStop.objects.filter(tour=tour).select_related("building", "installation_order").order_by("position")
     return render(request, "planning/_tour_detail.html", {
-        "tour": tour, "stops": stops,
+        "tour": tour, "stops": stops, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
         "employees": Employee.objects.filter(can_read=True, active=True),
     })
 
@@ -342,6 +344,7 @@ def my_day(request):
     return render(request, "planning/my_day.html", {
         "employee": employee, "date": date, "today": timezone.localdate(), "tour": tour,
         "stops": [_stop_context(s) for s in stops],
+        "map_data": tour_map_data(stops), "map_available": bool(stops) and bool(current_api_key()),
         "progress": dayplan.progress(stops),
         "previous_day": date - datetime.timedelta(days=1), "next_day": date + datetime.timedelta(days=1),
         "next_tour": Tour.objects.filter(employee=employee, date__gt=date).order_by("date").first(),
@@ -395,3 +398,22 @@ def my_day_check(request, pk):
         response["HX-Refresh"] = "true"
         return response
     return HttpResponse(status=204)  # nothing changed
+
+
+@login_required
+def map_tile(request, z, x, y):
+    """One map image for the TomTom maps (static/js/route_map.js).
+
+    The browser asks OUR server; we fetch the image from TomTom with the key
+    and pass it on. So the key never appears in the browser.
+    """
+    client = get_client()
+    if client is None:
+        return HttpResponse(status=404)
+    try:
+        png = client.map_tile(z, x, y)
+    except TomTomError:
+        return HttpResponse(status=404)  # the map just shows an empty square there
+    response = HttpResponse(png, content_type="image/png")
+    response["Cache-Control"] = "private, max-age=604800"  # the browser keeps it for a week
+    return response

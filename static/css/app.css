@@ -415,3 +415,16 @@ tr.gewaehlt { background: var(--good-wash); }
   .appnav { flex-wrap: wrap; padding: 6px 10px; }
   .appnav .user { display: none; }
 }
+
+/* ---- TomTom route map (static/js/route_map.js) ------------------------------ */
+.route-map { width: 100%; height: 420px; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.route-map.small { height: 260px; }
+.map-pin { width: 26px; height: 26px; border-radius: 50%; color: #fff; font: 700 12px/26px system-ui, sans-serif;
+  text-align: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: pointer; }
+.map-pin.done { opacity: .55; }
+.route-map { position: relative; }
+.map-copyright { position: absolute; right: 0; bottom: 0; z-index: 2; background: rgba(255,255,255,.8); font-size: 10.5px; padding: 1px 6px; color: #333; }
+.pr-nr[data-map-pin] { cursor: pointer; }
+.day-map { background: var(--surface); border: 1px solid var(--grid); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; }
+.day-map summary { font-weight: 600; cursor: pointer; }
+.day-map .route-map { margin-top: 8px; }

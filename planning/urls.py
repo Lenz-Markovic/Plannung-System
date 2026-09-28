@@ -20,6 +20,7 @@ urlpatterns = [
     path("fahrplan/<int:pk>/loeschen/", views.tour_delete, name="tour_delete"),
     path("fahrplan/<int:pk>/excel/", views.tour_excel, name="tour_excel"),
     path("excel/", views.tours_excel, name="tours_excel"),
+    path("karte/<int:z>/<int:x>/<int:y>.png", views.map_tile, name="map_tile"),
     path("mein-tag/", views.my_day, name="my_day"),
     path("mein-tag/pruefen/<int:pk>/", views.my_day_check, name="my_day_check"),
     path("stopp/<int:pk>/erledigt/", views.stop_done, name="stop_done"),

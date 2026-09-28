@@ -15,6 +15,8 @@
   </div>
   {% if tour.needs_recalculation %}<div class="pr-status warn mt-2">⟳ {{ tour.change_reason|default:"Plan wurde geändert – bitte neu mit TomTom rechnen" }}</div>{% endif %}
 
+  {% if map_available and map_data.pins %}<div class="mt-2">{% include "planning/_map.html" with map_class="small" %}</div>{% endif %}
+
   <table class="fp-tab mt-2">
     {% for s in stops %}
       <tr>

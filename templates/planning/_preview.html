@@ -31,7 +31,7 @@
     {% for s in preview.stops %}
       <div class="pr-stopp {% if forloop.first %}erst{% endif %} {% if forloop.last %}letzt{% endif %}">
         <div class="pr-zeile">
-          <span class="pr-nr">{{ forloop.counter }}</span>
+          <span class="pr-nr" data-map-pin="{{ forloop.counter }}" title="auf der Karte zeigen">{{ forloop.counter }}</span>
           <span class="pr-zeit">{{ s.start|time:"H:i" }}–{{ s.end|time:"H:i" }}</span>
           <span class="pr-adr">
             <b>{% if s.kind == "installation" %}🔧 {% endif %}{{ s.target.street }}</b>
@@ -62,13 +62,17 @@
     {% endfor %}
   </div>
 
-  {# Simple route sketch (the real TomTom map follows in the next step) #}
   <div class="pr-karte">
-    <svg viewBox="0 0 460 340" role="img" aria-label="Skizze der Route">
-      <rect x="0" y="0" width="460" height="340" rx="10" class="sk-bg"/>
-      {% include "planning/_sketch.html" %}
-    </svg>
-    <div class="na small mt-1">Skizze nach Koordinaten · grün = Start, blau = Stopps, rot = Ende · die TomTom-Karte folgt im nächsten Schritt</div>
+    {% if map_available %}
+      {% include "planning/_map.html" with road_lines=preview.all_from_tomtom pin_hint=True %}
+    {% else %}
+      {# No TomTom key: simple sketch from the coordinates #}
+      <svg viewBox="0 0 460 340" role="img" aria-label="Skizze der Route">
+        <rect x="0" y="0" width="460" height="340" rx="10" class="sk-bg"/>
+        {% include "planning/_sketch.html" %}
+      </svg>
+      <div class="na small mt-1">Skizze nach Koordinaten · grün = Start, blau = Stopps, rot = Ende · mit TomTom-Schlüssel erscheint hier die Karte</div>
+    {% endif %}
   </div>
 </div>
 

@@ -123,6 +123,18 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - Try it: `python manage.py demo_day` gives the demo reader a plan for today, then log
   in as `ableser_demo`.
 
+## TomTom map
+
+- The plan preview, the calendar side panel and "Mein Tag" (🗺 Karte des Tages) show
+  a real TomTom map: green = start, blue = stops, red = end. In the preview the line
+  follows the roads calculated by TomTom; click a stop number to show it on the map.
+- **The key stays on the server:** the browser loads the map images from our own
+  address `/planung/karte/<z>/<x>/<y>.png` (login needed). Django fetches the image
+  from TomTom with the key, keeps it for a week in the cache and passes it on.
+  The TomTom SDK in the browser only gets the placeholder `server-side`.
+- In the TomTom developer portal the key needs the **Map Display API** as well
+  (next to Search and Routing). Without a key the simple sketch is shown instead.
+
 ## Project layout
 
 | Folder | Contents |

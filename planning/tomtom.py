@@ -10,6 +10,9 @@ Used APIs (same as the prototype):
                        time -> TomTom uses historical traffic for that
                        weekday and time
 - Routing with computeBestOrder   best order of many stops
+- Map Display (raster tiles)      the map images; the browser loads them from
+                                  OUR server (planning/views.map_tile), which
+                                  adds the key here - so the key stays secret
 """
 
 import datetime
@@ -28,6 +31,8 @@ from django.utils import timezone
 BASE_URL = "https://api.tomtom.com"
 TIMEOUT_SECONDS = 15
 LEG_CACHE_SECONDS = 24 * 3600
+TILE_CACHE_SECONDS = 7 * 24 * 3600  # map images hardly change
+MAX_ZOOM = 18
 
 
 class TomTomError(Exception):
@@ -73,6 +78,29 @@ class TomTomClient:
         if not response.ok:
             raise TomTomError(f"TomTom-Fehler HTTP {response.status_code}{_error_text(response)}.")
         return response.json()
+
+    # --- map images ------------------------------------------------------------
+
+    def map_tile(self, z, x, y):
+        """One 256x256 PNG map image (standard web map tile numbering z/x/y)."""
+        if not (0 <= z <= MAX_ZOOM and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
+            raise TomTomError("Kachel außerhalb der Karte.")
+        cache_key = f"tt-tile-{z}-{x}-{y}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+        try:
+            response = self.session.get(
+                f"{BASE_URL}/map/1/tile/basic/main/{z}/{x}/{y}.png",
+                params={"key": self.api_key, "tileSize": 256, "language": "de-DE"}, timeout=TIMEOUT_SECONDS)
+        except requests.RequestException:
+            raise TomTomError("TomTom ist nicht erreichbar.")
+        if response.status_code in (401, 403):
+            raise TomTomError(f"TomTom lehnt den API-Schlüssel ab (HTTP {response.status_code}) – ist die Map Display API freigeschaltet?")
+        if not response.ok:
+            raise TomTomError(f"TomTom-Fehler HTTP {response.status_code}.")
+        cache.set(cache_key, response.content, TILE_CACHE_SECONDS)
+        return response.content
 
     # --- geocoding ------------------------------------------------------------
 

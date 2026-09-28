@@ -34,6 +34,10 @@
     {% include "planning/_day_progress.html" %}
     {% if tour.status == "provisional" %}<div class="pr-status warn">⏳ Dieser Fahrplan ist noch vorläufig – Zeiten können sich ändern.</div>{% endif %}
 
+    {% if map_available %}
+      {# Closed by default, so the phone does not load map images you do not need #}
+      <details class="day-map"><summary>🗺 Karte des Tages</summary>{% include "planning/_map.html" with map_class="small" %}</details>
+    {% endif %}
     <div class="day-stops">
       {% for item in stops %}
         {% include "planning/_day_stop.html" with s=item.s address=item.address navigation_url=item.navigation_url status_choices=item.status_choices %}
@@ -44,4 +48,5 @@
     <p class="na small mt-3">Tipp: Auf die Adresse tippen startet die Navigation. Telefonnummern in den Hinweisen sind anklickbar.</p>
   {% endif %}
 </div>
+{% if map_available %}{% include "planning/_map_scripts.html" %}{% endif %}
 {% endblock %}
