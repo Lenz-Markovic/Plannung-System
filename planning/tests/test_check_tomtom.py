@@ -23,11 +23,18 @@ def test_empty_key(settings, tmp_path):
     assert "kein TOMTOM_API_KEY" in run(settings, tmp_path, "TOMTOM_API_KEY=\n")
 
 
-def test_key_in_file_but_not_loaded_needs_restart(settings, tmp_path):
+def test_key_in_env_is_used_even_if_settings_have_none(settings, tmp_path, monkeypatch):
+    """The key is read fresh from .env - an empty setting (no restart) does not matter."""
     settings.TOMTOM_API_KEY = ""
+    fake_tomtom(monkeypatch)
     output = run(settings, tmp_path, "TOMTOM_API_KEY=abcdefgh\n")
-    assert "gefunden" in output and "keinen Schlüssel geladen" in output
+    assert "Alles in Ordnung" in output
     assert "abcdefgh" not in output  # the key itself is never printed
+
+
+def fake_tomtom(monkeypatch):
+    monkeypatch.setattr(TomTomClient, "geocode", lambda self, a: GeocodeResult(48.6, 8.9, a, "Point Address", ""))
+    monkeypatch.setattr(TomTomClient, "route", lambda self, a, b, d: Leg(seconds=1500, meters=24000))
 
 
 def test_everything_ok(settings, tmp_path, monkeypatch):
@@ -44,11 +51,14 @@ def test_invisible_characters_are_reported(settings, tmp_path):
     assert "ungewöhnliche Zeichen" in output
 
 
-def test_environment_variable_hides_the_env_file(settings, tmp_path):
-    """E.g. an old key in a Codespaces secret: the new key in .env is ignored."""
+def test_env_file_wins_over_an_old_environment_variable(settings, tmp_path, monkeypatch):
+    """E.g. an old key in a Codespaces secret: the new key in .env is used anyway."""
     settings.TOMTOM_API_KEY = "OLDoldoldold"
+    used = []
+    monkeypatch.setattr(TomTomClient, "geocode", lambda self, a: used.append(self.api_key) or GeocodeResult(48.6, 8.9, a, "Point Address", ""))
+    monkeypatch.setattr(TomTomClient, "route", lambda self, a, b, d: Leg(seconds=1500, meters=24000))
     output = run(settings, tmp_path, "TOMTOM_API_KEY=NEWnewnewnew\n")
-    assert "ANDEREN Schlüssel" in output and "unset TOMTOM_API_KEY" in output
+    assert used == ["NEWnewnewnew"] and "Alles in Ordnung" in output
     assert "oldold" not in output and "newnew" not in output
 
 

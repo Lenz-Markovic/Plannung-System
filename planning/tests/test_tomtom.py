@@ -95,3 +95,17 @@ def test_tomtom_error_text_is_passed_on():
     client = TomTomClient("KEY", FakeSession({"calculateRoute": answer}))
     with pytest.raises(TomTomError, match="HTTP 400: departAt must be in the future"):
         client.route((48.6, 8.9), (48.7, 9.0), datetime.datetime(2030, 1, 1, tzinfo=datetime.timezone.utc))
+
+
+def test_key_is_read_fresh_from_env_file(settings, tmp_path):
+    """A new key in .env works without restarting the server."""
+    from planning.tomtom import current_api_key, get_client
+
+    settings.BASE_DIR = tmp_path
+    settings.TOMTOM_API_KEY = ""
+    assert get_client() is None
+    (tmp_path / ".env").write_text('TOMTOM_API_KEY="NEWKEY"\n', encoding="utf-8")
+    assert current_api_key() == "NEWKEY" and get_client().api_key == "NEWKEY"
+    (tmp_path / ".env").write_text("TOMTOM_API_KEY=\n", encoding="utf-8")
+    settings.TOMTOM_API_KEY = "FROM-ENVIRONMENT"  # real server without key in .env
+    assert current_api_key() == "FROM-ENVIRONMENT"

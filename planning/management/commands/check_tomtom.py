@@ -15,7 +15,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from planning.tomtom import TomTomClient, TomTomError
+from planning.tomtom import TomTomClient, TomTomError, current_api_key
 
 TEST_ADDRESS = "Mörikeweg 8, 71154 Nufringen"
 
@@ -80,18 +80,14 @@ class Command(BaseCommand):
                 "Bitte alle anderen TOMTOM_API_KEY-Zeilen löschen."))
 
         self.stdout.write("2. Einstellungen des Servers")
-        key = settings.TOMTOM_API_KEY
+        key = current_api_key()  # the same function the planning uses
         if not key:
             self.fail("Die Einstellungen haben keinen Schlüssel geladen.",
                       "Zeile in .env prüfen: genau TOMTOM_API_KEY=… am Zeilenanfang.")
             return
         if key != from_file:
-            # load_dotenv() never overwrites a variable that already exists in the environment.
-            self.fail(f"Der Server benutzt einen ANDEREN Schlüssel ({describe(key)}) als in .env ({describe(from_file)}).",
-                      "Eine Umgebungsvariable TOMTOM_API_KEY überdeckt die Datei .env – z. B. ein Codespaces-Secret "
-                      "(github.com → Settings → Codespaces → Secrets) oder ein früheres „export“. "
-                      "Im Terminal einmal: unset TOMTOM_API_KEY – bzw. das Secret löschen oder dort den neuen Schlüssel "
-                      "eintragen und den Codespace neu starten.")
+            self.fail(f"Das Programm benutzt einen ANDEREN Schlüssel ({describe(key)}) als in .env ({describe(from_file)}).",
+                      "Bitte die Zeile TOMTOM_API_KEY in .env prüfen (nur eine Zeile, ohne Leerzeichen).")
             return
         self.ok(f"Schlüssel geladen ({describe(key)}) – derselbe wie in .env")
         self.stdout.write("    Vergleiche die ersten 2 Zeichen mit dem Schlüssel auf developer.tomtom.com.")
@@ -104,8 +100,7 @@ class Command(BaseCommand):
         if len(key) != 32:
             self.stdout.write(f"    Hinweis: TomTom-Schlüssel sind normalerweise 32 Zeichen lang, dieser hat {len(key)}. "
                               "Vielleicht nicht vollständig kopiert?")
-        self.stdout.write("    Wichtig: Nach jeder Änderung an .env den Server neu starten "
-                          "(Strg + C, dann python manage.py runserver).")
+        self.stdout.write("    Das Programm liest .env bei jeder Planung neu – kein Neustart nötig.")
 
         self.stdout.write("3. Verbindung zu TomTom")
         client = TomTomClient(key)

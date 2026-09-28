@@ -16,9 +16,11 @@ import datetime
 import hashlib
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import quote
 
 import requests
+from dotenv import dotenv_values
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
@@ -167,9 +169,26 @@ def traffic_warnings(sections):
     return warnings
 
 
+def current_api_key():
+    """The TomTom key: read FRESH from .env on every call, else from the settings.
+
+    Reading the file every time means a new key in .env works at once -
+    no server restart needed - and an empty or old TOMTOM_API_KEY variable
+    in the environment cannot hide the key in .env. On a real server
+    without a .env file, the environment variable (settings) is used.
+    """
+    env_file = Path(settings.BASE_DIR) / ".env"
+    if env_file.exists():
+        value = (dotenv_values(env_file).get("TOMTOM_API_KEY") or "").strip().strip("\"'").strip()
+        if value:
+            return value
+    return settings.TOMTOM_API_KEY
+
+
 def get_client():
     """A client if a key is configured, otherwise None (then only estimates are possible)."""
-    return TomTomClient(settings.TOMTOM_API_KEY) if settings.TOMTOM_API_KEY else None
+    key = current_api_key()
+    return TomTomClient(key) if key else None
 
 
 def local_datetime(date, clock_time):
