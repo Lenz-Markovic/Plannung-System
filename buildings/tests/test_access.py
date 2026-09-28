@@ -43,3 +43,19 @@ def test_text_for_plan_and_print():
     access = detect_access("MANU - Betreten der Wohnung", "Zugang zu HR über NE003.")
     assert access.text() == ("🔑 Zugang zur Wohnung notwendig (NE003): Ableseart: Wohnungen betreten, "
                              "Zugang nur über eine Wohnung · 🚪 Zugang Heizraum/Keller")
+
+
+@pytest.mark.django_db
+def test_update_access_command_keeps_other_fields():
+    import datetime
+    import io
+
+    from django.core.management import call_command
+
+    from buildings.models import Building
+
+    building = Building.objects.create(source_system="bfw_main", file_number="1", stichtag=datetime.date(2026, 12, 31),
+                                       status="rework", reading_type="MANU - Betreten der Wohnung", remark="NE004: HKV prüfen.")
+    call_command("update_access", stdout=io.StringIO())
+    building.refresh_from_db()
+    assert building.access_apartment and building.access_units == ["NE004"] and building.status == "rework"
