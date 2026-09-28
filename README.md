@@ -93,6 +93,19 @@ recalculates it (TomTom with the new day's traffic) and only "übernehmen"
 moves the tour. Readers only see their own tours and cannot move them.
 The only JavaScript is `static/js/calendar.js` (commented).
 
+## Access detection and Excel export
+
+- `buildings/rules/access.py` (port of `zugangErkennen`, same result as the
+  prototype for all 240 demo buildings): 🔑 apartment access / 🚪 boiler room,
+  unit numbers (NE003), key and announcement hints. Shown in the list,
+  the plan preview, the calendar and the Excel file; recalculated when a
+  note changes.
+- `planning/excel.py`: Excel in the prototype's layout (same widths, fonts,
+  colours, borders, row heights, page setup): overview "Fahrpläne", one
+  sheet per person, one A4 print sheet per tour. Downloaded automatically
+  after saving a plan; also "📄 Excel" in the calendar side panel and
+  "📄 Alle Fahrpläne (Excel)" in the calendar.
+
 ## Project layout
 
 | Folder | Contents |

@@ -36,6 +36,7 @@ from buildings.models import (
     SourceSystem,
 )
 from buildings.rules.file_numbers import extract_re_numbers, normalize_file_number
+from buildings.services import apply_access
 from buildings.rules.installation_time import DEFAULT_CATEGORIES, classify_article, installation_minutes
 from buildings.rules.installation_type import guess_installation_type
 from buildings.rules.reading_time import planned_reading_minutes
@@ -329,6 +330,7 @@ def _import_buildings(data, employees, result):
         }
         for name, value in values.items():
             setattr(building, name, value)
+        apply_access(building)
         _save(building)
         buildings[row["nr"]] = building
         result.add("Liegenschaften")

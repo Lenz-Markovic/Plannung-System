@@ -12,7 +12,20 @@ from django.utils import timezone
 from documents.services import refresh_deadline
 
 from .models import BuildingStatus, PropertyManager
+from .rules.access import detect_access
 from .rules.status import can_change_status
+
+
+def apply_access(building):
+    """Fill the access fields from reading type and notes (not saved here)."""
+    access = detect_access(building.reading_type, building.remark, building.note, building.handwritten_note)
+    building.access_apartment = access.apartment
+    building.access_room = access.room
+    building.access_units = access.units
+    building.access_reasons = access.reasons
+    building.key_hint = access.key_hint
+    building.announcement_hint = access.announcement_hint
+    return access
 
 
 def change_status(building, new_status, user):
@@ -35,6 +48,7 @@ def set_note(building, text, user):
     if not user.has_perm("buildings.change_building"):
         raise PermissionDenied("Notizen darf deine Rolle nicht ändern.")
     building.note = text.strip()
+    apply_access(building)  # a note like "NE004 manuell ablesen" changes the access
     building.save()
     return building
 

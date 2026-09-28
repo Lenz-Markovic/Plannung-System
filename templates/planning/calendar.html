@@ -5,7 +5,16 @@
 <header class="top">
   <h1>📅 Kalender</h1>
   <span class="sub">Ablesungen und Montage je Person · Fahrplan per Ziehen auf einen anderen Tag verschieben, danach neu rechnen und bestätigen</span>
+  <span class="spacer"></span>
+  <a class="btn" href="{% url 'planning:tours_excel' %}" title="Eine Excel-Mappe mit einem Blatt je Fahrplan zum Ausdrucken">📄 Alle Fahrpläne (Excel)</a>
 </header>
+
+{% if excel_tour %}
+  {# Just saved: the browser downloads the Excel file of this tour (no JavaScript needed). #}
+  <iframe src="{% url 'planning:tour_excel' excel_tour.pk %}" hidden title="Excel-Download"></iframe>
+  <div class="pr-status ok">📄 Die Excel-Datei für <b>{{ excel_tour.employee }} am {{ excel_tour.date|date:"d.m.Y" }}</b> wird heruntergeladen.
+    Falls nicht: <a href="{% url 'planning:tour_excel' excel_tour.pk %}">hier klicken</a>.</div>
+{% endif %}
 
 <div class="filters">
   <div class="f"><label for="cal-person">Person</label>

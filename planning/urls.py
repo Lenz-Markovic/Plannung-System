@@ -18,4 +18,6 @@ urlpatterns = [
     path("fahrplan/<int:pk>/verschieben/", views.tour_move, name="tour_move"),
     path("fahrplan/<int:pk>/neu-rechnen/", views.tour_recalculate, name="tour_recalculate"),
     path("fahrplan/<int:pk>/loeschen/", views.tour_delete, name="tour_delete"),
+    path("fahrplan/<int:pk>/excel/", views.tour_excel, name="tour_excel"),
+    path("excel/", views.tours_excel, name="tours_excel"),
 ]

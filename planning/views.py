@@ -15,6 +15,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import content_disposition_header
 from django.views.decorators.http import require_POST
 
 from buildings.models import Building
@@ -22,6 +23,7 @@ from buildings.models import Building
 from . import services
 from .calendar import calendar_events
 from .display import route_sketch
+from .excel import build_workbook
 from .forms import DraftSettingsForm, PlanForm
 from .models import Employee, Tour, TourStop
 from .rules.ordering import STRATEGIES
@@ -137,7 +139,7 @@ def draft_save(request):
     count = tour.stops.count()
     messages.success(request, f"Fahrplan {tour.employee} am {tour.date:%d.%m.%Y} {state} ({count} Stopp{'s' if count != 1 else ''}).")
     # like the prototype: jump to the calendar on that day
-    return redirect(f"{reverse('planning:calendar')}?datum={tour.date.isoformat()}")
+    return redirect(f"{reverse('planning:calendar')}?datum={tour.date.isoformat()}&excel={tour.pk}")
 
 
 @require_POST
@@ -173,6 +175,8 @@ def calendar_page(request):
         "employees": employees,
         "editable": request.user.has_perm("planning.change_tour"),
         "initial_date": request.GET.get("datum", ""),
+        # after saving a plan: its Excel file is downloaded automatically
+        "excel_tour": Tour.objects.filter(pk=request.GET.get("excel") or 0).first(),
     })
 
 
@@ -255,3 +259,43 @@ def tour_delete(request, pk):
     response = render(request, "core/_toast.html", {"message": f"Fahrplan {label} gelöscht"})
     response["HX-Trigger"] = "calendar-changed"  # the calendar reloads its events
     return response
+
+
+# =============================================================================
+# Excel export (same layout as the prototype)
+# =============================================================================
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _excel_response(tours):
+    workbook, filename = build_workbook(tours)
+    response = HttpResponse(content_type=XLSX)
+    response["Content-Disposition"] = content_disposition_header(as_attachment=True, filename=filename)
+    workbook.save(response)
+    return response
+
+
+@login_required
+def tour_excel(request, pk):
+    """One tour as Excel (downloaded automatically after saving a plan)."""
+    tour = get_object_or_404(Tour.objects.select_related("employee"), pk=pk)
+    if not (request.user.has_perm("planning.view_tour") or tour.employee.user_id == request.user.pk):
+        return HttpResponse(status=403)
+    return _excel_response([tour])
+
+
+@login_required
+def tours_excel(request):
+    """ "Alle Fahrpläne (Excel)": all tours, optionally of one person and/or from a date on."""
+    tours = Tour.objects.filter(employee__in=_calendar_employees(request.user)).select_related("employee")
+    if request.GET.get("person"):
+        tours = tours.filter(employee_id=request.GET["person"])
+    if request.GET.get("ab"):
+        tours = tours.filter(date__gte=request.GET["ab"])
+    if request.GET.get("bis"):
+        tours = tours.filter(date__lte=request.GET["bis"])
+    if not tours.exists():
+        messages.info(request, "Keine Fahrpläne für diese Auswahl.")
+        return redirect("planning:calendar")
+    return _excel_response(list(tours))

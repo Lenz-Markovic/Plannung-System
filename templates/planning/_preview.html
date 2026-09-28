@@ -47,6 +47,7 @@
                     hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "remove", "index": {{ s.index }}}' hx-target="#preview">✕</button>
           </span>
         </div>
+        {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="pr-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
         {% for f in s.findings %}<div class="kf-{{ f.severity }}">{% if f.severity == "critical" %}⛔{% else %}⚠{% endif %} {{ f.message }}</div>{% endfor %}
         {% for w in s.warnings %}<div class="pr-warn">⚠ {{ w }}</div>{% endfor %}
         {% if s.point_source == "zip" %}<div class="pr-warn">⚠ Position nur ungefähr (PLZ-Mitte).</div>{% elif not s.point %}<div class="pr-warn">⚠ Adresse ohne Position – Fahrzeit grob geschätzt.</div>{% endif %}

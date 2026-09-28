@@ -173,6 +173,14 @@ class Building(TimeStampedModel, GeocodedAddress):
         """Effective reading time: a manual value beats the calculated one."""
         return self.reading_minutes_manual or self.reading_minutes_calculated
 
+    @property
+    def access(self):
+        """The stored access fields as an Access object (buildings/rules/access.py)."""
+        from .rules.access import Access
+
+        return Access(self.access_apartment, self.access_room, list(self.access_units or []),
+                      list(self.access_reasons or []), self.key_hint, self.announcement_hint)
+
 
 class DeviceCategory(models.Model):
     """Installation time per device category (editable in the admin).

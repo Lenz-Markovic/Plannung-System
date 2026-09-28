@@ -14,6 +14,7 @@
       {% if b.detail_cold_water %}<dt>KWZ zusammengesetzt</dt><dd>{{ b.detail_cold_water }}</dd>{% endif %}
       {% if b.rwm_count %}<dt>Rauchwarnmelder (Stück)</dt><dd>{{ b.rwm_count }}</dd>{% endif %}
       {% if b.handwritten_note %}<dt>Handschriftlich</dt><dd>{{ b.handwritten_note }}</dd>{% endif %}
+      {% if b.access_apartment or b.access_room %}<dt>Zugang</dt><dd>{{ b.access.text }}</dd>{% endif %}
       {% if b.remark %}<dt>Vermerke / Bemerkungen</dt><dd>{{ b.remark }}</dd>{% endif %}
       {% if b.note %}<dt>Eigene Notiz</dt><dd>{{ b.note }}</dd>{% endif %}
       <dt>Hausverwaltung</dt><dd>{{ b.property_manager.name|default:"– nicht eingetragen" }}{% if b.cover_sheet.property_manager_text and b.cover_sheet.property_manager_text != b.property_manager.name %}  (Deckblatt: {{ b.cover_sheet.property_manager_text }}){% endif %}</dd>

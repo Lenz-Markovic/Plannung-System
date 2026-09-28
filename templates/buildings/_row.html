@@ -13,6 +13,9 @@
     <div class="obj-str" title="{{ b.full_address }}">{{ b.street }}</div>
     <div class="obj-sub">{{ b.zip_code }} {{ b.city }}</div>
     <div class="obj-meta" title="{{ b.region }}">{{ b.file_number }} · {{ b.region|short_region }}</div>
+    {% if b.access_apartment or b.access_room %}{% with z=b.access %}
+      <span class="zg-badge {% if z.important %}stark{% endif %}" title="{{ z.text }}">{% if z.apartment %}🔑 Wohnung{% if z.units %} {{ z.units|join:", " }}{% endif %}{% else %}🚪 Heizraum{% endif %}</span>
+    {% endwith %}{% endif %}
   </td>
   <td>
     <div class="tec-art" title="{{ b.reading_type }}">{{ b.reading_type|reading_type_code|default:"–" }}</div>
