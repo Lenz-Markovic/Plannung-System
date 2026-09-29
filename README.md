@@ -174,19 +174,22 @@ The only JavaScript is `static/js/calendar.js` (commented).
   with day and person filled in).
 - The ⚠ in the calendar now comes from the stored conflicts: accepted ones disappear.
 
-## Working time over 7,5 h or under 6 h
+## Creating a plan: the last question "Bist du sicher?"
 
-- **A person plans:** over 7,5 h or under 6 h net is shown in the preview ("ℹ ⏱ …",
-  a short message after every change, ⏱ in the calendar). Saving asks first:
-  **"⏱ Wirklich so speichern / übernehmen?"** – with options that make sense:
-  - too long: the stop to take out (the smallest one that is enough first) with
-    **✕ herausnehmen**, and **⇄ tauschen** against an unplanned stop nearby that fits
-    into the time instead;
+- "Fahrplan prüfen" has ONE button **🗺 Fahrplan erstellen …**. It always opens the
+  question "Fahrplan wirklich so erstellen?" with a summary (person, day, stops,
+  times, net working time, TomTom, conflicts). Only there **✓ Fahrplan final erstellen**
+  (confirmed, needs TomTom times) or **vorläufig erstellen** really saves the plan; the
+  server refuses to save without this answer.
+- **Over 7,5 h / under 6 h:** the question pops up by itself as soon as the plan opens,
+  with suggestions that make sense:
+  - too long: **⇄** swap a stop against an unplanned stop nearby that fits into the
+    time (the stop whose removal is enough, smallest first), or **✕ nur herausnehmen**;
   - too short: unplanned stops nearby (readings and installations the person can do)
-    that still fit into the day, with **＋ dazu**.
-  **"Ja, trotzdem so"** saves as it is; the server refuses to save without the answer.
-- **The system chooses:** automatic choices keep to 7,5 h strictly (`fits_in_day` in
-  `planning/rules/working_time.py`): "Passt dazu", the free-day suggestions, `demo_day`.
+    that still fit, **＋ dazu**.
+- Automatic choices of the system keep to 7,5 h strictly (`fits_in_day`).
+- CSS/JS links carry `?v=<version>` (`core/context_processors.py`), so browsers load the
+  new files after an update instead of old copies from their cache.
 
 ## Teams, first free day, weekly hours
 

@@ -1,4 +1,4 @@
-"""Working time over 7,5 h or under 6 h: a question before saving, with options to fix it."""
+"""The last question "Bist du sicher?" before a plan is created - with options for a day over 7,5 h / under 6 h."""
 
 import datetime
 
@@ -50,15 +50,16 @@ def unplanned():
 def test_short_day_asks_first_and_offers_unplanned_stops_nearby(planner):
     person = start_plan(planner, unplanned()[:1])
     page = planner.get(reverse("planning:draft")).content.decode()
-    assert "nicht ausgelastet" in page and reverse("planning:time_question") in page
+    assert "nicht ausgelastet" in page and reverse("planning:plan_confirm") in page
+    assert 'hx-trigger="load"' in page  # the question pops up at once
 
     # saving without answering the question is refused
     planner.post(reverse("planning:draft_save"), {"confirm": "1"})
     assert not Tour.objects.filter(employee=person, date=DAY).exists()
 
-    question = planner.get(reverse("planning:time_question"), {"confirm": "1"}).content.decode()
-    assert "Wirklich so übernehmen?" in question and "Noch nicht geplant, in der Nähe" in question
-    assert "＋ dazu" in question and 'name="time_ok" value="1"' in question
+    question = planner.get(reverse("planning:plan_confirm")).content.decode()
+    assert "nicht ausgelastet – wirklich so?" in question and "noch nicht geplant, in der Nähe" in question
+    assert "＋ dazu" in question and 'name="sure" value="1"' in question and "Fahrplan final erstellen" in question
 
     # "＋ dazu" adds a stop from the question and closes the dialog
     preview = services.calculate_preview(planner.session[services.DRAFT_KEY])
@@ -68,7 +69,7 @@ def test_short_day_asks_first_and_offers_unplanned_stops_nearby(planner):
     assert len(planner.session[services.DRAFT_KEY]["stops"]) == 2
 
     # "Ja, trotzdem so" saves
-    planner.post(reverse("planning:draft_save"), {"confirm": "1", "time_ok": "1"})
+    planner.post(reverse("planning:draft_save"), {"confirm": "1", "sure": "1"})
     assert Tour.objects.get(employee=person, date=DAY).status == "confirmed"
 
 
@@ -94,8 +95,8 @@ def test_long_day_offers_to_take_out_or_swap(planner):
     assert preview.time_notice.kind == "over"
     options = services.time_options(draft, preview)
     assert options["kind"] == "over" and options["trim"]
-    question = planner.get(reverse("planning:time_question")).content.decode()
-    assert "✕ herausnehmen" in question and "Wirklich so speichern?" in question
+    question = planner.get(reverse("planning:plan_confirm")).content.decode()
+    assert "✕ nur herausnehmen" in question and "Der Tag ist zu lang – wirklich so?" in question
 
     first = options["trim"][0]
     before = len(draft["stops"])
@@ -113,23 +114,25 @@ def test_swap_keeps_the_position(planner):
         services.swap_stop(draft, 0, StopKind.READING, other.pk)  # already in the plan
 
 
-def test_normal_day_needs_no_question(planner):
+def test_normal_day_also_asks_but_without_suggestions(planner):
     person = start_plan(planner, unplanned()[:1])
     draft = planner.session[services.DRAFT_KEY]
-    draft["stops"] = draft["stops"][:1]
-    # make the day "normal" (6-7,5 h) by giving the building a fitting manual time
     building = Building.objects.get(pk=draft["stops"][0]["building"])
-    building.reading_minutes_manual = 400
+    building.reading_minutes_manual = 400  # a normal day (6-7,5 h)
     building.save()
     page = planner.get(reverse("planning:draft")).content.decode()
-    assert reverse("planning:time_question") not in page
-    planner.post(reverse("planning:draft_save"), {"confirm": "1"})
-    assert Tour.objects.filter(employee=person, date=DAY).exists()
+    assert 'hx-trigger="load"' not in page  # no pop-up while planning
+    question = planner.get(reverse("planning:plan_confirm")).content.decode()
+    assert "Fahrplan wirklich so erstellen?" in question and "Vorschlag" not in question
+    planner.post(reverse("planning:draft_save"), {"confirm": "1"})  # without "sure": not saved
+    assert not Tour.objects.filter(employee=person, date=DAY).exists()
+    planner.post(reverse("planning:draft_save"), {"confirm": "1", "sure": "1"})
+    assert Tour.objects.get(employee=person, date=DAY).status == "confirmed"
 
 
 def test_saved_plan_shows_the_info_in_calendar_and_side_panel(planner):
     person = start_plan(planner, unplanned()[:1])
-    planner.post(reverse("planning:draft_save"), {"confirm": "1", "time_ok": "1"})
+    planner.post(reverse("planning:draft_save"), {"confirm": "1", "sure": "1"})
     tour = Tour.objects.get(employee=person, date=DAY)
     event = next(e for e in calendar_events(DAY, DAY + datetime.timedelta(days=1), Employee.objects.all(), True) if e.get("id") == tour.pk)
     assert "⏱" in event["title"] and "weniger als 6 h" in event["extendedProps"]["tooltip"]
@@ -149,8 +152,8 @@ def test_slightly_long_day_offers_swaps_that_fit(planner):
     assert options["enough"] and options["trim"][0].swaps
     room = 450 - (preview.day_plan.net_minutes - options["trim"][0].saves)
     assert all(c.need <= room for c in options["trim"][0].swaps)
-    question = planner.get(reverse("planning:time_question"), {"confirm": "1"}).content.decode()
-    assert "Ein Stopp weniger – dann passt der Tag" in question and "⇄" in question
+    question = planner.get(reverse("planning:plan_confirm")).content.decode()
+    assert "einen Stopp tauschen oder herausnehmen" in question and "⇄" in question
 
     swap = options["trim"][0].swaps[0]
     planner.post(reverse("planning:draft_action"), {"action": "swap", "index": options["trim"][0].index,

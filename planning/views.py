@@ -177,15 +177,15 @@ def draft_action(request):
 
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
-def time_question(request):
-    """Dialog before saving a day over 7,5 h / under 6 h: really? - with options to fix it."""
+def plan_confirm(request):
+    """Last step: "Bist du sicher?" with a summary - and, for a day over 7,5 h / under 6 h,
+    options that make sense (swap with a stop nearby, take out, add). Only from here a plan is saved."""
     current = _draft_or_none(request)
     if not current:
         return HttpResponse(status=204)
     preview = services.calculate_preview(current)
-    return render(request, "planning/_time_question.html", {
+    return render(request, "planning/_plan_confirm.html", {
         "preview": preview, "options": services.time_options(current, preview),
-        "confirm": request.GET.get("confirm") == "1",
     })
 
 
@@ -207,9 +207,9 @@ def draft_save(request):
     if confirm and not request.user.has_perm("planning.confirm_tour"):
         messages.error(request, "Deine Rolle darf Fahrpläne nicht bestätigen.")
         return redirect("planning:draft")
-    # Over 7,5 h / under 6 h: only after the question "wirklich so übernehmen?" was answered with yes
-    if request.POST.get("time_ok") != "1" and services.calculate_preview(current).time_notice:
-        messages.warning(request, "Die Arbeitszeit liegt außerhalb von 6–7,5 h – bitte zuerst die Frage beantworten.")
+    # Only after "Bist du sicher?" was answered (planning/_plan_confirm.html)
+    if request.POST.get("sure") != "1":
+        messages.warning(request, "Bitte unten auf „Fahrplan erstellen …“ klicken und die Frage beantworten.")
         return redirect("planning:draft")
     try:
         tour = services.save_draft(current, request.user, confirm=confirm)

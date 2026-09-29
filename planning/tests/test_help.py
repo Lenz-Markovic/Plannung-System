@@ -125,7 +125,7 @@ def test_side_panel_button_calendar_excel_and_mein_tag(two_plans):
     response = dispo.post(reverse("planning:help_request", args=[stop.pk]), {"helper": helper.pk})
     assert response["HX-Redirect"] == reverse("planning:draft")
     assert "art-tag help" in dispo.get(reverse("planning:draft")).content.decode()
-    dispo.post(reverse("planning:draft_save"), {"confirm": "0", "time_ok": "1"})  # "Ja" to the working-time question
+    dispo.post(reverse("planning:draft_save"), {"confirm": "0", "sure": "1"})  # "final erstellen" in the question "Bist du sicher?"
 
     assert f"🤝 Helfer: {helper}" in dispo.get(reverse("planning:tour_detail", args=[helped.pk])).content.decode()
     event = next(e for e in calendar_events(DAY, DAY + datetime.timedelta(days=1), Employee.objects.all(), True) if e.get("id") == own.pk)

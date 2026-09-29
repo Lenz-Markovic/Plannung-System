@@ -150,7 +150,7 @@ def test_planning_pages(client, demo, no_tomtom):
     page = client.get(reverse("planning:draft")).content.decode()
     assert "Fahrplan prüfen" in page and "geschätzt" in page
     client.post(reverse("planning:draft_action"), {"action": "down", "index": 0})
-    response = client.post(reverse("planning:draft_save"), {"confirm": "0", "time_ok": "1"})  # "Ja" to the working-time question
+    response = client.post(reverse("planning:draft_save"), {"confirm": "0", "sure": "1"})  # "final erstellen" in the question "Bist du sicher?"
     assert response.status_code == 302
     assert Tour.objects.get(employee=demo, date=DAY).status == TourStatus.PROVISIONAL
 

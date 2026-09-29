@@ -554,3 +554,6 @@ button.cal-pill:hover { border-color: var(--axis); }
 .tq-row { border-bottom: 1px dashed var(--grid); padding: 7px 0; font-size: 13px; }
 .tq-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .tq-actions .btn { text-align: left; white-space: normal; }
+.pc-sum { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; margin: 6px 0 10px; }
+.pc-btns { flex-wrap: wrap; }
+.pc-btns form { margin: 0; }

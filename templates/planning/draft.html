@@ -11,5 +11,9 @@
 <div id="preview">
   {% include "planning/_preview.html" %}
 </div>
+{% if preview.time_notice %}
+  {# The plan is too long / too short: the question with suggestions pops up at once #}
+  <div hx-get="{% url 'planning:plan_confirm' %}" hx-trigger="load" hx-target="#modal" hidden></div>
+{% endif %}
 {% include "planning/_map_scripts.html" %}
 {% endblock %}

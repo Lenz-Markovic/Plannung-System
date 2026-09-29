@@ -1,0 +1,66 @@
+{# Last step before a plan is really created: "Bist du sicher?" (planning/views.py: plan_confirm). #}
+{# Too long / too short: options that make sense (take out, swap with a stop nearby, add).       #}
+{% load core_tags %}
+{% with n=preview.time_notice o=options plan=preview.day_plan %}
+<div class="dlg-back">
+  <div class="dlg time-dlg">
+    <button class="dlg-x" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#modal">✕</button>
+    <h3>{% if n %}⏱ {% if n.kind == "over" %}Der Tag ist zu lang{% else %}Der Tag ist nicht ausgelastet{% endif %} – wirklich so?{% else %}🗺 Fahrplan wirklich so erstellen?{% endif %}</h3>
+
+    {# Summary: what will be saved #}
+    <div class="pc-sum">
+      <div><b>{{ preview.employee }}</b>{% for e in preview.team %} + {{ e }}{% endfor %} · {{ preview.date|date:"l, d.m.Y" }}</div>
+      <div>{{ preview.stops|length }} Stopp{{ preview.stops|length|pluralize:"s" }}{% if preview.reading_minutes %} · 📖 {{ preview.reading_minutes }} min Ablesung{% endif %}{% if preview.installation_minutes %} · 🔧 {{ preview.installation_minutes }} min Montage{% endif %}
+        · {{ preview.start|time:"H:i" }}–{{ plan.end|time:"H:i" }}</div>
+      <div>Netto <b class="{% if n %}t-warn{% endif %}">{{ plan.net_minutes|hours }}</b>{% if n %} – {{ n.text }}{% endif %}</div>
+      <div>{% if preview.all_from_tomtom and not preview.error %}✓ Fahrzeiten von TomTom{% else %}⚠ Fahrzeiten nur geschätzt – nur „vorläufig“ möglich{% endif %}
+        {% if preview.critical_count %} · <span class="t-crit">⛔ {{ preview.critical_count }} Konflikt{{ preview.critical_count|pluralize:"e" }} (siehe Plan)</span>{% endif %}</div>
+    </div>
+
+    {% if o.kind == "over" %}
+      <h4 class="pp-h">{% if o.enough %}Vorschlag: einen Stopp tauschen oder herausnehmen – dann passt der Tag{% else %}Die größten Stopps (einer allein reicht nicht){% endif %}</h4>
+      {% for t in o.trim %}
+        <div class="tq-row">
+          <div><span class="art-tag {{ t.stop.kind }}">{% if t.stop.kind == "installation" %}🔧{% elif t.stop.kind == "help" %}🤝{% else %}📖{% endif %}</span>
+            statt <b>{{ t.stop.target.street }}</b>, {{ t.stop.target.city }} <span class="na small">({{ t.stop.work_minutes }} min · spart ca. {{ t.saves }} min)</span></div>
+          <div class="tq-actions">
+            {% for c in t.swaps %}
+              <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                      hx-vals='{"action": "swap", "index": {{ t.index }}, "kind": "{{ c.kind }}", "pk": {{ c.pk }}, "close_modal": "1"}'
+                      title="Statt diesem Stopp – liegt in der Nähe und passt in die 7,5 h">⇄ {{ c.title }} <span class="na">({{ c.minutes }} min{% if c.km is not None %}, {{ c.km|floatformat:1 }} km entfernt{% endif %})</span></button>
+            {% empty %}<span class="na small">kein ungeplanter Stopp in der Nähe passt statt dessen</span>{% endfor %}
+            <button class="btn mini" hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "remove", "index": {{ t.index }}, "close_modal": "1"}'
+                    hx-target="#preview">✕ nur herausnehmen</button>
+          </div>
+        </div>
+      {% endfor %}
+    {% elif o.kind == "under" %}
+      <h4 class="pp-h">Vorschlag: noch nicht geplant, in der Nähe – passt noch in den Tag</h4>
+      {% for c in o.fill %}
+        <div class="tq-row">
+          <div><b>{{ c.title }}</b> <span class="na small">· {{ c.minutes }} min Arbeit + ca. {{ c.drive }} min Fahrt{% if c.km is not None %} · {{ c.km|floatformat:1 }} km vom nächsten Stopp{% endif %}</span></div>
+          <div class="tq-actions">
+            <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                    hx-vals='{"action": "add", "kind": "{{ c.kind }}", "pk": {{ c.pk }}, "close_modal": "1"}'>＋ dazu</button>
+          </div>
+        </div>
+      {% empty %}<div class="na small">Kein ungeplanter Stopp in der Nähe passt noch in den Tag.</div>{% endfor %}
+    {% endif %}
+
+    <div class="dlg-btns pc-btns">
+      <button class="btn" type="button" hx-get="{% url 'empty' %}" hx-target="#modal">← Zurück zum Plan</button>
+      <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}
+        <input type="hidden" name="confirm" value="0"><input type="hidden" name="sure" value="1">
+        <button class="btn" title="Wird gespeichert, ist aber noch nicht bestätigt (z. B. ohne TomTom-Zeiten)">{% if n %}Trotzdem {% endif %}vorläufig erstellen</button>
+      </form>
+      {% if perms.planning.confirm_tour %}
+        <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}
+          <input type="hidden" name="confirm" value="1"><input type="hidden" name="sure" value="1">
+          <button class="btn primary" {% if not preview.can_confirm %}disabled title="{{ preview.problems|join:' ' }}"{% endif %}>✓ {% if n %}Trotzdem {% endif %}Fahrplan final erstellen</button>
+        </form>
+      {% endif %}
+    </div>
+    {% if perms.planning.confirm_tour and not preview.can_confirm %}<div class="na small text-end">„Final“ geht noch nicht: {{ preview.problems|join:" " }}</div>{% endif %}
+  </div>
+</div>
+{% endwith %}
