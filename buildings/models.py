@@ -191,6 +191,8 @@ class DeviceCategory(models.Model):
     code = models.CharField("Kürzel", max_length=20, unique=True)
     label = models.CharField("Bezeichnung", max_length=100)
     minutes_per_piece = models.PositiveIntegerField("Minuten pro Stück", default=0)
+    # Material price per piece (only for the budget view "Material & Kosten", Admin only)
+    price = models.DecimalField("Preis pro Stück (€)", max_digits=9, decimal_places=2, default=0)
 
     class Meta:
         ordering = ["code"]
@@ -267,6 +269,9 @@ class InstallationOrder(TimeStampedModel, GeocodedAddress):
         ordering = ["re_number"]
         verbose_name = "Montageauftrag"
         verbose_name_plural = "Montageaufträge"
+        permissions = [
+            ("view_costs", "Material und Kosten (Budget) sehen"),  # only Admin by default
+        ]
 
     def __str__(self):
         return f"{self.re_number} {self.street}, {self.city}"
@@ -281,7 +286,7 @@ class InstallationOrder(TimeStampedModel, GeocodedAddress):
 
 
 class InstallationOrderItem(models.Model):
-    """One contract line of an order: article, description, quantity. No prices."""
+    """One contract line of an order: article, description, quantity (prices: category or ArticlePrice)."""
 
     order = models.ForeignKey(InstallationOrder, on_delete=models.CASCADE, related_name="items")
     article_number = models.CharField("Artikel-Nr.", max_length=30)
@@ -297,3 +302,19 @@ class InstallationOrderItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity}× {self.description}"
+
+
+class ArticlePrice(models.Model):
+    """A fixed price for one article number: wins over the price of its category (⚙ Artikelpreise)."""
+
+    article_number = models.CharField("Artikel-Nr.", max_length=30, unique=True)
+    description = models.CharField("Bezeichnung", max_length=200, blank=True)
+    price = models.DecimalField("Preis pro Stück (€)", max_digits=9, decimal_places=2)
+
+    class Meta:
+        ordering = ["article_number"]
+        verbose_name = "Artikelpreis"
+        verbose_name_plural = "Artikelpreise"
+
+    def __str__(self):
+        return f"{self.article_number}: {self.price} €"

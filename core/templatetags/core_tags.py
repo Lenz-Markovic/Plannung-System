@@ -77,3 +77,50 @@ def phone_links(text):
         return f'<a href="tel:{re.sub(r"[^0-9+]", "", number)}">{number}</a>'
 
     return mark_safe(re.sub(r"(\+?\d[\d /\-]{5,}\d)", link, escape(text or "")))
+
+
+@register.filter
+def eur(value):
+    """1234.5 -> '1.234,50 €' (German money format)."""
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        return value
+    text = f"{number:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{text} €"
+
+
+@register.filter
+def price_input(value):
+    """Decimal('12.50') -> '12,50' for a price input field."""
+    return f"{float(value or 0):.2f}".replace(".", ",")
+
+
+@register.filter
+def percent_of(value, total):
+    """Width of a bar in % (0-100)."""
+    try:
+        return max(0, min(100, round(float(value) / float(total) * 100))) if float(total) else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+@register.filter
+def get_item(mapping, key):
+    """{{ d|get_item:key }} - a dict value by a variable key."""
+    try:
+        return mapping.get(key)
+    except AttributeError:
+        return None
+
+
+@register.filter
+def row_count(row, groups):
+    """Material row: pieces of the counted groups."""
+    return row.count(groups)
+
+
+@register.filter
+def row_money(row, groups):
+    """Material row: € of the counted groups."""
+    return row.money(groups)

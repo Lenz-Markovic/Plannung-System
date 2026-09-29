@@ -2,7 +2,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Building, DeviceCategory, InstallationOrder, InstallationOrderItem, PropertyManager
+from .models import ArticlePrice, Building, DeviceCategory, InstallationOrder, InstallationOrderItem, PropertyManager
 
 
 @admin.register(PropertyManager)
@@ -37,5 +37,12 @@ class InstallationOrderAdmin(SimpleHistoryAdmin):
 
 @admin.register(DeviceCategory)
 class DeviceCategoryAdmin(admin.ModelAdmin):
-    list_display = ["code", "label", "minutes_per_piece"]
-    list_editable = ["minutes_per_piece"]
+    list_display = ["code", "label", "minutes_per_piece", "price"]
+    list_editable = ["minutes_per_piece", "price"]
+
+
+@admin.register(ArticlePrice)
+class ArticlePriceAdmin(admin.ModelAdmin):
+    list_display = ["article_number", "description", "price"]
+    list_editable = ["price"]
+    search_fields = ["article_number", "description"]

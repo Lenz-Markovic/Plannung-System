@@ -582,3 +582,39 @@ button.cal-pill:hover { border-color: var(--axis); }
 .notice-box.off { border-left-color: var(--ring); }
 .notice-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .linkish { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
+
+/* ---- 💶 Material & Kosten (Montage, Admin) ------------------------------------------- */
+.mat-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.mat-presets .pill { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--ring); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; background: var(--surface); font-size: 13px; }
+.mat-presets .pill input { position: absolute; opacity: 0; pointer-events: none; }
+.mat-presets .pill.on { border-color: var(--accent, #1f4e8c); background: var(--accent, #1f4e8c); color: #fff; }
+.mat-open { align-self: flex-end; font-size: 13px; }
+.mat-kpis .tile.mat-total .val { font-size: 32px; }
+.mat-kpis .tile.muted { opacity: .55; }
+.mat-kpis .tile.planned { border-left: 4px solid var(--good); }
+.mat-kpis .tile.due { border-left: 4px solid var(--warning); }
+.mat-kpis .tile.open { border-left: 4px solid var(--ring); }
+.mat-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; margin-top: 12px; align-items: start; }
+.mat-side { display: flex; flex-direction: column; gap: 12px; }
+.mat-table td.muted, .mat-table th.muted { opacity: .45; }
+.mat-table tr.no-price td { background: var(--warn-wash); }
+.mat-table .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.mat-table tfoot td { border-top: 2px solid var(--ring); }
+.price-in { width: 78px; text-align: right; font: inherit; padding: 2px 6px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.price-in:focus { outline: 2px solid var(--accent, #1f4e8c); }
+.mat-price { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; border-bottom: 1px dashed var(--ring); }
+.mat-bar { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+.mat-bar .k { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mat-bar .b { height: 10px; background: var(--ring); border-radius: 5px; overflow: hidden; }
+.mat-bar .b i { display: block; height: 100%; background: var(--accent, #1f4e8c); border-radius: 5px; }
+.mat-bar .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.mat-uses summary { cursor: pointer; font-size: 12.5px; white-space: nowrap; }
+.mat-uses-list { max-height: 150px; overflow: auto; font-size: 12px; white-space: nowrap; padding: 2px 0; }
+.mat-table form { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.mat-price span { white-space: nowrap; }
+.mat-open span { display: inline-flex; align-items: center; gap: 6px; }
+.mat-open input[type=checkbox] { width: 16px; height: 16px; margin: 0; }
+.mat-uses .due { color: var(--warn-ink); }
+@media (max-width: 1000px) { .mat-grid { grid-template-columns: 1fr; } }
+.mat-table td.num, .mat-table th.num { white-space: nowrap; }

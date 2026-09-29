@@ -2,7 +2,7 @@
 Montageaufträge list (like the Montage dashboard of the prototype):
 query, filters and the inline changes of one order.
 
-No prices: the planning system only needs dates, people and devices.
+Prices are only used by the Admin budget view "💶 Material & Kosten" (material.py).
 """
 
 import django_filters

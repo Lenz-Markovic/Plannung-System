@@ -1,0 +1,102 @@
+{% load core_tags %}
+{# Results of "💶 Material & Kosten" (also returned alone after every change) #}
+<div id="mat-window" data-preset="{{ preset }}" data-von="{{ s.start|date:'Y-m-d' }}" data-bis="{{ s.end|date:'Y-m-d' }}" hidden></div>
+
+<div class="kpis mat-kpis">
+  <div class="tile mat-total"><div class="lbl">Bedarf {{ s.start|date:"d.m." }} – {{ s.end|date:"d.m.Y" }}</div>
+    <div class="val">{{ s.total|eur }}</div>
+    <div class="na small">{{ s.total_pieces }} Stück · {{ s.total_orders }} Aufträge</div></div>
+  {% for g, label in groups %}
+    <div class="tile mat-g {{ g }} {% if g not in s.counted %}muted{% endif %}">
+      <div class="lbl">{% if g == PLANNED %}📅{% elif g == DUE %}⏳{% else %}❔{% endif %} {{ label }}</div>
+      <div class="val">{{ s.money|get_item:g|eur }}</div>
+      <div class="na small">{{ s.orders|get_item:g }} Aufträge · {{ s.pieces|get_item:g }} Stück{% if g not in s.counted %} · nicht in der Summe{% endif %}</div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if s.without_price %}
+  <div class="pr-status warn mt-2">⚠ {{ s.without_price|length }} Artikel ohne Preis ({% for r in s.without_price %}{{ r.article }}{% if not forloop.last %}, {% endif %}{% endfor %}) –
+    die Summe ist zu niedrig. Preis in der Tabelle eintragen.</div>
+{% endif %}
+
+<div class="mat-grid">
+  <div class="tablecard">
+    <div class="tbar">
+      <strong>Bestellliste · {{ s.rows|length }} Artikel</strong>
+      <span class="legend"><span>Preis anklicken zum Ändern – gilt dann fest für diese Art.-Nr.; leer = Preis der Kategorie</span></span>
+      <span class="spacer"></span>
+      <a class="btn mini primary" href="{% url 'orders:material' %}?{{ query }}&amp;format=xlsx" download>⬇ Excel-Bestellliste</a>
+    </div>
+    <div class="scroll">
+      <table class="list mat-table">
+        <thead><tr>
+          <th>Art.-Nr.</th><th style="min-width:200px">Bezeichnung</th><th>Kategorie</th>
+          <th class="num" title="{{ groups.0.1 }}">📅 geplant</th><th class="num" title="{{ groups.1.1 }}">⏳ fällig</th>
+          <th class="num {% if not with_open %}muted{% endif %}" title="{{ groups.2.1 }}">❔ offen</th>
+          <th class="num">Stück</th><th class="num">Preis/Stück</th><th class="num">Summe</th><th>zuerst gebraucht</th><th>Aufträge</th>
+        </tr></thead>
+        <tbody>
+          {% for r in s.rows %}
+            <tr class="{% if not r.price %}no-price{% endif %}">
+              <td class="mono">{{ r.article }}</td><td>{{ r.description }}</td><td class="na">{{ labels|get_item:r.category|default:"–" }}</td>
+              <td class="num">{{ r.pieces|get_item:PLANNED|default:"" }}</td>
+              <td class="num">{{ r.pieces|get_item:DUE|default:"" }}</td>
+              <td class="num {% if not with_open %}muted{% endif %}">{{ r.pieces|get_item:OPEN|default:"" }}</td>
+              <td class="num"><b>{{ r|row_count:s.counted }}</b></td>
+              <td class="num">
+                {% if perms.buildings.change_articleprice %}
+                  <form hx-post="{% url 'orders:material_price' %}" hx-target="#material-results" hx-include="#material-filter" hx-trigger="change">
+                    <input type="hidden" name="article" value="{{ r.article }}"><input type="hidden" name="description" value="{{ r.description }}">
+                    <input class="price-in" name="price" inputmode="decimal" value="{{ r.price|price_input }}" aria-label="Preis {{ r.article }}"> €
+                  </form>
+                {% else %}{{ r.price|eur }}{% endif %}
+              </td>
+              <td class="num"><b>{{ r|row_money:s.counted|eur }}</b></td>
+              <td>{{ r.first_needed|date:"D d.m."|default:"–" }}</td>
+              <td><details class="mat-uses"><summary>{{ r.orders|length }} Auftr.</summary>
+                <div class="mat-uses-list">{% for u in r.uses %}<div class="{{ u.group }}">{% if u.group == PLANNED %}📅{% elif u.group == DUE %}⏳ bis{% else %}❔{% endif %}
+                  {{ u.date|date:"d.m."|default:"" }} · {{ u.order }} · <b>{{ u.quantity }}×</b></div>{% endfor %}</div></details></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="11" class="na p-3">In diesem Zeitraum wird kein Material gebraucht.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if s.rows %}<tfoot><tr><td></td><td><b>Gesamt</b></td><td></td>
+          <td class="num">{{ s.pieces|get_item:PLANNED }}</td><td class="num">{{ s.pieces|get_item:DUE }}</td>
+          <td class="num {% if not with_open %}muted{% endif %}">{{ s.pieces|get_item:OPEN }}</td>
+          <td class="num"><b>{{ s.total_pieces }}</b></td><td></td><td class="num"><b>{{ s.total|eur }}</b></td><td colspan="2"></td></tr></tfoot>{% endif %}
+      </table>
+    </div>
+  </div>
+
+  <div class="mat-side">
+    <div class="card-lite">
+      <h3 class="h6">📊 Budget je Woche</h3>
+      {% for monday, money in s.by_week %}
+        <div class="mat-bar"><span class="k">KW {{ monday|date:"W" }} · {{ monday|date:"d.m." }}</span>
+          <span class="b"><i style="width: {{ money|percent_of:week_max }}%"></i></span><span class="v">{{ money|eur }}</span></div>
+      {% empty %}<div class="na small">Keine Montage mit Datum im Zeitraum.</div>{% endfor %}
+      {% if s.by_week %}<div class="na small mt-1">nach Montagetag bzw. spätestem Tag; schon überfällige zählen in die erste Woche</div>{% endif %}
+    </div>
+    <div class="card-lite">
+      <h3 class="h6">🧩 nach Kategorie</h3>
+      {% for code, pieces, money in s.by_category %}
+        <div class="mat-bar"><span class="k">{{ labels|get_item:code|default:"ohne Kategorie" }} <span class="na">{{ pieces }}×</span></span>
+          <span class="b"><i style="width: {{ money|percent_of:category_max }}%"></i></span><span class="v">{{ money|eur }}</span></div>
+      {% empty %}<div class="na small">–</div>{% endfor %}
+    </div>
+    <div class="card-lite">
+      <h3 class="h6">€ Preise je Kategorie</h3>
+      {% for c in categories %}
+        {% if perms.buildings.change_devicecategory %}
+          <form class="mat-price" hx-post="{% url 'orders:material_price' %}" hx-target="#material-results" hx-include="#material-filter" hx-trigger="change">
+            <input type="hidden" name="category" value="{{ c.code }}"><label for="cp-{{ c.code }}">{{ c.label }}</label>
+            <span><input id="cp-{{ c.code }}" class="price-in" name="price" inputmode="decimal" value="{{ c.price|price_input }}"> €</span>
+          </form>
+        {% else %}<div class="mat-price"><span>{{ c.label }}</span><span>{{ c.price|eur }}</span></div>{% endif %}
+      {% endfor %}
+      <div class="na small mt-1">Ein fester Artikelpreis in der Tabelle geht vor. Alle Preise auch unter ⚙ Verwaltung → Gerätekategorien / Artikelpreise.</div>
+    </div>
+  </div>
+</div>

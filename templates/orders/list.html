@@ -3,9 +3,10 @@
 {% block content %}
 <header class="top">
   <h1>🔧 Montageaufträge</h1>
-  <span class="sub">{{ all_count }} Aufträge · Termine kommen aus den Fahrplänen · keine Preise</span>
+  <span class="sub">{{ all_count }} Aufträge · Termine kommen aus den Fahrplänen</span>
   <span class="spacer"></span>
   {% if perms.planning.add_tour %}{% include "orders/_plan_bar.html" %}{% endif %}
+  {% if perms.buildings.view_costs %}<a class="btn" href="{% url 'orders:material' %}" title="Material und Geld für einen Zeitraum – nur Admin">💶 Material &amp; Kosten</a>{% endif %}
   {% if perms.planning.view_tour %}<a class="btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>{% endif %}
   <span id="loading" class="htmx-indicator">wird geladen …</span>
 </header>

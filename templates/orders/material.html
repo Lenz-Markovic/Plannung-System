@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Material & Kosten{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>💶 Material &amp; Kosten</h1>
+  <span class="sub">Was brauchen die Montagen in diesem Zeitraum? – für Budget und rechtzeitige Bestellung · nur für Admin</span>
+  <span class="spacer"></span>
+  <a class="btn" href="{% url 'orders:list' %}">🔧 Montageaufträge</a>
+  <span id="loading" class="htmx-indicator">wird gerechnet …</span>
+</header>
+
+{# Every change reloads only #material-results (and the URL, so the window can be bookmarked) #}
+<form id="material-filter" class="filters mat-filter" method="get" action="{% url 'orders:material' %}"
+      hx-get="{% url 'orders:material' %}" hx-target="#material-results" hx-indicator="#loading" hx-trigger="change, submit" hx-sync="this:replace">
+  <div class="f"><label>Zeitraum ab heute</label>
+    <div class="mat-presets" role="radiogroup">
+      {% for key, label in presets.items %}
+        <label class="pill {% if preset == key %}on{% endif %}"><input type="radio" name="z" value="{{ key }}" {% if preset == key %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+      <label class="pill {% if preset == 'frei' %}on{% endif %}"><input type="radio" name="z" value="frei" {% if preset == 'frei' %}checked{% endif %}> von – bis</label>
+    </div>
+  </div>
+  <div class="f"><label for="m-von">von</label><input type="date" id="m-von" name="von" value="{{ s.start|date:'Y-m-d' }}"></div>
+  <div class="f"><label for="m-bis">bis</label><input type="date" id="m-bis" name="bis" value="{{ s.end|date:'Y-m-d' }}"></div>
+  <label class="f mat-open"><span><input type="checkbox" name="offen" value="1" {% if with_open %}checked{% endif %}>
+    auch offene Aufträge ohne Termin und ohne Frist dazurechnen</span></label>
+</form>
+
+<div id="material-results" hx-get="{% url 'orders:material' %}" hx-include="#material-filter"
+     hx-trigger="orders-changed from:body, calendar-changed from:body" hx-target="this">
+  {% include "orders/_material.html" %}
+</div>
+
+<script>
+  // typing a date means "von – bis"; a preset button fills the dates itself (server side)
+  (function () {
+    var form = document.getElementById("material-filter");
+    form.addEventListener("change", function (e) {
+      if (e.target.type === "date") { form.querySelector('input[name=z][value=frei]').checked = true; }
+      form.querySelectorAll(".mat-presets .pill").forEach(function (p) { p.classList.toggle("on", p.querySelector("input").checked); });
+    }, true);
+    document.body.addEventListener("htmx:afterSwap", function (e) {
+      if (e.detail.target.id !== "material-results") return;
+      var box = document.getElementById("mat-window");  // the server's window -> date fields
+      if (box && box.dataset.preset !== "frei") { form.querySelector("[name=von]").value = box.dataset.von; form.querySelector("[name=bis]").value = box.dataset.bis; }
+    });
+  })();
+</script>
+{% endblock %}

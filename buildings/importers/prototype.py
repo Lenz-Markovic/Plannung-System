@@ -38,6 +38,7 @@ from buildings.models import (
 from buildings.rules.file_numbers import extract_re_numbers, normalize_file_number
 from buildings.services import apply_access
 from buildings.rules.installation_time import DEFAULT_CATEGORIES, classify_article, installation_minutes
+from buildings.rules.material import DEFAULT_PRICES
 from buildings.rules.installation_type import guess_installation_type
 from buildings.rules.reading_time import planned_reading_minutes
 from core import roles
@@ -260,9 +261,9 @@ def _import_employees(data, result):
 def _import_categories(result):
     categories = {}
     for code, (label, minutes) in DEFAULT_CATEGORIES.items():
-        # get_or_create: minutes changed later in the admin are kept
+        # get_or_create: minutes and prices changed later in the admin are kept
         categories[code], _ = DeviceCategory.objects.get_or_create(
-            code=code, defaults={"label": label, "minutes_per_piece": minutes}
+            code=code, defaults={"label": label, "minutes_per_piece": minutes, "price": DEFAULT_PRICES.get(code, 0)}
         )
     result.add("Gerätekategorien", len(categories))
     return categories

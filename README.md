@@ -248,6 +248,30 @@ The only JavaScript is `static/js/calendar.js` (commented).
   **Alle … vorläufig erstellen** (after "Bist du sicher?") saves all days as provisional
   plans - confirm them one by one in the calendar as usual.
 
+## 💶 Material & Kosten (Montage, Admin only)
+
+- **🔧 Montage → 💶 Material & Kosten** (permission `buildings.view_costs`, only the
+  Admin role by default): which material and how much money the installations of a
+  time window need - to plan the budget and order in time.
+- Time window from today: **1 Woche, 2 Wochen, 1 Monat, 3 Monate**, or **von – bis**
+  with your own dates. The URL keeps the window (bookmark it).
+- Counted orders (`buildings/rules/material.py`, pure functions):
+  - 📅 **geplant im Zeitraum** - the installation day of its Fahrplan is in the window
+  - ⏳ **noch ungeplant, aber bis dahin fällig** - latest day (8 days before the
+    building's reading) is before the end of the window, also when already overdue
+  - ❔ **offen ohne Frist** - not in the total; switch "auch offene … dazurechnen" on
+  - done orders without a plan are not counted (nothing to buy any more).
+- **Bestellliste** per article: pieces per group, price per piece, sum, "zuerst
+  gebraucht" (first day it is needed) and which orders (click "n Auftr.").
+  **⬇ Excel-Bestellliste** downloads the same list plus a sheet "Budget je Woche".
+- Budget per calendar week and per category as bars.
+- **Prices**: per category (right side, the prototype prices as start values) and a fixed
+  price per article number directly in the table (empty = category price again). A
+  price change updates all sums at once. Also in ⚙ Verwaltung → Gerätekategorien /
+  Artikelpreise. Articles without a price are marked (the sum would be too low).
+- After the update run `python manage.py setup_roles` once, so the Admin role gets the
+  new permission.
+
 ## 📄 Tenant notices (Aushang)
 
 - **Optional per stop** - not every building gets a notice. In the calendar side panel

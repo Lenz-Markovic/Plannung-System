@@ -9,7 +9,7 @@ article's category (minutes are editable in DeviceCategory).
 import re
 
 # Default categories (CATS in the Montage dashboard): code -> (label, minutes per piece).
-# Prices exist in the prototype but are deliberately not taken over.
+# Prices: see DEFAULT_PRICES in buildings/rules/material.py (only for the Admin budget view).
 DEFAULT_CATEGORIES = {
     "EHKV": ("EHKV (322011F)", 8),
     "FUNKMODUL": ("Funkmodul W1-R (244430F)", 0),
