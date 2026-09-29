@@ -2,6 +2,7 @@
 
 import datetime
 import io
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth.models import Group, User
@@ -60,8 +61,13 @@ def unplanned(count):
     return list(Building.objects.filter(region="Region Calw", tour_stops__isnull=True).order_by("file_number")[:count])
 
 
-def draft_for(employee, buildings, start=datetime.time(8, 0)):
-    return services.create_draft([b.pk for b in buildings], employee, DAY, start, 30, "far")
+# stands for the planner who clicks "Arbeitszeit so übernehmen" (the test days are short)
+PLANNER = SimpleNamespace(pk=None, get_username=lambda: "planer")
+
+
+def draft_for(employee, buildings, start=datetime.time(8, 0), approve_time=True):
+    draft = services.create_draft([b.pk for b in buildings], employee, DAY, start, 30, "far")
+    return services.approve_time(draft, PLANNER) if approve_time else draft
 
 
 def test_preview_without_tomtom_is_estimated_and_cannot_be_confirmed(demo, no_tomtom):

@@ -517,3 +517,9 @@ button.cal-pill:hover { border-color: var(--axis); }
   padding: 5px 8px; margin-bottom: 4px; font: inherit; font-size: 13px; cursor: pointer; }
 .pp-tour:hover { border-color: var(--accent); background: var(--accent-wash); }
 .pp-free { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; border-bottom: 1px dashed var(--grid); }
+
+/* ---- Working time notice (over 7,5 h / under 6 h) ----------------------------- */
+.time-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.time-approve { display: inline-flex; gap: 6px; align-items: center; }
+.time-approve input { border: 1px solid var(--grid); border-radius: 6px; padding: 2px 8px; font-size: 13px; min-width: 220px; }
+.cal-time { font-size: 12px; margin-top: 4px; }

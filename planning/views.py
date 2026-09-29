@@ -90,10 +90,12 @@ def _draft_or_none(request):
 def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
-    return render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
-                                      "suggestions": services.draft_suggestions(draft),
-                                      "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
-                                      "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
+    response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
+                                          "suggestions": services.draft_suggestions(draft),
+                                          "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
+                                          "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
+    response.preview = preview  # for draft_action (notification about the working time)
+    return response
 
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
@@ -128,6 +130,12 @@ def draft_action(request):
             current["start"] = form.cleaned_data["start"].strftime("%H:%M")
             current["break"] = form.cleaned_data["break_minutes"]
     message, error = "", False
+    if action == "approve_time":
+        services.approve_time(current, request.user, request.POST.get("note", ""))
+        message = "Arbeitszeit bewusst übernommen – der Plan kann so bestätigt werden"
+    elif action == "revoke_time":
+        current["time_approval"] = None
+        message = "Freigabe der Arbeitszeit zurückgenommen"
     if action == "add":
         # "+ Stopp hinzufügen": a reading or an installation joins the same plan
         try:
@@ -136,6 +144,9 @@ def draft_action(request):
             message, error = str(problem), True
     request.session[services.DRAFT_KEY] = current
     response = _render_preview(request, current)
+    if not message and response.preview.time_notice and not response.preview.time_approval:
+        # notification after each change while the day is too long / too short
+        message, error = f"⏱ {response.preview.time_notice.text}", True
     if message:
         response.content += render(request, "core/_toast.html", {"message": message, "error": error}).content
     return response

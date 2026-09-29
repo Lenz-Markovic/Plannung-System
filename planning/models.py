@@ -16,6 +16,8 @@ from simple_history.models import HistoricalRecords
 
 from core.models import GeocodedAddress, TimeStampedModel
 
+from .rules.working_time import MAX_NET_MINUTES, MIN_NET_MINUTES
+
 
 class Employee(TimeStampedModel, GeocodedAddress):
     """Extra data for a user who reads and/or installs.
@@ -134,6 +136,14 @@ class Tour(TimeStampedModel):
     )
     confirmed_at = models.DateTimeField("bestätigt am", null=True, blank=True)
 
+    # Working time over 7,5 h or under 6 h, approved knowingly by the planner
+    time_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, verbose_name="Arbeitszeit übernommen von", null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="+",
+    )
+    time_approved_at = models.DateTimeField("Arbeitszeit übernommen am", null=True, blank=True)
+    time_approval_note = models.CharField("Begründung Arbeitszeit", max_length=300, blank=True)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -156,6 +166,18 @@ class Tour(TimeStampedModel):
     def net_minutes(self):
         """Net working time = reading/installation + driving between stops."""
         return self.work_minutes + self.drive_minutes
+
+    @property
+    def time_state(self):
+        """'over' (more than 7,5 h), 'under' (less than 6 h) or '' - see rules/working_time.py."""
+        if self.net_minutes > MAX_NET_MINUTES:
+            return "over"
+        return "under" if 0 < self.net_minutes < MIN_NET_MINUTES else ""
+
+    @property
+    def time_open(self):
+        """Working time outside the range and nobody approved it yet."""
+        return bool(self.time_state) and not self.time_approved_at
 
 
 class StopKind(models.TextChoices):

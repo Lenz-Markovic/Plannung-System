@@ -15,6 +15,7 @@ import datetime
 from dataclasses import dataclass
 
 MAX_NET_MINUTES = 450         # 7.5 h
+MIN_NET_MINUTES = 360         # below 6 h the day is "nicht ausgelastet" (only a notice)
 BREAK_THRESHOLD_MINUTES = 360  # break only if the day is longer than 6 h
 BREAK_NOT_BEFORE = datetime.time(12, 0)
 DEFAULT_BREAK_MINUTES = 30
@@ -97,12 +98,45 @@ def schedule_day(start, work_minutes, drive_minutes, break_minutes=DEFAULT_BREAK
     )
 
 
-def confirmation_problems(day_plan, all_drives_from_tomtom):
-    """Reasons why a plan cannot be confirmed (empty list = may be confirmed)."""
+def _h(minutes):
+    return f"{minutes / 60:.1f}".replace(".", ",")
+
+
+@dataclass(frozen=True)
+class TimeNotice:
+    """Working time outside the normal range: the planner must approve it knowingly."""
+
+    kind: str   # "over" or "under"
+    text: str
+
+
+def time_notice(day_plan):
+    """More than 7,5 h or less than 6 h net - or None if the day is in the normal range."""
+    net = day_plan.net_minutes
+    if not net:
+        return None
+    if day_plan.over_limit_minutes:
+        return TimeNotice("over", f"Netto-Arbeitszeit {_h(net)} h – {_h(day_plan.over_limit_minutes)} h über 7,5 h")
+    if net < MIN_NET_MINUTES:
+        return TimeNotice("under", f"Netto-Arbeitszeit nur {_h(net)} h – unter 6 h, der Tag ist nicht ausgelastet")
+    return None
+
+
+def confirmation_problems(day_plan, all_drives_from_tomtom, time_approved=False):
+    """Reasons why a plan cannot be confirmed (empty list = may be confirmed).
+
+    time_approved: the planner clicked "Arbeitszeit so übernehmen" - then a day
+    over 7,5 h or under 6 h may be confirmed as it is.
+    """
     problems = []
     if not all_drives_from_tomtom:
         problems.append("Ohne echte TomTom-Fahrzeiten kann der Plan nicht bestätigt werden.")
-    if day_plan.over_limit_minutes:
-        hours = f"{day_plan.over_limit_minutes / 60:.1f}".replace(".", ",")
-        problems.append(f"Netto-Arbeitszeit {hours} h über 7,5 h – bitte Stopps herausnehmen.")
+    notice = time_notice(day_plan)
+    if notice and not time_approved:
+        if notice.kind == "over":
+            problems.append(f"Netto-Arbeitszeit {_h(day_plan.over_limit_minutes)} h über 7,5 h – "
+                            "Stopps herausnehmen oder die Arbeitszeit bewusst so übernehmen.")
+        else:
+            problems.append(f"Netto-Arbeitszeit nur {_h(day_plan.net_minutes)} h – Stopps ergänzen "
+                            "oder die Arbeitszeit bewusst so übernehmen.")
     return problems

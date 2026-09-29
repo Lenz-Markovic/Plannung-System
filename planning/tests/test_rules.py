@@ -6,7 +6,7 @@ import pytest
 
 from planning.rules.drive_time import estimate_drive_minutes, planned_drive_minutes
 from planning.rules.ordering import FAR, SHORT, order_stops
-from planning.rules.working_time import confirmation_problems, schedule_day
+from planning.rules.working_time import TimeNotice, confirmation_problems, schedule_day, time_notice
 
 T = datetime.time
 
@@ -61,12 +61,22 @@ def test_never_a_break_after_the_last_stop():
     assert plan.break_after_index is None
 
 
-def test_confirmation_needs_tomtom_and_max_7_5_hours():
-    ok = schedule_day(T(8, 0), [60], [])
+def test_confirmation_needs_tomtom_and_6_to_7_5_hours_or_an_approval():
+    ok = schedule_day(T(8, 0), [200, 200], [15])  # 415 min net
     assert confirmation_problems(ok, all_drives_from_tomtom=True) == []
+    assert time_notice(ok) is None
     assert "TomTom" in confirmation_problems(ok, all_drives_from_tomtom=False)[0]
+
     too_long = schedule_day(T(7, 0), [240, 240], [15])  # 495 min net
-    assert confirmation_problems(too_long, True) == ["Netto-Arbeitszeit 0,8 h über 7,5 h – bitte Stopps herausnehmen."]
+    assert time_notice(too_long) == TimeNotice("over", "Netto-Arbeitszeit 8,2 h – 0,8 h über 7,5 h")
+    assert confirmation_problems(too_long, True) == [
+        "Netto-Arbeitszeit 0,8 h über 7,5 h – Stopps herausnehmen oder die Arbeitszeit bewusst so übernehmen."]
+    assert confirmation_problems(too_long, True, time_approved=True) == []  # the planner approved it
+
+    too_short = schedule_day(T(8, 0), [60], [])
+    assert time_notice(too_short).kind == "under" and "nicht ausgelastet" in time_notice(too_short).text
+    assert "Stopps ergänzen" in confirmation_problems(too_short, True)[0]
+    assert confirmation_problems(too_short, True, time_approved=True) == []
 
 
 def test_order_nearest_neighbour():

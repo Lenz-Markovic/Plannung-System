@@ -1,3 +1,4 @@
+{% load core_tags %}
 {# Side panel of one tour in the calendar (cal-side in the prototype). #}
 <div class="card-lite">
   <div class="d-flex justify-content-between align-items-start">
@@ -13,6 +14,12 @@
     <span class="st {% if tour.status == 'confirmed' %}released{% elif tour.status == 'provisional' %}open{% else %}released{% endif %}">{{ tour.get_status_display }}</span>
     <span class="tag">{{ tour.get_routing_source_display }}</span>
   </div>
+  {% if tour.time_state %}
+    <div class="pr-status {% if tour.time_approved_at %}ok{% else %}warn{% endif %} cal-time">⏱ Netto {{ tour.net_minutes|hours }}
+      {% if tour.time_state == "over" %}– mehr als 7,5 h{% else %}– weniger als 6 h{% endif %}
+      {% if tour.time_approved_at %}· bewusst übernommen von {{ tour.time_approved_by|default:"?" }} am {{ tour.time_approved_at|date:"d.m.Y" }}{% if tour.time_approval_note %}: „{{ tour.time_approval_note }}“{% endif %}
+      {% else %}· noch nicht freigegeben – „Neu rechnen / bearbeiten“, dann ändern oder übernehmen{% endif %}</div>
+  {% endif %}
   {% if tour.needs_recalculation %}<div class="pr-status warn mt-2">⟳ {{ tour.change_reason|default:"Plan wurde geändert – bitte neu mit TomTom rechnen" }}</div>{% endif %}
 
   {% if map_available and map_data.pins %}<div class="mt-2">{% include "planning/_map.html" with map_class="small" %}</div>{% endif %}

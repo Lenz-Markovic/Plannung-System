@@ -24,7 +24,7 @@ from buildings.rules.file_numbers import extract_re_numbers
 from buildings.rules.reading_time import is_manual_reading
 
 from .models import RoutingSource, StopKind, TourStatus
-from .rules.working_time import MAX_NET_MINUTES, schedule_day
+from .rules.working_time import MAX_NET_MINUTES, MIN_NET_MINUTES, schedule_day
 
 # --- styles (XF / XA / XK / XC / RAHMEN in the prototype) ---------------------
 NAVY, GREY, WARN = "FF1F3864", "FFD9D9D9", "FFFFE699"
@@ -99,6 +99,7 @@ class TourSheet:
     provisional: bool = False
     source: str = ""
     commute: int | None = None
+    time_approved_by: str = ""   # working time over 7,5 h / under 6 h approved knowingly
 
     @property
     def net(self):
@@ -113,6 +114,8 @@ class TourSheet:
         text = f"Netto-Arbeitszeit: {hh_mm(self.net)}   ({' + '.join(parts)} + Fahrzeit im Tag {self.drive} min)"
         if self.net > MAX_NET_MINUTES:
             text += f"   |  {self.net - MAX_NET_MINUTES} min über 7,5 h"
+        if self.time_approved_by and (self.net > MAX_NET_MINUTES or 0 < self.net < MIN_NET_MINUTES):
+            text += f" – bewusst übernommen von {self.time_approved_by}"
         if self.provisional:
             text += "   |  VORLÄUFIG – noch ohne TomTom-Zeiten"
         return text
@@ -206,6 +209,7 @@ def tour_sheet(tour):
         installation_work=sum(s.work_minutes for s in stops if s.kind == StopKind.INSTALLATION),
         provisional=tour.status == TourStatus.PROVISIONAL or tour.needs_recalculation or tour.routing_source != RoutingSource.TOMTOM,
         source=tour.routing_note, commute=tour.commute_to_minutes,
+        time_approved_by=str(tour.time_approved_by or "?") if tour.time_approved_at else "",
     )
     if tour.break_after_position:
         sheet.break_after, sheet.break_minutes = tour.break_after_position - 1, tour.break_minutes
@@ -321,7 +325,7 @@ def day_sheet(wb, sheet, name):
     _height(ws, z, 6)
     z += 1
     _height(ws, z, 20.1)
-    red = sheet.net > MAX_NET_MINUTES or sheet.provisional
+    red = (sheet.net > MAX_NET_MINUTES and not sheet.time_approved_by) or sheet.provisional
     _field(ws, z, 1, z, 8, sheet.net_text(), calibri(italic=True, color="FFC00000" if red else "FF404040"), border=Border(top=THIN))
     z += 1
     _height(ws, z, 12.95)
@@ -403,7 +407,7 @@ def list_sheet(wb, name, sheets, title=None):
                 cell.value, cell.font, cell.border = f"→ Fahrtzeit: {s.drive_after} min", arial(size=9, italic=True), Border(bottom=THIN)
                 z += 1
         cell = ws.cell(z, 1)
-        red = sheet.net > MAX_NET_MINUTES or sheet.provisional
+        red = (sheet.net > MAX_NET_MINUTES and not sheet.time_approved_by) or sheet.provisional
         cell.value, cell.font = sheet.net_text(), arial(size=9, bold=True, color="FFC00000" if red else "FF000000")
         z += 2
     _page(ws, landscape=True, last_row=z - 1, margins=dict(left=0.4, right=0.4, top=0.6, bottom=0.6, header=0.3, footer=0.3))

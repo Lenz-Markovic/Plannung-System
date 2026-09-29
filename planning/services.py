@@ -33,7 +33,7 @@ from . import geocoding
 from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop
 from .rules.drive_time import estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
-from .rules.working_time import confirmation_problems, schedule_day
+from .rules.working_time import confirmation_problems, schedule_day, time_notice
 from .tomtom import TomTomError, get_client, local_datetime
 
 SELECTION_KEY = "plan_selection"
@@ -172,6 +172,9 @@ def draft_from_tour(tour, date=None, employee=None):
         "tour_version": tour.version,
         "moved_from": f"{tour.employee} am {tour.date:%d.%m.%Y}" if moved else "",
         "stops": stops,
+        # an approved working time stays approved as long as the net time does not change
+        "time_approval": {"net": tour.net_minutes, "by": str(tour.time_approved_by or "?"), "user_id": tour.time_approved_by_id,
+                          "note": tour.time_approval_note} if tour.time_approved_at else None,
     }
 
 
@@ -293,6 +296,20 @@ def search_targets(query, draft, limit=6):
     return results
 
 
+def approve_time(draft, user, note=""):
+    """ "Arbeitszeit so übernehmen": remembered in the draft together with the
+    net minutes it was given for - if the plan changes, the approval is void."""
+    plan = calculate_preview(draft).day_plan
+    draft["time_approval"] = {"net": plan.net_minutes, "by": user.get_username(), "user_id": user.pk,
+                              "note": note.strip()[:300]}
+    return draft
+
+
+def valid_time_approval(draft, plan):
+    approval = draft.get("time_approval")
+    return approval if approval and approval.get("net") == plan.net_minutes else None
+
+
 def remove_stop(draft, index):
     if 0 <= index < len(draft["stops"]) and len(draft["stops"]) > 1:
         del draft["stops"][index]
@@ -341,6 +358,8 @@ class Preview:
     commute_minutes: int | None = None
     commute_km: Decimal | None = None
     has_tomtom: bool = False
+    time_notice: object = None     # rules.working_time.TimeNotice: over 7,5 h / under 6 h
+    time_approval: dict | None = None  # {"by": ..., "note": ...} when the planner approved it
 
     @property
     def all_from_tomtom(self):
@@ -459,7 +478,10 @@ def calculate_preview(draft):
                       error=error, has_tomtom=client is not None)
     preview.distance_km = sum((s.drive_km or Decimal("0")) for s in stops)
     _add_findings(preview, draft)
-    preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error)
+    preview.time_notice = time_notice(plan)
+    preview.time_approval = valid_time_approval(draft, plan) if preview.time_notice else None
+    preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error,
+                                             time_approved=preview.time_approval is not None)
     _add_commute(preview, client)
     return preview
 
@@ -570,6 +592,10 @@ def save_draft(draft, user, confirm):
     tour.end_time, tour.distance_km = plan.end, preview.distance_km
     tour.commute_to_minutes, tour.commute_to_km = preview.commute_minutes, preview.commute_km
     tour.confirmed_by, tour.confirmed_at = (user, timezone.now()) if confirm else (None, None)
+    approval = preview.time_approval
+    tour.time_approved_by_id = approval["user_id"] if approval else None
+    tour.time_approved_at = timezone.now() if approval else None
+    tour.time_approval_note = approval["note"] if approval else ""
     tour.save()
 
     tour.stops.all().delete()
