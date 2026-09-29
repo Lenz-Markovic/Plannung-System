@@ -10,11 +10,16 @@
  * 4. Drag & drop to another day: asks the server to make a DRAFT for the new
  *    day and opens the preview ("Fahrplan prüfen"). Nothing is saved before
  *    the user confirms there, so the event jumps back meanwhile.
+ * 5. Click on a person: only their plans, and their overview in the side panel.
+ *    Buttons "alle / Ablesung / Montage / beides": only plans of that kind.
+ * 6. Mouse over a plan: its stops as a tooltip.
+ * 7. Click on an empty part of a day: that day in the side panel (who is free).
  */
 document.addEventListener("DOMContentLoaded", function () {
   var element = document.getElementById("calendar");
   var personSelect = document.getElementById("cal-person");
   var csrfToken = element.dataset.csrf;
+  var kind = "";  // "" = all plans, "reading", "installation", "mixed"
 
   var calendar = new FullCalendar.Calendar(element, {
     locale: "de",
@@ -37,8 +42,18 @@ document.addEventListener("DOMContentLoaded", function () {
     // 1 + 2: events from the server, with the chosen person
     events: {
       url: element.dataset.feedUrl,
-      extraParams: function () { return { person: personSelect.value }; }
+      extraParams: function () { return { person: personSelect.value, art: kind }; }
     },
+
+    // 6: the stops of a plan when the mouse is over it
+    eventDidMount: function (info) {
+      if (info.event.extendedProps.tooltip) { info.el.title = info.event.extendedProps.tooltip; }
+    },
+
+    // 7: click on a day: who is planned, who is still free (office only)
+    dateClick: element.dataset.dayUrl ? function (info) {
+      htmx.ajax("GET", element.dataset.dayUrl + "?datum=" + info.dateStr.slice(0, 10), "#cal-side");
+    } : undefined,
 
     // 3: side panel
     eventClick: function (info) {
@@ -67,7 +82,38 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   calendar.render();
 
-  personSelect.addEventListener("change", function () { calendar.refetchEvents(); });
+  // 5: people and kinds
+  var pills = document.querySelectorAll(".cal-pill[data-person]");
+  function choosePerson(id) {
+    personSelect.value = id;
+    pills.forEach(function (pill) { pill.classList.toggle("on", pill.dataset.person === id); });
+    calendar.refetchEvents();
+    var pill = document.querySelector('.cal-pill[data-person="' + id + '"]');
+    if (id && pill) { htmx.ajax("GET", pill.dataset.overview, "#cal-side"); }
+    else { document.getElementById("cal-side").innerHTML = ""; calendar.updateSize(); }
+  }
+  pills.forEach(function (pill) {
+    pill.addEventListener("click", function () {
+      // a second click on the chosen person shows everybody again
+      choosePerson(personSelect.value === pill.dataset.person ? "" : pill.dataset.person);
+    });
+  });
+  personSelect.addEventListener("change", function () { choosePerson(personSelect.value); });
+
+  document.querySelectorAll(".cal-kinds [data-kind]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      kind = button.dataset.kind;
+      document.querySelectorAll(".cal-kinds [data-kind]").forEach(function (b) { b.classList.toggle("an", b === button); });
+      calendar.refetchEvents();
+    });
+  });
+
+  // In the person overview: a click on a plan also jumps the calendar to its day
+  document.getElementById("cal-side").addEventListener("click", function (event) {
+    var target = event.target.closest("[data-goto]");
+    if (target) { calendar.gotoDate(target.dataset.goto); }
+    if (event.target.closest("[data-person-close]")) { personSelect.value = ""; pills.forEach(function (p) { p.classList.remove("on"); }); calendar.refetchEvents(); }
+  });
   // The side panel opens/closes -> the calendar gets narrower/wider.
   document.getElementById("cal-side").addEventListener("htmx:afterSwap", function () { calendar.updateSize(); });
 

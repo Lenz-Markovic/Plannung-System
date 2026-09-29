@@ -1,6 +1,7 @@
 import datetime
 
 from django import forms
+from django.db.models import Q
 
 from .models import Employee
 from .rules.ordering import STRATEGIES
@@ -16,7 +17,11 @@ def next_working_day(today=None):
 
 
 class PlanForm(forms.Form):
-    """The dialog "Ableseroute planen" (same fields as in the prototype)."""
+    """The dialog "Fahrplan planen" (same fields as in the prototype).
+
+    readings / installations: what is selected. The person list shows readers,
+    installers, or - for a plan with both - everybody who can do either.
+    """
 
     employee = forms.ModelChoiceField(label="Ableser", queryset=Employee.objects.filter(can_read=True, active=True),
                                       empty_label="– bitte wählen –")
@@ -26,9 +31,18 @@ class PlanForm(forms.Form):
     break_minutes = forms.TypedChoiceField(label="Pause", choices=BREAK_CHOICES, coerce=int, initial=30)
     strategy = forms.ChoiceField(label="Reihenfolge", choices=list(STRATEGIES.items()), initial="far")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, readings=True, installations=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["date"].initial = next_working_day()
+        if "date" not in self.initial:
+            self.fields["date"].initial = next_working_day()
+        employee = self.fields["employee"]
+        active = Employee.objects.filter(active=True)
+        if installations and readings:
+            employee.label = "Person (Ableser / Monteur)"
+            employee.queryset = active.filter(Q(can_read=True) | Q(can_install=True))
+            employee.label_from_instance = lambda e: f"{e} ({'Ableser + Monteur' if e.can_read and e.can_install else 'Monteur' if e.can_install else 'Ableser'})"
+        elif installations:
+            employee.label, employee.queryset = "Monteur", active.filter(can_install=True)
 
 
 class DraftSettingsForm(forms.Form):
@@ -36,10 +50,3 @@ class DraftSettingsForm(forms.Form):
 
     start = PlanForm.base_fields["start"]
     break_minutes = PlanForm.base_fields["break_minutes"]
-
-
-class MontagePlanForm(PlanForm):
-    """The same dialog for installation orders: an installer instead of a reader."""
-
-    employee = forms.ModelChoiceField(label="Monteur", queryset=Employee.objects.filter(can_install=True, active=True),
-                                      empty_label="– bitte wählen –")

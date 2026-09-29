@@ -1,0 +1,38 @@
+{# Side panel after clicking a day in the calendar (planning/views.py: day_overview). #}
+<div class="card-lite person-panel">
+  <div class="d-flex justify-content-between align-items-start">
+    <h3 class="h6 mb-1">📅 {{ date|date:"l, d.m.Y" }}</h3>
+    <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen">✕</button>
+  </div>
+  {% if weekend %}<div class="pr-status warn">Wochenende</div>{% endif %}
+
+  <h4 class="pp-h">Geplant ({{ tours|length }})</h4>
+  {% for t in tours %}
+    <button class="pp-tour" hx-get="{% url 'planning:tour_detail' t.pk %}" hx-target="#cal-side">
+      <span class="dot" style="background:{{ t.employee.calendar_color }}"></span> <b>{{ t.employee }}</b>
+      <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% else %}📖 Ablesung{% endif %}</span>
+      <span class="na small">{{ t.stops.all|length }} Stopp{{ t.stops.all|length|pluralize:"s" }} · {{ t.start_time|time:"H:i" }}{% if t.status == "provisional" %} · ⏳{% endif %}</span>
+    </button>
+  {% empty %}<div class="na small">Noch niemand eingeplant.</div>{% endfor %}
+
+  {% if absent %}
+    <h4 class="pp-h">Abwesend</h4>
+    {% for a in absent %}<div class="small">🏖 {{ a.employee }} · {{ a.get_kind_display }}</div>{% endfor %}
+  {% endif %}
+
+  <h4 class="pp-h">Noch frei ({{ free|length }})</h4>
+  {% for e in free %}
+    <div class="pp-free">
+      <span><span class="dot" style="background:{{ e.calendar_color }}"></span> {{ e }}
+        <span class="pill-role">{% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</span></span>
+      {% if perms.planning.add_tour and selected and not e.fits %}
+        <span class="na small" title="kann nicht alles Angekreuzte übernehmen">{% if e.can_read %}nur Ablesung{% else %}nur Montage{% endif %}</span>
+      {% elif perms.planning.add_tour %}
+        {# Opens "Fahrplan planen" with this day and person filled in #}
+        <button class="btn mini {% if selected %}primary{% endif %}" hx-get="{% url 'planning:dialog' %}?datum={{ date|date:'Y-m-d' }}&person={{ e.pk }}" hx-target="#modal"
+                title="{% if selected %}Die {{ selected }} angekreuzten Stopps für {{ e }} an diesem Tag planen{% else %}Zuerst in 🏢 Liegenschaften oder 🔧 Montage ankreuzen{% endif %}">planen{% if selected %} ({{ selected }}){% endif %}</button>
+      {% endif %}
+    </div>
+  {% empty %}<div class="na small">Alle sind eingeplant oder abwesend.</div>{% endfor %}
+  {% if perms.planning.add_tour and not selected %}<div class="na small mt-2">Tipp: In „🏢 Liegenschaften“ oder „🔧 Montage“ ankreuzen – dann hier „planen“.</div>{% endif %}
+</div>

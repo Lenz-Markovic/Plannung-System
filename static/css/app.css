@@ -479,3 +479,41 @@ tr.erledigt td { color: var(--muted); }
 .itemtable th, .itemtable td { border-bottom: 1px solid var(--grid); padding: 3px 6px; }
 .odet-msg { font-size: 13px; margin-bottom: 4px; }
 .dlg-liste { font-size: 13px; max-height: 160px; overflow: auto; padding-left: 18px; }
+
+/* ---- Reading vs. installation: the same marks everywhere --------------------- */
+/* 📖 Ablesung = blue tag, plain; 🔧 Montage = amber tag, light diagonal stripes   */
+.art-tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 5px; padding: 1px 6px; margin-right: 4px; white-space: nowrap; }
+.art-tag.reading { background: var(--accent-wash); color: var(--accent); }
+.art-tag.installation { background: #fbf0dd; color: var(--warn-ink); }
+.art-tag.mixed { background: linear-gradient(90deg, var(--accent-wash) 50%, #fbf0dd 50%); color: var(--ink); }
+.pr-stopp.installation { background-image: repeating-linear-gradient(135deg, rgba(250, 178, 25, .07) 0 8px, transparent 8px 16px); }
+.pr-add { margin-top: 10px; border: 1px dashed var(--ring); border-radius: 9px; padding: 8px 10px; background: var(--surface); }
+.pr-add input[type=search] { width: 100%; margin-top: 6px; border: 1px solid var(--grid); border-radius: 6px; padding: 5px 8px; font-size: 13.5px; }
+.pr-add-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.pr-add-row:last-child { border-bottom: 0; }
+
+/* ---- Calendar: people clickable, kind of plan visible ------------------------ */
+button.cal-pill { cursor: pointer; font: inherit; font-size: 12px; color: var(--ink); }
+button.cal-pill:hover { border-color: var(--axis); }
+.cal-pill.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-wash); font-weight: 600; }
+.fc-event.tour .fc-event-title { text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+.pill-role { font-size: 10.5px; opacity: .8; }
+.cal-kinds { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.cal-kinds .ul-f { cursor: pointer; font: inherit; font-size: 12.5px; }
+/* Montage = diagonal white stripes over the person's colour; both = stripes on the right half */
+.fc-event.kind-installation, .leg-bar.kind-installation {
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.2) 0 5px, transparent 5px 11px); }
+.fc-event.kind-mixed, .leg-bar.kind-mixed {
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.2) 0 5px, transparent 5px 11px);
+  background-size: 50% 100%; background-position: right; background-repeat: no-repeat; }
+.leg-bar { display: inline-block; width: 26px; height: 12px; border-radius: 3px; background-color: #5b8fd0; vertical-align: -2px; }
+/* person overview in the side panel */
+.person-panel .pp-h { font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+.pp-weeks { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.pp-week { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: center; }
+.pp-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.pp-bar span { display: block; height: 100%; background: var(--accent); }
+.pp-tour { display: block; width: 100%; text-align: left; border: 1px solid var(--ring); border-radius: 8px; background: var(--surface);
+  padding: 5px 8px; margin-bottom: 4px; font: inherit; font-size: 13px; cursor: pointer; }
+.pp-tour:hover { border-color: var(--accent); background: var(--accent-wash); }
+.pp-free { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; border-bottom: 1px dashed var(--grid); }

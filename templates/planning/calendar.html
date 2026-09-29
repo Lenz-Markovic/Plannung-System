@@ -20,13 +20,28 @@
   <div class="f"><label for="cal-person">Person</label>
     <select id="cal-person">
       {% if employees|length > 1 %}<option value="">alle Personen</option>{% endif %}
-      {% for e in employees %}<option value="{{ e.pk }}">{{ e.short_name }}{% if e.can_install and not e.can_read %} (Monteur){% endif %}</option>{% endfor %}
+      {% for e in employees %}<option value="{{ e.pk }}">{{ e.short_name }} {% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</option>{% endfor %}
     </select></div>
+  {# Click a person: only their plans + their overview on the right. Click again: everybody. #}
   <div class="cal-legend">
-    {% for e in employees %}<span class="cal-pill"><span class="dot" style="background:{{ e.calendar_color }}"></span>{{ e.short_name }}</span>{% endfor %}
+    {% for e in employees %}<button type="button" class="cal-pill" data-person="{{ e.pk }}"
+        data-overview="{% url 'planning:person' e.pk %}" title="Nur {{ e.short_name }} zeigen – mit Übersicht">
+      <span class="dot" style="background:{{ e.calendar_color }}"></span>{{ e.short_name }}
+      <span class="pill-role">{% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</span></button>{% endfor %}
+  </div>
+  {# Which kind of plans: all / only readings / only installations / both in one plan #}
+  <div class="cal-kinds" role="group" aria-label="Art der Fahrpläne">
+    <button type="button" class="ul-f an" data-kind="">alle</button>
+    <button type="button" class="ul-f" data-kind="reading"><span class="art-tag reading">📖 Ablesung</span></button>
+    <button type="button" class="ul-f" data-kind="installation"><span class="art-tag installation">🔧 Montage</span></button>
+    <button type="button" class="ul-f" data-kind="mixed"><span class="art-tag mixed">📖🔧 beides</span></button>
   </div>
   <div class="legend">
+    <span><span class="leg-bar kind-reading"></span> Ablesung</span>
+    <span><span class="leg-bar kind-installation"></span> Montage (gestreift)</span>
+    <span><span class="leg-bar kind-mixed"></span> beides an einem Tag</span>
     <span>⏳ vorläufig</span><span>⟳ neu rechnen</span><span class="t-crit">⚠ Montage-Konflikt</span><span>🏖 abwesend</span>
+    <span class="na">· Maus über einen Plan zeigt die Stopps · Klick auf einen Tag zeigt, wer noch frei ist</span>
   </div>
 </div>
 
@@ -36,6 +51,7 @@
     <div id="calendar"
          data-feed-url="{% url 'planning:calendar_feed' %}"
          data-editable="{% if editable %}1{% else %}0{% endif %}"
+         {% if perms.planning.view_tour %}data-day-url="{% url 'planning:day' %}"{% endif %}
          data-initial-date="{{ initial_date }}"
          data-csrf="{{ csrf_token }}"></div>
   </div>

@@ -1,0 +1,48 @@
+{# Side panel after clicking a person in the calendar (planning/views.py: person_overview). #}
+{% load core_tags %}
+<div class="card-lite person-panel">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h3 class="h6 mb-1"><span class="dot" style="background:{{ employee.calendar_color }}"></span> {{ employee }}</h3>
+      <div>{% if employee.can_read %}<span class="art-tag reading">📖 Ableser</span>{% endif %}{% if employee.can_install %}<span class="art-tag installation">🔧 Monteur</span>{% endif %}</div>
+    </div>
+    <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen" data-person-close>✕</button>
+  </div>
+
+  {# Workload of this and the next two weeks (5 days × 7,5 h = 100 %) #}
+  <div class="pp-weeks">
+    {% for w in weeks %}
+      <div class="pp-week" title="{{ w.days }} Tag{{ w.days|pluralize:'e' }} geplant · {{ w.minutes|hours }} von 37,5 Std">
+        <span class="na small">KW {{ w.start|date:"W" }}{% if forloop.first %} (diese){% endif %}</span>
+        <div class="pp-bar"><span style="width:{{ w.percent }}%"></span></div>
+        <span class="small"><b>{{ w.minutes|hours }}</b> · {{ w.days }} Tag{{ w.days|pluralize:"e" }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h4 class="pp-h">Nächste Fahrpläne</h4>
+  {% for t in tours %}
+    {# Click: this plan in the side panel, the calendar jumps to its day #}
+    <button class="pp-tour" hx-get="{% url 'planning:tour_detail' t.pk %}" hx-target="#cal-side" data-goto="{{ t.date|date:'Y-m-d' }}">
+      <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% else %}📖 Ablesung{% endif %}</span>
+      <b>{{ t.date|date:"D d.m." }}</b> {{ t.start_time|time:"H:i" }}–{{ t.end_shown|time:"H:i" }}
+      <span class="na small">· {{ t.stops.all|length }} Stopp{{ t.stops.all|length|pluralize:"s" }} · {{ t.net_minutes|hours }}{% if t.status == "provisional" %} · ⏳ vorläufig{% endif %}</span>
+    </button>
+  {% empty %}<div class="na small">Keine Fahrpläne ab heute.</div>{% endfor %}
+
+  {% if employee.can_install %}
+    <h4 class="pp-h">Zugewiesene Aufträge ohne Termin{% if open_orders %} ({{ open_orders|length }}){% endif %}</h4>
+    {% for o in open_orders|slice:":6" %}<div class="small">🔧 <b>{{ o.re_number }}</b> {{ o.street }}, {{ o.city }} · {{ o.duration_minutes }} min</div>
+    {% empty %}<div class="na small">Keine – alles eingeplant.</div>{% endfor %}
+    {% if open_orders %}<a class="small" href="{% url 'orders:list' %}?installer={{ employee.pk }}&termin=ohne">→ in „🔧 Montage“ ankreuzen und planen</a>{% endif %}
+  {% endif %}
+
+  {% if absences %}
+    <h4 class="pp-h">Abwesend</h4>
+    {% for a in absences %}<div class="small">🏖 {{ a.start_date|date:"d.m." }}–{{ a.end_date|date:"d.m.Y" }} · {{ a.get_kind_display }}</div>{% endfor %}
+  {% endif %}
+
+  <div class="side-actions">
+    <a class="btn" href="{% url 'planning:my_day' %}?person={{ employee.pk }}">📱 Tagesansicht wie auf dem Handy</a>
+  </div>
+</div>

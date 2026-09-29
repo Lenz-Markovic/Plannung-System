@@ -158,6 +158,22 @@ The only JavaScript is `static/js/calendar.js` (commented).
   for all 240 demo buildings). `conflicts/services.py` stores the result after every
   planning change. After an update run `python manage.py update_conflicts` once.
 
+## One plan with readings and installations, clearer calendar
+
+- Tick buildings in 🏢 Liegenschaften **and** orders in 🔧 Montage: both buttons show
+  the other count ("+ 🔧 2") and open the same dialog → one plan with both.
+- In the preview: **＋ Stopp hinzufügen** (search AZ, RE-Nr., street, town) and
+  "Passt dazu" suggestions (open order for a building in the plan, the reading of a
+  building that gets an installation, orders assigned to this installer). A warning
+  appears if the person is not registered as Ableser / Monteur for a stop.
+- Everywhere: 📖 Ablesung = blue, 🔧 Montage = amber and striped, 📖🔧 = both in one plan.
+- Calendar: click a **person** → only their plans + overview (workload of 3 weeks, next
+  plans, assigned orders without date, absences); click again → everybody. Buttons
+  alle / Ablesung / Montage / beides filter the plans. Mouse over a plan shows its
+  stops. Click a **day** → who is planned, absent, still free, with "planen" (dialog
+  with day and person filled in).
+- The ⚠ in the calendar now comes from the stored conflicts: accepted ones disappear.
+
 ## Project layout
 
 | Folder | Contents |

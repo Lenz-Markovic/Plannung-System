@@ -1,10 +1,15 @@
-{# Dialog "Ableseroute planen" (planDlg in the prototype). #}
+{# Dialog "Fahrplan planen" (planDlg in the prototype): readings and/or installations. #}
 <div class="dlg-back">
   <div class="dlg">
     <button class="dlg-x" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#modal">✕</button>
-    <h3>Ableseroute planen</h3>
-    <p class="dlg-sub"><b>{{ buildings|length }}</b> Liegenschaften ausgewählt · {{ minutes }} min reine Ablesezeit</p>
-    {% if not buildings %}<div class="alert alert-warning py-2">Bitte zuerst Liegenschaften in der Tabelle ankreuzen.</div>{% endif %}
+    <h3>{% if buildings and orders %}Fahrplan mit Ablesung und Montage{% elif orders %}Montage planen{% else %}Ableseroute planen{% endif %}</h3>
+    <p class="dlg-sub">
+      {% if buildings %}<span class="art-tag reading">📖 {{ buildings|length }} Liegenschaft{{ buildings|length|pluralize:"en" }}</span> {{ reading_minutes }} min Ablesezeit{% endif %}
+      {% if buildings and orders %}&nbsp;+&nbsp;{% endif %}
+      {% if orders %}<span class="art-tag installation">🔧 {{ orders|length }} Auftr{{ orders|length|pluralize:"ag,äge" }}</span> {{ installation_minutes }} min Montagezeit{% endif %}
+    </p>
+    {% if not buildings and not orders %}<div class="alert alert-warning py-2">Bitte zuerst Liegenschaften oder Montageaufträge in der Tabelle ankreuzen.</div>{% endif %}
+    {% if orders %}<ul class="dlg-liste">{% for o in orders %}<li>🔧 <b>{{ o.re_number }}</b> {{ o.street }}, {{ o.city }} · {{ o.duration_minutes }} min{% if o.assigned_installers.all %} · Monteur: {{ o.assigned_installers.all|join:", " }}{% endif %}</li>{% endfor %}</ul>{% endif %}
     <form hx-post="{% url 'planning:dialog' %}" hx-target="#modal">
       <div class="dlg-grid">
         {% for field in form %}
@@ -13,10 +18,12 @@
         {% endfor %}
       </div>
       <p class="dlg-hinweis">Im nächsten Schritt rechnet TomTom die echten Fahrzeiten (Verkehr am gewählten Wochentag zur jeweiligen Abfahrtszeit).
-        Du prüfst den Plan, änderst bei Bedarf die Reihenfolge und bestätigst ihn – erst dann wird er gespeichert.</p>
+        {% if orders %}Montagetermine werden gleich gegen die geplanten Ablesungen geprüft. {% endif %}
+        In der Prüfung kannst du weitere Ablesungen oder Montagen hinzufügen („＋ Stopp hinzufügen“). Erst beim Übernehmen wird gespeichert.
+        {% if not orders %}<br>Tipp: Unter „🔧 Montage“ angekreuzte Aufträge kommen automatisch mit in diesen Plan.{% elif not buildings %}<br>Tipp: Unter „🏢 Liegenschaften“ angekreuzte Liegenschaften kommen automatisch mit in diesen Plan.{% endif %}</p>
       <div class="dlg-btns">
         <button class="btn" type="button" hx-get="{% url 'empty' %}" hx-target="#modal">Abbrechen</button>
-        <button class="btn primary" {% if not buildings %}disabled{% endif %}>Weiter zur Prüfung →</button>
+        <button class="btn primary" {% if not buildings and not orders %}disabled{% endif %}>Weiter zur Prüfung →</button>
       </div>
     </form>
   </div>

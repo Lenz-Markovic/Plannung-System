@@ -9,11 +9,12 @@ badges in the title show the state:
 
 import datetime
 
+from django.db.models import Q
 from django.urls import reverse
 
-from conflicts.rules import CRITICAL, WARNING, check_installation_vs_reading
+from conflicts.models import Conflict, Severity
 
-from .models import Absence, StopKind, Tour, TourStatus, TourStop
+from .models import Absence, StopKind, Tour, TourStatus
 
 
 def _hours(minutes):
@@ -21,31 +22,56 @@ def _hours(minutes):
 
 
 def installation_conflicts(tours):
-    """Tour ids with a reading that clashes with an installation (spec section 8)."""
-    reading = {}
-    for tour in tours:
-        for stop in tour.stops.all():
-            if stop.kind == StopKind.READING:
-                reading.setdefault(stop.building_id, []).append(tour)
-    installations = (TourStop.objects.filter(kind=StopKind.INSTALLATION, installation_order__building_id__in=reading)
-                     .select_related("tour", "installation_order"))
+    """Tour ids with an open reading-vs-installation conflict (stored by conflicts/services.py).
+
+    Both tours are marked: the one with the reading and the one with the
+    installation. Conflicts accepted knowingly ("bewusst übernommen") are not.
+    """
+    tour_ids = [tour.pk for tour in tours]
+    open_conflicts = Conflict.objects.filter(
+        acknowledged_at__isnull=True, severity__in=[Severity.CRITICAL, Severity.WARNING]
+    ).filter(Q(stop__tour_id__in=tour_ids) | Q(other_stop__tour_id__in=tour_ids))
     clashing = set()
-    for stop in installations:
-        for tour in reading.get(stop.installation_order.building_id, []):
-            if check_installation_vs_reading(tour.date, stop.tour.date).severity in (CRITICAL, WARNING):
-                clashing.add(tour.pk)
+    for stop_tour, other_tour in open_conflicts.values_list("stop__tour_id", "other_stop__tour_id"):
+        clashing.update(t for t in (stop_tour, other_tour) if t in tour_ids)
     return clashing
 
 
-def calendar_events(start, end, employees, editable):
+KIND_ICONS = {"reading": "📖", "installation": "🔧", "mixed": "📖🔧"}
+
+
+def tour_kind(stops):
+    """'reading', 'installation' or 'mixed' (both in one plan)."""
+    kinds = {s.kind for s in stops}
+    if kinds == {StopKind.INSTALLATION}:
+        return "installation"
+    return "mixed" if StopKind.INSTALLATION in kinds else "reading"
+
+
+def _tooltip(tour, stops):
+    """Text shown when the mouse is over a tour: one line per stop."""
+    lines = [f"{tour.employee} · {tour.date:%d.%m.%Y} · {tour.get_status_display()}"]
+    for stop in stops:
+        target = stop.building or stop.installation_order
+        icon = "🔧" if stop.kind == StopKind.INSTALLATION else "📖"
+        when = f"{stop.start_time:%H:%M} " if stop.start_time else ""
+        lines.append(f"{when}{icon} {target.street}, {target.city}" if target else f"{when}{icon}")
+    return "\n".join(lines)
+
+
+def calendar_events(start, end, employees, editable, kind=""):
+    """kind: '' = all plans, or only 'reading' / 'installation' / 'mixed' plans."""
     tours = list(
         Tour.objects.filter(date__gte=start, date__lt=end, employee__in=employees)
-        .select_related("employee").prefetch_related("stops")
+        .select_related("employee").prefetch_related("stops__building", "stops__installation_order")
     )
     clashing = installation_conflicts(tours)
     events = []
     for tour in tours:
-        stops = list(tour.stops.all())
+        stops = sorted(tour.stops.all(), key=lambda s: s.position)
+        plan_kind = tour_kind(stops)
+        if kind and plan_kind != kind:
+            continue
         badges = []
         if tour.status == TourStatus.PROVISIONAL:
             badges.append("⏳")
@@ -54,21 +80,21 @@ def calendar_events(start, end, employees, editable):
         if tour.pk in clashing:
             badges.append("⚠")
         installations = sum(1 for s in stops if s.kind == StopKind.INSTALLATION)
-        what = f"{len(stops)} Stopp{'s' if len(stops) != 1 else ''}"
-        if installations:
-            what += f" · {installations}× Montage"
+        readings = len(stops) - installations
+        what = " · ".join(([f"{readings}× Ablesung"] if readings else []) + ([f"{installations}× Montage"] if installations else []))
         end_time = tour.end_time or (datetime.datetime.combine(tour.date, tour.start_time)
                                      + datetime.timedelta(minutes=tour.work_minutes + tour.drive_minutes)).time()
         events.append({
             "id": tour.pk,
-            "title": " ".join(badges + [f"{tour.employee} · {what} · {_hours(tour.work_minutes + tour.drive_minutes)} h"]),
+            "title": " ".join(badges + [f"{KIND_ICONS[plan_kind]} {tour.employee} · {what} · {_hours(tour.work_minutes + tour.drive_minutes)} h"]),
             "start": datetime.datetime.combine(tour.date, tour.start_time).isoformat(),
             "end": datetime.datetime.combine(tour.date, end_time).isoformat(),
             "backgroundColor": tour.employee.calendar_color,
             "borderColor": "#d03b3b" if tour.pk in clashing else ("#fab219" if tour.needs_recalculation else tour.employee.calendar_color),
-            "classNames": ["tour", tour.status] + (["needs-recalc"] if tour.needs_recalculation else []),
+            "classNames": ["tour", tour.status, f"kind-{plan_kind}"] + (["needs-recalc"] if tour.needs_recalculation else []),
             "editable": editable,
-            "extendedProps": {"version": tour.version, "detailUrl": reverse("planning:tour_detail", args=[tour.pk])},
+            "extendedProps": {"version": tour.version, "detailUrl": reverse("planning:tour_detail", args=[tour.pk]),
+                              "kind": plan_kind, "tooltip": _tooltip(tour, stops)},
         })
     for absence in Absence.objects.filter(employee__in=employees, start_date__lt=end, end_date__gte=start).select_related("employee"):
         events.append({

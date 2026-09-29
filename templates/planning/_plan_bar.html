@@ -1,8 +1,8 @@
 {# "Fahrplan erstellen (n)" in the page header; replaced after every checkbox click. #}
 <span id="plan-bar" class="plan-bar">
-  <button class="btn primary" {% if not selected_count %}disabled{% endif %}
+  <button class="btn primary" {% if not selected_count and not other_count %}disabled{% endif %}
           hx-get="{% url 'planning:dialog' %}" hx-target="#modal"
-          title="Aus den ausgewählten Liegenschaften einen Fahrplan bauen">🗺 Fahrplan erstellen{% if selected_count %} <b>({{ selected_count }})</b>{% endif %}</button>
+          title="Aus den ausgewählten Liegenschaften einen Fahrplan bauen">🗺 Fahrplan erstellen{% if selected_count %} <b>({{ selected_count }})</b>{% endif %}{% if other_count %} <b title="angekreuzte Montageaufträge kommen mit in den Plan">+ 🔧 {{ other_count }}</b>{% endif %}</button>
   {% if selected_count %}
     <span class="na small">{{ selected_minutes }} min Ablesezeit</span>
     <button class="btn mini" hx-post="{% url 'planning:select_clear' %}">Auswahl leeren</button>

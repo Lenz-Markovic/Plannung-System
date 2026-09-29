@@ -1,0 +1,6 @@
+{# One search result / suggestion with a "+" button that adds it to the draft. #}
+<div class="pr-add-row">
+  <span><b>{{ f.title }}</b> <span class="na small">{{ f.reason }}</span></span>
+  <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+          hx-vals='{"action": "add", "kind": "{{ f.kind }}", "pk": {{ f.pk }}}' title="Zum Plan hinzufügen">＋</button>
+</div>

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 
 from buildings.models import Building, InstallationOrder, OrderStatus
@@ -87,14 +87,15 @@ def order_bar_context(session):
     """Numbers for the "Montage planen (n)" button."""
     ids = get_order_selection(session)
     minutes = sum(o.duration_minutes for o in InstallationOrder.objects.filter(pk__in=ids))
-    return {"selected_count": len(ids), "selected_minutes": minutes}
+    return {"selected_count": len(ids), "selected_minutes": minutes, "other_count": len(get_selection(session))}
 
 
 def plan_bar_context(session):
     """Numbers for the "Fahrplan erstellen (n)" button in the list header."""
     ids = get_selection(session)
     minutes = sum(b.reading_minutes for b in Building.objects.filter(pk__in=ids))
-    return {"selected_count": len(ids), "selected_minutes": minutes}
+    # ticked orders (🔧 Montage) go into the same plan
+    return {"selected_count": len(ids), "selected_minutes": minutes, "other_count": len(get_order_selection(session))}
 
 
 # =============================================================================
@@ -201,6 +202,95 @@ def move_stop(draft, index, direction):
     if 0 <= index < len(stops) and 0 <= other < len(stops):
         stops[index], stops[other] = stops[other], stops[index]
     return draft
+
+
+def add_stop(draft, kind, pk):
+    """Add a reading (building pk) or an installation (order pk) at the end of the draft.
+
+    Returns a short text for the toast, or raises ValueError (unknown / already in the plan).
+    """
+    if kind == StopKind.READING:
+        building = Building.objects.filter(pk=pk).first()
+        if building is None:
+            raise ValueError("Liegenschaft nicht gefunden.")
+        new, label = {"kind": StopKind.READING, "building": building.pk}, f"Ablesung {building.file_number} {building.street}"
+    elif kind == StopKind.INSTALLATION:
+        order = InstallationOrder.objects.filter(pk=pk).first()
+        if order is None:
+            raise ValueError("Montageauftrag nicht gefunden.")
+        if order.status == OrderStatus.DONE:
+            raise ValueError(f"{order.re_number} ist schon erledigt.")
+        new, label = {"kind": StopKind.INSTALLATION, "order": order.pk, "building": order.building_id}, f"Montage {order.re_number} {order.street}"
+    else:
+        raise ValueError("Unbekannte Art.")
+    if _stop_key(new) in {_stop_key(s) for s in draft["stops"]}:
+        raise ValueError(f"{label} ist schon im Plan.")
+    draft["stops"].append(new)
+    return f"{label} hinzugefügt"
+
+
+@dataclass
+class Suggestion:
+    """Something that would fit into the plan (shown under the stops with a "+" button)."""
+
+    kind: str
+    pk: int
+    title: str
+    reason: str
+
+
+def draft_suggestions(draft, limit=6):
+    """Readings and installations that belong together (prototype: "Zusammen mit der HA").
+
+    - an open order for a building that is read in this plan
+    - the reading of a building that gets an installation in this plan, if not planned yet
+    - open orders assigned to this installer, still without an appointment
+    """
+    in_plan = {_stop_key(s) for s in draft["stops"]}
+    building_ids = {s["building"] for s in draft["stops"] if s["kind"] == StopKind.READING}
+    order_ids = {s["order"] for s in draft["stops"] if s["kind"] == StopKind.INSTALLATION}
+    buildings = Building.objects.filter(pk__in=building_ids)
+    cores = {b.file_number_core for b in buildings}
+    open_orders = InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(pk__in=order_ids)
+    found = []
+    for order in open_orders.filter(Q(building__in=building_ids) | Q(building_file_number_core__in=cores)).order_by("re_number"):
+        found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
+                                f"offen für eine Liegenschaft dieses Plans · {order.duration_minutes} min"))
+    for order in InstallationOrder.objects.filter(pk__in=order_ids, building__isnull=False).select_related("building"):
+        key = (StopKind.READING, order.building_id, None)
+        if key not in in_plan and not order.building.tour_stops.filter(kind=StopKind.READING).exists():
+            b = order.building
+            found.append(Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.city}",
+                                    f"gleiche Liegenschaft wie {order.re_number}, noch kein Ablesetermin · {b.reading_minutes} min"))
+    employee = Employee.objects.filter(pk=draft["employee"]).first()
+    if employee and employee.can_install:
+        for order in (open_orders.filter(assigned_installers=employee, tour_stops__isnull=True)
+                      .exclude(pk__in=[f.pk for f in found if f.kind == StopKind.INSTALLATION]).order_by("re_number")[:limit]):
+            found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
+                                    f"{employee} zugewiesen, noch ohne Termin · {order.duration_minutes} min"))
+    return found[:limit]
+
+
+def search_targets(query, draft, limit=6):
+    """Search box "+ Stopp hinzufügen": buildings (reading) and orders (installation)."""
+    words = query.split()
+    if not words or len(query.strip()) < 2:
+        return []
+    in_plan = {_stop_key(s) for s in draft["stops"]}
+    buildings, orders = Building.objects.all(), InstallationOrder.objects.exclude(status=OrderStatus.DONE)
+    for word in words:
+        buildings = buildings.filter(Q(file_number__icontains=word) | Q(street__icontains=word) | Q(city__icontains=word)
+                                     | Q(zip_code__startswith=word))
+        orders = orders.filter(Q(re_number__icontains=word) | Q(building_file_number__icontains=word)
+                               | Q(street__icontains=word) | Q(city__icontains=word) | Q(zip_code__startswith=word))
+    results = [Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.zip_code} {b.city}",
+                          f"{b.reading_minutes} min")
+               for b in buildings.order_by("file_number")[:limit] if (StopKind.READING, b.pk, None) not in in_plan]
+    results += [Suggestion(StopKind.INSTALLATION, o.pk, f"🔧 Montage {o.re_number} · {o.street}, {o.zip_code} {o.city}",
+                           f"{o.duration_minutes} min{' · ' + o.summary if o.summary else ''}")
+                for o in orders.order_by("re_number")[:limit]
+                if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
+    return results
 
 
 def remove_stop(draft, index):
@@ -425,6 +515,13 @@ def _add_findings(preview, draft):
         stop.findings = [Finding(severity, text) for severity, text in what_if.get(stop.order.pk, [])]
         if absent:
             stop.findings.append(Finding("critical", "Mitarbeiter ist an diesem Tag abwesend"))
+
+    # The person should be able to do the job (Employee: "Ableser" / "Monteur" ticked)
+    for stop in preview.stops:
+        if stop.kind == StopKind.READING and not preview.employee.can_read:
+            stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Ableser eingetragen"))
+        if stop.kind == StopKind.INSTALLATION and not preview.employee.can_install:
+            stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Monteur eingetragen"))
 
 
 def _add_commute(preview, client):

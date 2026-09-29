@@ -25,11 +25,11 @@ from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 
 from . import dayplan, services
-from .calendar import calendar_events
+from .calendar import calendar_events, tour_kind
 from .display import preview_map_data, route_sketch, tour_map_data
 from .excel import build_workbook
-from .forms import DraftSettingsForm, MontagePlanForm, PlanForm
-from .models import Employee, Tour, TourStop
+from .forms import DraftSettingsForm, PlanForm
+from .models import Absence, Employee, StopKind, Tour, TourStop
 from .rules.ordering import STRATEGIES
 from .tomtom import TomTomError, current_api_key, get_client
 
@@ -59,37 +59,27 @@ def select_clear(request):
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
 def plan_dialog(request):
-    ids = services.get_selection(request.session)
-    buildings = list(Building.objects.filter(pk__in=ids).order_by("file_number"))
-    form = PlanForm(request.POST or None)
-    if request.method == "POST" and form.is_valid() and buildings:
+    """"Fahrplan erstellen" / "Montage planen": everything ticked in BOTH lists.
+
+    Buildings (🏢 Liegenschaften) become readings, orders (🔧 Montage)
+    installations - so one plan can hold both.
+    """
+    buildings = list(Building.objects.filter(pk__in=services.get_selection(request.session)).order_by("file_number"))
+    orders = list(InstallationOrder.objects.filter(pk__in=services.get_order_selection(request.session)).order_by("re_number"))
+    initial = {key: value for key, value in (("date", request.GET.get("datum")), ("employee", request.GET.get("person"))) if value}
+    form = PlanForm(request.POST or None, initial=initial, readings=bool(buildings) or not orders, installations=bool(orders))
+    if request.method == "POST" and form.is_valid() and (buildings or orders):
         data = form.cleaned_data
         request.session[services.DRAFT_KEY] = services.create_draft(
-            [b.pk for b in buildings], data["employee"], data["date"], data["start"], data["break_minutes"], data["strategy"])
-        response = HttpResponse("")
-        response["HX-Redirect"] = reverse("planning:draft")
-        return response
-    return render(request, "planning/_plan_dialog.html", {
-        "form": form, "buildings": buildings, "minutes": sum(b.reading_minutes for b in buildings),
-    })
-
-
-@permission_required(PLAN_PERMISSION, raise_exception=True)
-def montage_dialog(request):
-    """"Montage planen": the selected orders for one installer and day (same preview as readings)."""
-    ids = services.get_order_selection(request.session)
-    orders = list(InstallationOrder.objects.filter(pk__in=ids).order_by("re_number"))
-    form = MontagePlanForm(request.POST or None)
-    if request.method == "POST" and form.is_valid() and orders:
-        data = form.cleaned_data
-        request.session[services.DRAFT_KEY] = services.create_draft(
-            [], data["employee"], data["date"], data["start"], data["break_minutes"], data["strategy"],
+            [b.pk for b in buildings], data["employee"], data["date"], data["start"], data["break_minutes"], data["strategy"],
             order_ids=[o.pk for o in orders])
         response = HttpResponse("")
         response["HX-Redirect"] = reverse("planning:draft")
         return response
-    return render(request, "planning/_montage_dialog.html", {
-        "form": form, "orders": orders, "minutes": sum(o.duration_minutes for o in orders),
+    return render(request, "planning/_plan_dialog.html", {
+        "form": form, "buildings": buildings, "orders": orders,
+        "reading_minutes": sum(b.reading_minutes for b in buildings),
+        "installation_minutes": sum(o.duration_minutes for o in orders),
     })
 
 
@@ -101,6 +91,7 @@ def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     return render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
+                                      "suggestions": services.draft_suggestions(draft),
                                       "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
                                       "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
 
@@ -136,8 +127,26 @@ def draft_action(request):
         if form.is_valid():
             current["start"] = form.cleaned_data["start"].strftime("%H:%M")
             current["break"] = form.cleaned_data["break_minutes"]
+    message, error = "", False
+    if action == "add":
+        # "+ Stopp hinzufügen": a reading or an installation joins the same plan
+        try:
+            message = services.add_stop(current, request.POST.get("kind"), int(request.POST.get("pk", 0)))
+        except ValueError as problem:
+            message, error = str(problem), True
     request.session[services.DRAFT_KEY] = current
-    return _render_preview(request, current)
+    response = _render_preview(request, current)
+    if message:
+        response.content += render(request, "core/_toast.html", {"message": message, "error": error}).content
+    return response
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def draft_search(request):
+    """Search box in the preview: buildings and orders to add to the plan."""
+    current = _draft_or_none(request)
+    results = services.search_targets(request.GET.get("q", ""), current) if current else []
+    return render(request, "planning/_draft_search.html", {"results": results, "query": request.GET.get("q", "")})
 
 
 @require_POST
@@ -217,7 +226,62 @@ def calendar_feed(request):
     if request.GET.get("person"):
         employees = employees.filter(pk=request.GET["person"])
     editable = request.user.has_perm("planning.change_tour")
-    return JsonResponse(calendar_events(start, end, employees, editable), safe=False)
+    kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed") else ""
+    return JsonResponse(calendar_events(start, end, employees, editable, kind), safe=False)
+
+
+@login_required
+def day_overview(request):
+    """Side panel after a click on a day: who is planned, who is absent, who is still free."""
+    if not request.user.has_perm("planning.view_tour"):
+        return HttpResponse(status=403)
+    try:
+        date = datetime.date.fromisoformat(request.GET.get("datum", ""))
+    except ValueError:
+        return HttpResponse(status=400)
+    tours = list(Tour.objects.filter(date=date).select_related("employee").prefetch_related("stops"))
+    for tour in tours:
+        tour.kind = tour_kind(list(tour.stops.all()))
+    absent = {a.employee_id: a for a in Absence.objects.filter(start_date__lte=date, end_date__gte=date).select_related("employee")}
+    planned = {t.employee_id for t in tours}
+    free = [e for e in Employee.objects.filter(active=True) if e.pk not in planned and e.pk not in absent]
+    selection = services.plan_bar_context(request.session)
+    # "planen" only for people who can do what is ticked (readings -> reader, orders -> installer)
+    for employee in free:
+        employee.fits = ((not selection["selected_count"] or employee.can_read)
+                         and (not selection["other_count"] or employee.can_install))
+    return render(request, "planning/_day_panel.html", {
+        "date": date, "tours": tours, "absent": list(absent.values()), "free": free,
+        "selected": selection["selected_count"] + selection["other_count"], "weekend": date.weekday() >= 5,
+    })
+
+
+@login_required
+def person_overview(request, pk):
+    """Side panel after a click on a person in the calendar: their plans at a glance."""
+    employee = get_object_or_404(_calendar_employees(request.user), pk=pk)
+    today = timezone.localdate()
+    monday = today - datetime.timedelta(days=today.weekday())
+    tours = list(Tour.objects.filter(employee=employee, date__gte=today).order_by("date")
+                 .prefetch_related("stops")[:12])
+    for tour in tours:
+        tour.kind = tour_kind(list(tour.stops.all()))
+        # imported plans have no end time yet: start + work + drive, like the calendar
+        tour.end_shown = tour.end_time or (datetime.datetime.combine(tour.date, tour.start_time)
+                                           + datetime.timedelta(minutes=tour.net_minutes)).time()
+    weeks = []
+    for offset in range(3):
+        start = monday + datetime.timedelta(weeks=offset)
+        week_tours = Tour.objects.filter(employee=employee, date__gte=start, date__lt=start + datetime.timedelta(days=7))
+        minutes = sum(t.work_minutes + t.drive_minutes for t in week_tours)
+        weeks.append({"start": start, "minutes": minutes, "days": week_tours.count(),
+                      "percent": min(100, round(minutes / (5 * 450) * 100))})  # 5 days × 7.5 h
+    open_orders = (InstallationOrder.objects.filter(assigned_installers=employee, tour_stops__isnull=True)
+                   .exclude(status="done").order_by("re_number"))
+    return render(request, "planning/_person.html", {
+        "employee": employee, "tours": tours, "weeks": weeks, "open_orders": open_orders,
+        "absences": Absence.objects.filter(employee=employee, end_date__gte=today).order_by("start_date")[:5],
+    })
 
 
 @login_required
@@ -229,8 +293,19 @@ def tour_detail(request, pk):
     stops = TourStop.objects.filter(tour=tour).select_related("building", "installation_order").order_by("position")
     return render(request, "planning/_tour_detail.html", {
         "tour": tour, "stops": stops, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
-        "employees": Employee.objects.filter(can_read=True, active=True),
+        # moving to another person: readers for readings, installers for installations, both for mixed plans
+        "employees": _move_candidates(stops),
     })
+
+
+def _move_candidates(stops):
+    kinds = {s.kind for s in stops}
+    people = Employee.objects.filter(active=True)
+    if StopKind.READING in kinds:
+        people = people.filter(can_read=True)
+    if StopKind.INSTALLATION in kinds:
+        people = people.filter(can_install=True)
+    return people if people.exists() else Employee.objects.filter(active=True)  # nobody can do both: show all
 
 
 @require_POST
