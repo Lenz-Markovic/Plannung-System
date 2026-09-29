@@ -5,7 +5,7 @@ import io
 import time
 
 import pytest
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group, Permission, User
 from django.core.management import call_command
 from django.test import Client
 from django.urls import reverse
@@ -127,16 +127,22 @@ def test_day_check_reloads_only_when_the_tour_changed(day):
     assert client.get(url, {"version": tour.version})["HX-Refresh"] == "true"
 
 
-def test_office_can_look_at_any_day(day):
-    office = login(user_with("dispo", roles.DISPATCHER))
-    html = office.get(reverse("planning:my_day") + f"?person={day['tour'].employee.pk}").content.decode()
-    assert "Mörikeweg 1" in html and "Stopp erledigt" in html  # dispatchers may tick stops, too
+def test_admin_can_look_at_any_day_in_the_phone_look(day):
+    admin = login(user_with("adm", roles.ADMIN))
+    html = admin.get(reverse("planning:my_day") + f"?person={day['tour'].employee.pk}").content.decode()
+    assert "Mörikeweg 1" in html and "Stopp erledigt" in html and 'class="day-phone"' in html
 
 
-def test_management_may_look_but_not_tick(day):
-    html = login(user_with("chef", roles.MANAGEMENT)).get(
-        reverse("planning:my_day") + f"?person={day['tour'].employee.pk}").content.decode()
-    assert "Mörikeweg 1" in html and "Stopp erledigt" not in html
+def test_mein_tag_only_for_readers_admin_and_granted_roles(day):
+    """Disposition, Sachbearbeitung, Leitung do not need it - an admin can give it to a role."""
+    for role in (roles.DISPATCHER, roles.PROCESSING, roles.MANAGEMENT):
+        client = login(user_with(f"u-{role}", role))
+        assert client.get(reverse("planning:my_day")).status_code == 403
+        assert "📱 Mein Tag" not in client.get(reverse("buildings:list")).content.decode()
+    group = Group.objects.get(name=roles.DISPATCHER)
+    group.permissions.add(Permission.objects.get(codename="view_own_tours"))
+    granted = login(user_with("dispo2", roles.DISPATCHER))
+    assert granted.get(reverse("planning:my_day") + f"?person={day['tour'].employee.pk}").status_code == 200
 
 
 def test_user_without_tour_rights_gets_403(day):

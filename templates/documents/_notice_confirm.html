@@ -1,0 +1,23 @@
+{# "Bist du sicher?" before printing a notice that is too late (like "Fahrplan erstellen"). #}
+<div class="dlg-back">
+  <div class="dlg">
+    <button class="dlg-x" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#modal">✕</button>
+    <h3>⏰ Aushang ist schon zu spät – trotzdem {% if docx %}als Word laden{% else %}drucken{% endif %}?</h3>
+    {% for day in days %}
+      <div class="pr-status warn mt-2">
+        {% if day.past %}Der Termin <b>{{ day.date|date:"l, d.m.Y" }}</b> ist schon vorbei.
+        {% else %}Termin <b>{{ day.date|date:"l, d.m.Y" }}</b>: nur noch <b>{{ day.left }} Tag{{ day.left|pluralize:"e" }}</b>.
+          Der Aushang sollte 14 Tage vorher hängen (bis {{ day.deadline|date:"D d.m.Y" }}).{% endif %}
+        <div class="small mt-1">{{ day.streets }}</div>
+      </div>
+    {% endfor %}
+    <p class="small mt-2">Die Mieter haben dann weniger Zeit. Eventuell den Termin telefonisch ankündigen oder den Termin verschieben.</p>
+    <form method="post" action="{% url 'documents:notice_print' %}" {% if not docx %}target="_blank"{% endif %} class="dlg-foot"
+          onsubmit="setTimeout(function () { htmx.ajax('GET', '{% url 'empty' %}', '#modal'); }, 100)">{% csrf_token %}
+      {% for s in stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
+      {% if docx %}<input type="hidden" name="format" value="docx">{% endif %}
+      <button class="btn primary">{% if docx %}⬇ Trotzdem als Word laden{% else %}🖨 Trotzdem drucken{% endif %} ({{ stops|length }})</button>
+      <button type="button" class="btn" hx-get="{% url 'empty' %}" hx-target="#modal">Abbrechen</button>
+    </form>
+  </div>
+</div>

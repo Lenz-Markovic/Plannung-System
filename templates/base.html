@@ -47,7 +47,7 @@
     {% endif %}
     {% if perms.journal.view_activity %}
       {# behind the user name, not a button of its own: 🕘 Verlauf (who changed what - to know whom to ask) #}
-      <details class="user user-menu"><summary>{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %} ▾</summary>
+      <details class="user user-menu"><summary title="Menü: Verlauf">👤 {{ user.get_full_name|default:user.username }}<span class="who-role">{% for g in user.groups.all %} · {{ g.name }}{% endfor %}</span> ▾</summary>
         <div class="user-menu-box">
           <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}" hx-target="#drawer"
                   onclick="this.closest('details').open = false">🕘 Verlauf – wer hat was geändert?</button>

@@ -1,7 +1,9 @@
 {% load core_tags %}
 {# Side panel of one tour in the calendar (cal-side in the prototype). #}
 <div class="card-lite">
+  {# live: new notes at once, and every minute what the Ableser/Monteur reports from "Mein Tag" #}
   <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}" hx-trigger="notes-changed from:body" hx-target="#cal-side"></div>
+  <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}?check={{ stamp|urlencode }}" hx-trigger="every 30s" hx-target="#cal-side"></div>
   <div class="d-flex justify-content-between align-items-start">
     <div>
       <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {% if tour.team.all %}👥 {% endif %}{{ tour.people_label }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
@@ -32,6 +34,10 @@
           {% if s.building %}<b>{{ s.building.street }}</b> <span class="o">{{ s.building.city }}</span>
           {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+          {# 📱 from "Mein Tag": done, note on site, status proposal #}
+          {% if s.done_at %}<div class="field-line done">✓ erledigt {{ s.done_at|date:"d.m. H:i" }}{% if s.done_by %} von <b>{{ s.done_by }}</b>{% endif %}</div>{% endif %}
+          {% if s.field_note and not s.field_is_problem %}<div class="field-line">📱 vor Ort: {{ s.field_note|truncatechars:200 }}</div>{% endif %}
+          {% if s.building.proposed_status %}<div class="field-line">🏷 Vorschlag{% if s.building.proposed_status_by %} von <b>{{ s.building.proposed_status_by }}</b>{% endif %}: <b>{{ s.building.get_proposed_status_display }}</b> – wartet aufs Büro (Liegenschaften-Liste: übernehmen)</div>{% endif %}
           {% for n in s.notes %}<div class="stop-note {{ n.kind }}">{{ n.icon }} <b>{{ n.get_kind_display }}</b>: {{ n.text|truncatechars:160 }} <span class="na">– {{ n.author|default:"?" }}</span></div>{% endfor %}
           {% if perms.journal.view_note and s.kind != "help" %}<button type="button" class="linkish small" hx-get="{% if s.installation_order %}{% url 'journal:notes' 'auftrag' s.installation_order.pk %}{% else %}{% url 'journal:notes' 'liegenschaft' s.building.pk %}{% endif %}?dialog=1" hx-target="#modal">📝 Notizen{% if s.notes %} ({{ s.notes|length }}){% endif %} · ＋ neue</button>{% endif %}
           {% if s.kind == "help" %}<div class="g help-line">🤝 Hilfe bei {{ s.help_tour.people_label|default:"(Plan gelöscht)" }}</div>
@@ -43,9 +49,7 @@
               {% elif s.notice.state == "late" %}Aushang fehlt – schon zu spät
               {% else %}Aushang noch nicht gedruckt{% endif %}
               {% if perms.planning.change_tour %}
-                <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
-                  <input type="hidden" name="stop" value="{{ s.pk }}"><button class="linkish" title="Nur diesen Aushang drucken">drucken</button>
-                  <button class="linkish" name="format" value="docx" formtarget="_self" title="Als Word-Datei (Firmen-Vorlage)">Word</button></form>
+                {% include "documents/_print_buttons.html" with stops=s|as_list label="drucken" word_label="Word" cls="linkish" word_cls="linkish" late=notices_too_late %}
                 · <button class="linkish" hx-post="{% url 'documents:notice_toggle' %}" hx-vals='{"stop": "{{ s.pk }}", "on": "0"}'
                           hx-target="#cal-side" title="Für diesen Stopp keinen Aushang">✕ kein Aushang</button>
               {% endif %}
@@ -53,7 +57,8 @@
           {% elif s.notice_possible and perms.planning.change_tour %}
             <div class="g notice-line off">📄 kein Aushang ·
               <button class="linkish" hx-post="{% url 'documents:notice_toggle' %}" hx-vals='{"stop": "{{ s.pk }}", "on": "1"}'
-                      hx-target="#cal-side" title="Für diesen Stopp einen Aushang für die Mieter drucken">＋ Aushang</button></div>
+                      hx-target="#cal-side" title="Für diesen Stopp einen Aushang für die Mieter vormerken">＋ Aushang</button>
+              · {% include "documents/_print_buttons.html" with stops=s|as_list label="🖨 gleich drucken" word_label="Word" cls="linkish" word_cls="linkish" late=notices_too_late %}</div>
           {% endif %}
           {% for h in s.helpers %}<div class="g help-line">🤝 Helfer: {{ h.tour.employee }}{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %}</div>{% endfor %}
           {% if perms.planning.add_tour and s.kind != "help" %}
@@ -80,7 +85,7 @@
     <div class="notice-box {% if not notice_stops %}off{% elif notices_late %}late{% elif notices_outdated %}outdated{% elif not notices_open %}done{% endif %}">
       <b>📄 Aushang für die Mieter</b> <span class="small">(nur wo nötig)</span>
       {% if not notice_stops %}
-        <div class="small">Für keinen Stopp gewählt. Bei Bedarf beim Stopp „＋ Aushang“ klicken.</div>
+        <div class="small">Für keinen Stopp gewählt. Bei Bedarf beim Stopp „＋ Aushang“ oder „🖨 gleich drucken“ klicken{% if notices_too_late %} – <b>für diesen Tag ist es schon zu spät</b> (14 Tage vorher: {{ notice_deadline|date:"d.m." }}){% endif %}.</div>
       {% else %}
         {% if not notices_open %}– ✓ alle gedruckt
         {% else %}– {{ notices_open }} von {{ notice_stops|length }} {% if notices_outdated %}fehlen oder sind veraltet{% else %}fehlen noch{% endif %}{% endif %}
@@ -89,11 +94,9 @@
       {% if perms.planning.change_tour %}
         <div class="notice-actions mt-1">
           {% if notice_stops %}
-            <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
-              {% for s in notice_stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
-              <button class="btn mini primary">🖨 Aushänge drucken ({{ notice_stops|length }})</button>
-              <button class="btn mini" name="format" value="docx" formtarget="_self" title="Firmen-Vorlage ausgefüllt, zum Bearbeiten in Word">⬇ Word ({{ notice_stops|length }})</button>
-            </form>
+            {% with n=notice_stops|length|stringformat:"s" %}{% with label="🖨 Aushänge drucken ("|add:n|add:")" word="⬇ Word ("|add:n|add:")" %}
+              {% include "documents/_print_buttons.html" with stops=notice_stops label=label word_label=word cls="btn mini primary" word_cls="btn mini" late=notices_too_late %}
+            {% endwith %}{% endwith %}
           {% endif %}
           {% if notice_off %}
             <button class="btn mini" hx-post="{% url 'documents:notice_toggle' %}" hx-target="#cal-side"

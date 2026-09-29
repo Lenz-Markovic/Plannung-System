@@ -81,7 +81,7 @@ def note_resolve(request, pk):
 # --- 🕘 Verlauf ----------------------------------------------------------------------------
 
 AREAS = [("", "Alle"), (ActivityKind.PLAN, "🗺 Fahrpläne"), (ActivityKind.NOTICE, "📄 Aushänge"),
-         (ActivityKind.ORDER, "🔧 Aufträge"), (ActivityKind.STATUS, "🏷 Status"), (ActivityKind.NOTE, "📝 Notizen"),
+         (ActivityKind.FIELD, "📱 vor Ort"), (ActivityKind.ORDER, "🔧 Aufträge"), (ActivityKind.STATUS, "🏷 Status"), (ActivityKind.NOTE, "📝 Notizen"),
          (ActivityKind.DOCUMENTS, "📥 Unterlagen")]
 PAGE = 60
 

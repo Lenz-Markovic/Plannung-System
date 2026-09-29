@@ -264,8 +264,23 @@ The only JavaScript is `static/js/calendar.js` (commented).
   plan it anyway.
 - A new note shows up at once in an open plan / side panel (`notes-changed`).
 
+## 📱 Reports from "Mein Tag" (live in the office)
+
+- On the phone every stop has "Notiz vor Ort" and **⚠ Problem ans Büro melden** (the note
+  goes to the office as a ⚠ note on the building / order; empty = "Bitte kurz beschreiben").
+- The calendar side panel of the plan shows per stop: ✓ erledigt (time, person), 📱 vor
+  Ort: the note, ⚠ Problem vor Ort, 🏷 status proposal of the reader. It checks every
+  30 s and reloads ONLY if something changed (nothing you type is lost otherwise).
+- Lists: badge **⚠ Problem**; Verlauf: filter **📱 vor Ort**.
+- **Mein Tag** itself is only for Ableser/Monteur, Admin and roles that get "Eigenen
+  Tagesplan sehen" in ⚙ Verwaltung → Gruppen (no longer for Disposition by default). On a
+  PC it has the same phone look (a phone frame in the middle).
+
 ## 🕘 Verlauf (who changed what)
 
+- The Verlauf starts with everything from before the update (taken over once from the
+  change history: plans, printed notices, status changes); since then every step is
+  recorded with the person.
 - Purpose: to know **whom to ask** about a step. So it is kept out of the way: click
   your **name in the navigation (▾) → 🕘 Verlauf – wer hat was geändert?**. It opens a side drawer: newest first, grouped by day,
   with who and when. Filters: Fahrpläne, Aushänge, Aufträge, Status, Notizen,
@@ -283,7 +298,8 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - **Who may see it**: permission `journal.view_activity` - Admin, Disposition,
   Sachbearbeitung, Leitung by default; not Ableser/Monteur. Change it per role in
   ⚙ Verwaltung → Gruppen. The Verlauf itself cannot be edited or deleted (admin read only).
-- After the update: `python manage.py migrate` and `python manage.py setup_roles`.
+- After an update `python manage.py migrate` is enough: NEW default permissions reach the
+  roles by themselves (core/role_sync.py). A permission an admin took away stays away.
 
 ## 💶 Material & Kosten (Montage, Admin only)
 
@@ -338,7 +354,11 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - **⬇ Word (n)** downloads ONE .docx with one page per notice: the template itself with
   its form fields filled (standard library only, `documents/aushang_docx.py`) - to
   change it further in Word.
-- Printing / Word marks the stops "✓ Aushang gedruckt"; the panel shows the deadline
+- Print **any time**: also "🖨 gleich drucken" at a stop without "＋ Aushang". When it is
+  already too late (less than 14 days before, or the day is over), a question comes first -
+  like "Fahrplan erstellen": "Aushang ist schon zu spät – trotzdem drucken?".
+- Ableser/Monteur see no Aushang information on their side.
+- Printing / Word marks the stops "✓ Aushang gedruckt … von <person>"; the panel shows the deadline
   (14 days before, red when late) and **⚠ veraltet** if the plan was moved or its time
   window changed since.
 - A new version of the template: replace `documents/vorlage/Aushang_Vorlage.dotx` (same

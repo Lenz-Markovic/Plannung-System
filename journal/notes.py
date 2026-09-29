@@ -86,6 +86,17 @@ def attach_notes(stops):
     return stops
 
 
+def field_problem(stop, text, user):
+    """⚠ Problem vor Ort from "Mein Tag": a note on the building / order - the office sees it at once."""
+    text = (text or "").strip()
+    if not text:
+        raise ValidationError("Bitte kurz beschreiben, was nicht geklappt hat.")
+    building = stop.building if stop.kind == "reading" or not stop.installation_order else None
+    order = stop.installation_order
+    return Note.objects.create(building=building, installation_order=order if building is None else None,
+                               kind=NoteKind.PROBLEM, text=text[:MAX_TEXT], author=user)
+
+
 def note_annotations(field):
     """Annotations for a list: open_notes (number) and has_storno. field: "building" / "installation_order"."""
     from django.db.models import Count, Exists, IntegerField, OuterRef, Subquery, Value
@@ -96,4 +107,5 @@ def note_annotations(field):
     return {
         "open_notes": Coalesce(Subquery(count, output_field=IntegerField()), Value(0)),
         "has_storno": Exists(open_notes.filter(kind=NoteKind.STORNO)),
+        "has_problem": Exists(open_notes.filter(kind=NoteKind.PROBLEM)),
     }

@@ -124,3 +124,9 @@ def row_count(row, groups):
 def row_money(row, groups):
     """Material row: € of the counted groups."""
     return row.money(groups)
+
+
+@register.filter
+def as_list(value):
+    """{% include ... with stops=s|as_list %} - one object as a list."""
+    return [value]

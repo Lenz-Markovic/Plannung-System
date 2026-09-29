@@ -50,7 +50,9 @@
     {% for a in absences %}<div class="small">🏖 {{ a.start_date|date:"d.m." }}–{{ a.end_date|date:"d.m.Y" }} · {{ a.get_kind_display }}</div>{% endfor %}
   {% endif %}
 
+  {% if perms.planning.view_own_tours %}
   <div class="side-actions">
     <a class="btn" href="{% url 'planning:my_day' %}?person={{ employee.pk }}">📱 Tagesansicht wie auf dem Handy</a>
   </div>
+  {% endif %}
 </div>

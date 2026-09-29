@@ -141,9 +141,9 @@ def test_late_warning_only_for_chosen_stops(demo, monkeypatch):
     dispo = login(roles.DISPATCHER, "dispo")
     tour = planned_tour()
     monkeypatch.setattr(timezone, "localdate", lambda *args: tour.date - datetime.timedelta(days=3))
-    assert "schon zu spät" not in panel(dispo, tour)
+    assert "Aushang fehlt – schon zu spät" not in panel(dispo, tour)  # no warning per stop without a choice
     switch_on(dispo, [tour.stops.exclude(kind=StopKind.HELP).first()])
-    assert "schon zu spät" in panel(dispo, tour)
+    assert "Aushang fehlt – schon zu spät" in panel(dispo, tour)
 
 
 def test_permissions(demo):
@@ -155,3 +155,29 @@ def test_permissions(demo):
     assert chef.get(reverse("documents:notice_page"), {"stop": stop.pk}).status_code == 200
     assert chef.post(reverse("documents:notice_print"), {"stop": [stop.pk]}).status_code == 403
     assert chef.post(reverse("documents:notice_toggle"), {"stop": [stop.pk], "on": "1"}).status_code == 403
+
+
+def test_print_any_time_but_ask_when_too_late(demo, monkeypatch):
+    dispo = login(roles.DISPATCHER, "dispo")
+    tour = planned_tour()
+    stop = tour.stops.exclude(kind=StopKind.HELP).first()
+    html = panel(dispo, tour)
+    assert "gleich drucken" in html  # printing works without "＋ Aushang" first
+    monkeypatch.setattr(timezone, "localdate", lambda *args: tour.date - datetime.timedelta(days=5))
+    html = panel(dispo, tour)
+    assert reverse("documents:notice_confirm") in html  # too late: the button asks first
+    question = dispo.get(reverse("documents:notice_confirm"), {"stop": [stop.pk]}).content.decode()
+    assert "schon zu spät" in question and "nur noch <b>5 Tage</b>" in question and "Trotzdem drucken" in question
+    word = dispo.get(reverse("documents:notice_confirm"), {"stop": [stop.pk], "format": "docx"}).content.decode()
+    assert "Trotzdem als Word laden" in word and 'name="format" value="docx"' in word
+    dispo.post(reverse("documents:notice_print"), {"stop": [stop.pk]})  # "Trotzdem drucken"
+    stop.refresh_from_db()
+    assert stop.notice_printed_at and stop.notice_wanted
+
+
+def test_in_time_prints_directly(demo, monkeypatch):
+    dispo = login(roles.DISPATCHER, "dispo")
+    tour = planned_tour()
+    monkeypatch.setattr(timezone, "localdate", lambda *args: tour.date - datetime.timedelta(days=30))
+    html = panel(dispo, tour)
+    assert reverse("documents:notice_confirm") not in html and 'action="/unterlagen/aushang/drucken/"' in html

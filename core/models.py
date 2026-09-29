@@ -86,3 +86,22 @@ class Features(models.Model):
     @classmethod
     def load(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+
+class RoleDefault(models.Model):
+    """A default permission that was already given to a role once (core/roles.py).
+
+    After `migrate`, only defaults that are NEW get added automatically - a permission an
+    admin took away from a role on purpose stays away.
+    """
+
+    role = models.CharField("Rolle", max_length=80)
+    permission = models.CharField("Recht", max_length=150)
+
+    class Meta:
+        unique_together = [("role", "permission")]
+        verbose_name = "Standardrecht (vergeben)"
+        verbose_name_plural = "Standardrechte (vergeben)"
+
+    def __str__(self):
+        return f"{self.role}: {self.permission}"

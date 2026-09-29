@@ -131,3 +131,50 @@ def test_reader_sees_no_aushang_and_no_verlauf(demo):
     assert "Aushang" not in panel and "wer hat was geändert" not in panel
     page = client_for(reader).get(reverse("planning:my_day")).content.decode()
     assert "Aushang" not in page and "user-menu" not in page
+
+
+# --- 📱 reports from "Mein Tag" -----------------------------------------------------------
+
+def reader_on(tour):
+    reader = user(roles.READER, f"abl{tour.pk}")
+    tour.employee.user = reader
+    tour.employee.save()
+    return reader
+
+
+def test_field_note_problem_and_done_are_live_in_the_office(demo):
+    tour = a_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    reader = reader_on(tour)
+    phone = client_for(reader)
+    office = client_for(user(roles.DISPATCHER, "dispo"))
+    first = office.get(reverse("planning:tour_detail", args=[tour.pk]))
+    stamp = first.content.decode().split("?check=")[1].split('"')[0]
+    from urllib.parse import unquote
+    assert office.get(reverse("planning:tour_detail", args=[tour.pk]), {"check": unquote(stamp)}).status_code == 204
+
+    phone.post(reverse("planning:stop_note", args=[stop.pk]), {"field_note": "Zähler in Whg 3 defekt", "problem": "1"})
+    phone.post(reverse("planning:stop_done", args=[stop.pk]), {"done": "1"})
+    changed = office.get(reverse("planning:tour_detail", args=[tour.pk]), {"check": unquote(stamp)})
+    html = changed.content.decode()
+    assert changed.status_code == 200  # something new: the panel reloads
+    assert "Problem vor Ort</b>: Zähler in Whg 3 defekt" in html and f"von <b>{reader}</b>" in html  # shown once, as problem
+    field = Activity.objects.filter(kind=ActivityKind.FIELD)
+    assert field.filter(text__startswith="⚠ Problem vor Ort").exists() and field.filter(text__startswith="✓ Stopp erledigt").exists()
+    row = office.get(reverse("buildings:list"), {"q": stop.building.file_number}).content.decode()
+    assert "⚠ Problem" in row
+
+
+def test_problem_needs_a_text(demo):
+    tour = a_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    html = client_for(reader_on(tour)).post(reverse("planning:stop_note", args=[stop.pk]),
+                                           {"field_note": "", "problem": "1"}).content.decode()
+    assert "Bitte kurz beschreiben" in html
+
+
+def test_backfill_fills_the_verlauf_from_the_history(demo):
+    from django.apps import apps
+    from journal.backfill import backfill
+    Activity.objects.all().delete()
+    assert backfill(apps) > 0 and Activity.objects.filter(kind=ActivityKind.PLAN).exists()

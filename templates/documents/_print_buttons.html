@@ -1,0 +1,15 @@
+{% load core_tags %}
+{# 🖨 print / ⬇ Word for some stops. Too late (less than 14 days)? Then first the question "trotzdem drucken?". #}
+{# with: stops, label, word_label, cls, word_cls, late #}
+{% if late %}
+  <button type="button" class="{{ cls }}" hx-get="{% url 'documents:notice_confirm' %}?{% for s in stops %}stop={{ s.pk }}{% if not forloop.last %}&amp;{% endif %}{% endfor %}"
+          hx-target="#modal" title="Schon zu spät – vorher kommt eine Frage">{{ label }}</button>
+  <button type="button" class="{{ word_cls }}" hx-get="{% url 'documents:notice_confirm' %}?format=docx{% for s in stops %}&amp;stop={{ s.pk }}{% endfor %}"
+          hx-target="#modal" title="Als Word-Datei (Firmen-Vorlage)">{{ word_label }}</button>
+{% else %}
+  <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
+    {% for s in stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
+    <button class="{{ cls }}">{{ label }}</button>
+    <button class="{{ word_cls }}" name="format" value="docx" formtarget="_self" title="Als Word-Datei (Firmen-Vorlage)">{{ word_label }}</button>
+  </form>
+{% endif %}

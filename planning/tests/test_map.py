@@ -116,8 +116,7 @@ def test_tile_view_answers_404_when_tomtom_fails(dispatcher, key, monkeypatch):
 # --- pages -----------------------------------------------------------------------
 
 def test_pages_show_the_map_but_never_the_key(dispatcher, key, tour):
-    for url in [reverse("planning:tour_detail", args=[tour.pk]),
-                reverse("planning:my_day") + f"?person={tour.employee.pk}"]:
+    for url in [reverse("planning:tour_detail", args=[tour.pk])]:
         html = dispatcher.get(url).content.decode()
         assert 'class="route-map' in html and "/planung/karte/0/0/0.png" in html, url
         assert SECRET not in html, url

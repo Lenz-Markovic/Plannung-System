@@ -25,8 +25,12 @@
 
   {% if can_work %}
     {# Note on site: saved when leaving the field #}
-    <textarea class="day-note" name="field_note" rows="2" placeholder="Notiz vor Ort (z. B. Mieter nicht da, Zähler defekt) …"
+    {% for p in s.problems %}<div class="stop-note problem">⚠ <b>ans Büro gemeldet</b> {{ p.created_at|date:"d.m. H:i" }}: {{ p.text|truncatechars:140 }}</div>{% endfor %}
+    <textarea class="day-note" id="fn-{{ s.pk }}" name="field_note" rows="2" placeholder="Notiz vor Ort (z. B. Mieter nicht da, Zähler defekt) …"
               hx-post="{% url 'planning:stop_note' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">{{ s.field_note }}</textarea>
+    {# something went wrong: the office sees it at once (📝 note ⚠, Verlauf 📱) #}
+    <button class="btn mini day-problem" hx-post="{% url 'planning:stop_note' s.pk %}" hx-include="#fn-{{ s.pk }}" hx-vals='{"problem": "1"}'
+            hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML" title="Die Notiz oben geht als Problem an das Büro">⚠ Problem ans Büro melden</button>
     <div class="day-actions">
       {% if s.done_at %}
         <button class="btn" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "0"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">↺ doch nicht erledigt</button>

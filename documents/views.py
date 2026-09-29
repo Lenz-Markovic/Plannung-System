@@ -27,6 +27,8 @@ from buildings.services import change_status
 from planning.models import StopKind, TourStop
 
 from journal.activity import day_label, record, streets
+
+from .notice_rules import notice_deadline
 from journal.models import ActivityKind
 
 from . import notices
@@ -244,6 +246,20 @@ def _docx_response(stops):
     response = HttpResponse(data, content_type=DOCX_TYPE)
     response["Content-Disposition"] = f'attachment; filename="{name}"'
     return response
+
+
+@permission_required("planning.change_tour", raise_exception=True)
+def notice_confirm(request):
+    """Too late (less than 14 days before) or the day is over: ask first, then print anyway."""
+    stops = [s for s in _chosen_stops(request.GET.getlist("stop")) if s.kind != StopKind.HELP]
+    today = timezone.localdate()
+    days = []
+    for tour in sorted({s.tour for s in stops}, key=lambda t: t.date):
+        mine = [s for s in stops if s.tour == tour]
+        days.append({"date": tour.date, "left": (tour.date - today).days, "past": tour.date < today,
+                     "deadline": notice_deadline(tour.date), "streets": streets(mine, limit=6)})
+    return render(request, "documents/_notice_confirm.html", {
+        "stops": stops, "days": days, "docx": request.GET.get("format") == "docx"})
 
 
 @permission_required("planning.view_tour", raise_exception=True)

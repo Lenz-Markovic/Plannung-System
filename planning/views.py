@@ -13,7 +13,8 @@ from urllib.parse import quote_plus
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Max, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -421,8 +422,12 @@ def tour_detail(request, pk):
     tour = get_object_or_404(Tour.objects.select_related("employee"), pk=pk)
     if not (request.user.has_perm("planning.view_tour") or tour.employee.user_id == request.user.pk):
         return HttpResponse(status=403)
+    stamp = _panel_stamp(tour)
+    if request.GET.get("check") == stamp:
+        return HttpResponse(status=204)  # polling: nothing new, the panel stays as it is
     stops = list(TourStop.objects.filter(tour=tour).select_related("building", "installation_order", "help_tour__employee",
-                                                                   "notice_printed_by").order_by("position"))
+                                                                   "notice_printed_by", "done_by",
+                                                                   "building__proposed_status_by").order_by("position"))
     office = request.user.has_perm("planning.view_tour")  # Ableser/Monteur: no Aushang, no Verlauf on their side
     helps = list(TourStop.objects.filter(kind=StopKind.HELP, help_tour=tour).select_related("tour__employee"))
     for stop in stops:
@@ -432,6 +437,8 @@ def tour_detail(request, pk):
         stop.notice_possible = office and stop.kind != StopKind.HELP
         stop.notice = notices.state_of(stop) if office and notices.wanted(stop) else None
     notes.attach_notes(stops)  # 📝 open notes of each building / order
+    for stop in stops:  # a note on site that went to the office as ⚠ problem is shown once, as the problem
+        stop.field_is_problem = any(n.kind == "problem" and n.text == stop.field_note for n in stop.notes)
     notice_states = [s.notice.state for s in stops if s.notice]
     # who can help at one object: everybody active who is not in this plan and not fixed in a team that day
     in_teams = Tour.objects.filter(date=tour.date, team__isnull=False).values("team")  # no NULLs in "NOT IN"
@@ -439,17 +446,33 @@ def tour_detail(request, pk):
                          .exclude(pk__in=in_teams).exclude(pk__in=Absence.objects.filter(
                              start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
-        "tour": tour, "stops": stops, "helper_candidates": helper_candidates,
+        "tour": tour, "stops": stops, "helper_candidates": helper_candidates, "stamp": stamp,
         # the last change (who to ask) - the full Verlauf is behind the user name in the navigation
         "last_change": tour.activities.select_related("user").first() if request.user.has_perm("journal.view_activity") else None,
         "notice_stops": [s for s in stops if s.notice], "notice_deadline": notice_deadline(tour.date),
         "notice_possible": [s for s in stops if s.notice_possible],
         "notice_off": [s for s in stops if s.notice_possible and not s.notice],
         "notices_open": sum(1 for state in notice_states if state != "printed"),
-        "notices_late": "late" in notice_states, "notices_outdated": "outdated" in notice_states, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
+        "notices_late": "late" in notice_states,
+        "notices_too_late": timezone.localdate() > notice_deadline(tour.date),  # printing asks "trotzdem?"
+        "notices_outdated": "outdated" in notice_states, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
         # moving to another person: readers for readings, installers for installations, both for mixed plans
         "employees": _move_candidates(stops),
     })
+
+
+def _panel_stamp(tour):
+    """Changes when anything in the side panel changes (stops, reports from Mein Tag, notes, Verlauf)."""
+    from journal.models import Activity, Note
+
+    stops = tour.stops.aggregate(last=Max("updated_at"))["last"]
+    ids = list(tour.stops.values_list("building_id", "installation_order_id"))
+    buildings, orders = {b for b, _ in ids if b}, {o for _, o in ids if o}
+    notes = Note.objects.filter(Q(building__in=buildings) | Q(installation_order__in=orders))
+    last_note = notes.aggregate(n=Max("pk"), r=Max("resolved_at"))
+    last_activity = Activity.objects.filter(tour=tour).aggregate(n=Max("pk"))["n"]
+    proposals = "".join(Building.objects.filter(pk__in=buildings).order_by("pk").values_list("proposed_status", flat=True))
+    return f"{tour.version}-{stops}-{last_note['n']}-{last_note['r']}-{last_activity}-{proposals}"
 
 
 def _move_candidates(stops):
@@ -592,13 +615,16 @@ def _day_employee(request):
 def _stop_context(stop):
     target = stop.building or stop.installation_order
     address = f"{target.street}, {target.zip_code} {target.city}"
+    notes.attach_notes([stop])  # open notes of the object: problems reported from here are shown on the card
+    stop.problems = [n for n in stop.notes if n.kind == "problem"]
     return {"s": stop, "address": address, "status_choices": BuildingStatus.choices,
             "navigation_url": "https://www.google.com/maps/dir/?api=1&destination=" + quote_plus(address)}
 
 
 @login_required
 def my_day(request):
-    if not (request.user.has_perm("planning.view_own_tours") or request.user.has_perm("planning.view_tour")):
+    # 📱 only for Ableser/Monteur, Admin and roles that got "Eigenen Tagesplan sehen" in the admin
+    if not request.user.has_perm("planning.view_own_tours"):
         raise PermissionDenied
     employee = _day_employee(request)
     if employee is None:
@@ -619,11 +645,11 @@ def my_day(request):
     })
 
 
-def _stop_answer(request, stop, message):
+def _stop_answer(request, stop, message, error=False):
     stops = list(stop.tour.stops.order_by("position"))
     response = render(request, "planning/_day_stop.html", {
         **_stop_context(stop), "can_work": True, "progress": dayplan.progress(stops), "oob_progress": True,
-        "message": message,
+        "message": message, "error": error,
     })
     return response
 
@@ -635,7 +661,7 @@ def stop_done(request, pk):
     done = request.POST.get("done") == "1"
     dayplan.set_stop_done(stop, request.user, done)
     target = stop.building or stop.installation_order
-    record(request.user, ActivityKind.PLAN, f"{'✓ Stopp erledigt' if done else 'Stopp wieder offen'}: {target.street} "
+    record(request.user, ActivityKind.FIELD, f"{'✓ Stopp erledigt' if done else 'Stopp wieder offen'}: {target.street} "
            f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
            order=stop.installation_order)
     return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
@@ -644,8 +670,23 @@ def stop_done(request, pk):
 @require_POST
 @login_required
 def stop_note(request, pk):
+    """Notiz vor Ort; with problem=1 also "⚠ Problem ans Büro" (a note the office sees at once)."""
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
+    before = stop.field_note
     dayplan.save_field_note(stop, request.POST.get("field_note", ""), request.user)
+    target = stop.building or stop.installation_order
+    where = f"{stop.tour.employee}, {target.street} ({day_label(stop.tour.date)})"
+    if request.POST.get("problem") == "1":
+        try:
+            notes.field_problem(stop, stop.field_note, request.user)
+        except ValidationError as error:
+            return _stop_answer(request, stop, error.messages[0], error=True)
+        record(request.user, ActivityKind.FIELD, f"⚠ Problem vor Ort – {where}: {stop.field_note}", tour=stop.tour,
+               building=stop.building, order=stop.installation_order)
+        return _stop_answer(request, stop, "Problem ans Büro gemeldet")
+    if stop.field_note != before:
+        record(request.user, ActivityKind.FIELD, f"Notiz vor Ort – {where}: {stop.field_note or '(gelöscht)'}",
+               tour=stop.tour, building=stop.building, order=stop.installation_order)
     return _stop_answer(request, stop, "Notiz gespeichert")
 
 
@@ -655,7 +696,7 @@ def stop_propose(request, pk):
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
     if not stop.building or not dayplan.may_work_on(request.user, stop.tour):
         raise PermissionDenied
-    propose_status(stop.building, request.POST.get("status", ""), request.user)
+    propose_status(stop.building, request.POST.get("status", ""), request.user)  # also in the Verlauf (Status)
     return _stop_answer(request, stop, "Vorschlag an das Büro geschickt")
 
 

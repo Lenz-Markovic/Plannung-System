@@ -49,6 +49,10 @@ class Command(BaseCommand):
             else:
                 group.permissions.add(*permissions)
 
+            from core.models import RoleDefault  # remembered: `migrate` will not add these again
+            for permission in permissions:
+                RoleDefault.objects.get_or_create(
+                    role=role, permission=f"{permission.content_type.app_label}.{permission.codename}")
             state = "angelegt" if created else "aktualisiert"
             self.stdout.write(f"{role}: {state}, {group.permissions.count()} Rechte")
         self.stdout.write(self.style.SUCCESS("Rollen sind eingerichtet."))

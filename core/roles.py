@@ -96,7 +96,7 @@ ROLE_PERMISSIONS = {
         *ENTER_DOCUMENTS,
         "buildings.set_status_open_rework",
         *EDIT_PROPERTY_MANAGER_AND_NOTES,
-        *OWN_DAY_PLAN,
+        # 📱 Mein Tag (OWN_DAY_PLAN) only for Ableser/Monteur and Admin - other roles get it in the admin if needed
         "planning.view_reports",
         *WRITE_NOTES,
         *VIEW_ACTIVITY,

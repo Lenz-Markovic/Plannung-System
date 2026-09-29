@@ -20,9 +20,11 @@ class NoteKind(models.TextChoices):
     STORNO = "storno", "Storno"
     WISH = "wish", "Terminwunsch"
     ACCESS = "access", "Zugang / Schlüssel"
+    PROBLEM = "problem", "Problem vor Ort"   # reported by the Ableser/Monteur from "Mein Tag"
 
 
-NOTE_ICONS = {NoteKind.INFO: "📝", NoteKind.STORNO: "⛔", NoteKind.WISH: "📅", NoteKind.ACCESS: "🔑"}
+NOTE_ICONS = {NoteKind.INFO: "📝", NoteKind.STORNO: "⛔", NoteKind.WISH: "📅", NoteKind.ACCESS: "🔑",
+              NoteKind.PROBLEM: "⚠"}
 
 
 class Note(models.Model):
@@ -71,10 +73,12 @@ class ActivityKind(models.TextChoices):
     STATUS = "status", "Status"
     NOTE = "note", "Notiz"
     DOCUMENTS = "documents", "Unterlagen"
+    FIELD = "field", "vor Ort"   # what the Ableser/Monteur did in "Mein Tag": done, note, problem, proposal
 
 
 ACTIVITY_ICONS = {ActivityKind.PLAN: "🗺", ActivityKind.NOTICE: "📄", ActivityKind.ORDER: "🔧",
-                  ActivityKind.STATUS: "🏷", ActivityKind.NOTE: "📝", ActivityKind.DOCUMENTS: "📥"}
+                  ActivityKind.STATUS: "🏷", ActivityKind.NOTE: "📝", ActivityKind.DOCUMENTS: "📥",
+                  ActivityKind.FIELD: "📱"}
 
 
 class Activity(models.Model):

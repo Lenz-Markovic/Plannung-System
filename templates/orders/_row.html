@@ -12,8 +12,8 @@
   <td class="mono"><b>{{ o.re_number }}</b></td>
   <td class="adr">{{ o.street }}<small>{{ o.zip_code }} {{ o.city }}{% if o.client %} · {{ o.client }}{% endif %}</small>
     {% if o.summary %}<div class="typ-tag">{{ o.summary }}</div>{% endif %}
-    {% if o.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if o.has_storno %}storno{% endif %}" title="Notizen ansehen / schreiben"
-      hx-get="{% url 'journal:notes' 'auftrag' o.pk %}?dialog=1" hx-target="#modal">{% if o.has_storno %}⛔ Storno{% else %}📝 {{ o.open_notes }}{% endif %}</button>{% endif %}</td>
+    {% if o.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if o.has_storno %}storno{% elif o.has_problem %}problem{% endif %}" title="Notizen ansehen / schreiben"
+      hx-get="{% url 'journal:notes' 'auftrag' o.pk %}?dialog=1" hx-target="#modal">{% if o.has_storno %}⛔ Storno{% elif o.has_problem %}⚠ Problem{% else %}📝 {{ o.open_notes }}{% endif %}</button>{% endif %}</td>
   <td>{{ o.order_date|date:"d.m.Y"|default:"–" }}</td>
   <td>
     {% if stop %}

@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Mein Tag – {{ date|date:"d.m.Y" }}{% endblock %}
 {% block content %}
+<div class="day-phone-hint">📱 Handy-Ansicht – so sieht es der Ableser / Monteur unterwegs</div>
+<div class="day-phone">
 <div class="day">
   <header class="day-head">
     <a class="btn mini" href="?datum={{ previous_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Vortag">‹</a>
@@ -47,6 +49,7 @@
     </div>
     <p class="na small mt-3">Tipp: Auf die Adresse tippen startet die Navigation. Telefonnummern in den Hinweisen sind anklickbar.</p>
   {% endif %}
+</div>
 </div>
 {% if map_available %}{% include "planning/_map_scripts.html" %}{% endif %}
 {% endblock %}
