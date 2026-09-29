@@ -559,3 +559,13 @@ button.cal-pill:hover { border-color: var(--axis); }
 .pc-btns form { margin: 0; }
 .pc-search { width: 100%; border: 1px solid var(--grid); border-radius: 6px; padding: 6px 9px; font-size: 13.5px; margin-bottom: 4px; }
 .time-dlg { max-height: 92vh; overflow-y: auto; }
+
+/* ---- 🤖 Automatic planning --------------------------------------------------------- */
+.ap-form { align-items: flex-end; }
+.ap-people > div { display: flex; flex-wrap: wrap; gap: 4px 10px; max-width: 720px; }
+.ap-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; margin: 10px 0 14px; }
+.ap-day { padding: 12px 14px; }
+.ap-stops { font-size: 13px; padding-left: 20px; margin: 6px 0 8px; }
+.ap-stops li { margin-bottom: 3px; }
+.ap-people input[type=checkbox] { width: auto; height: auto; min-width: 0; padding: 0; margin-right: 3px; }
+.ap-people .chk { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; }

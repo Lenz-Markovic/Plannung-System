@@ -23,7 +23,7 @@ from django.db import transaction
 from django.db.models import F, Prefetch, Q
 from django.utils import timezone
 
-from buildings.models import Building, InstallationOrder, OrderStatus
+from buildings.models import Building, BuildingStatus, InstallationOrder, OrderStatus
 from buildings.rules.file_numbers import normalize_file_number
 from conflicts.rules import Finding, OtherPlan, PlannedBuilding, planning_findings
 from conflicts.services import installation_findings
@@ -32,6 +32,7 @@ from documents.services import refresh_deadline
 
 from . import geocoding
 from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop
+from .rules import autoplan as autoplan_rules
 from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
@@ -1054,3 +1055,115 @@ def delete_tour(tour):
         order.status = OrderStatus.OPEN
         order.save()
     refresh_conflicts_for([b.pk for b in buildings], order_ids)
+
+
+# =============================================================================
+# 🤖 Automatic planning: proposals for a period (nothing saved until confirmed)
+# =============================================================================
+
+AUTOPLAN_KEY = "autoplan"
+
+
+def working_days(start, end):
+    day, days = start, []
+    while day <= end:
+        if day.weekday() < 5:
+            days.append(day)
+        day += datetime.timedelta(days=1)
+    return days
+
+
+def autoplan_slots(employees, start, end):
+    """Free working days (no plan as lead / in a team, not absent) of these people."""
+    days = working_days(start, end)
+    busy = {}
+    for tour in Tour.objects.filter(date__gte=start, date__lte=end).prefetch_related("team"):
+        for person in [tour.employee_id, *[e.pk for e in tour.team.all()]]:
+            busy.setdefault(person, set()).add(tour.date)
+    for absence in Absence.objects.filter(end_date__gte=start, start_date__lte=end):
+        for day in days:
+            if absence.start_date <= day <= absence.end_date:
+                busy.setdefault(absence.employee_id, set()).add(day)
+    return [autoplan_rules.Slot(e.pk, day, e.can_read, e.can_install, _usual_region(e))
+            for e in employees for day in days if day not in busy.get(e.pk, set())]
+
+
+def autoplan_jobs(kind):
+    """Everything not planned yet, as jobs for the rule (with date windows from section 8)."""
+    buffer = datetime.timedelta(days=autoplan_rules.BUFFER_DAYS)
+    jobs = []
+    if kind in ("", "reading"):
+        installs = {}  # building number core -> latest planned installation
+        for stop in TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour", "installation_order__building"):
+            order = stop.installation_order
+            core = order.building.file_number_core if order.building else order.building_file_number_core
+            if core:
+                installs[core] = max(installs.get(core, stop.tour.date), stop.tour.date)
+        # not planned, and not "freigegeben" (released = already done)
+        for b in Building.objects.exclude(tour_stops__kind=StopKind.READING).exclude(status=BuildingStatus.RELEASED):
+            jobs.append(autoplan_rules.Job(
+                key=(StopKind.READING, b.pk), kind="reading", minutes=b.reading_minutes,
+                point=geocoding.position(b, None)[0], region=b.region, person=b.assigned_reader_id,
+                earliest=installs[b.file_number_core] + buffer if b.file_number_core in installs else None,
+                group=b.file_number_core))
+    if kind in ("", "installation"):
+        readings = {}  # building number core -> earliest planned reading
+        for stop in TourStop.objects.filter(kind=StopKind.READING).select_related("tour", "building"):
+            core = stop.building.file_number_core
+            readings[core] = min(readings.get(core, stop.tour.date), stop.tour.date)
+        for o in (InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(tour_stops__kind=StopKind.INSTALLATION)
+                  .select_related("building").prefetch_related("assigned_installers")):
+            installers = sorted(o.assigned_installers.all(), key=lambda e: e.short_name)
+            core = o.building.file_number_core if o.building else o.building_file_number_core
+            jobs.append(autoplan_rules.Job(
+                key=(StopKind.INSTALLATION, o.pk), kind="installation", minutes=o.duration_minutes,
+                point=geocoding.position(o, None)[0], region=o.building.region if o.building else "",
+                person=installers[0].pk if installers else None,
+                latest=readings[core] - buffer if core in readings else None, group=core))
+    return [job for job in jobs if job.minutes]
+
+
+def autoplan(employees, start, end, kind=""):
+    """Compute proposals; returns a dict for the session (plain values only)."""
+    people = [e for e in employees if (kind != "reading" or e.can_read) and (kind != "installation" or e.can_install)]
+    proposals, left = autoplan_rules.plan_days(autoplan_slots(people, start, end), autoplan_jobs(kind))
+    days = []
+    for p in proposals:
+        stops = []
+        for job in p.jobs:
+            stop_kind, pk = job.key
+            stops.append({"kind": stop_kind, "building": pk} if stop_kind == StopKind.READING else {"kind": stop_kind, "order": pk})
+        days.append({"employee": p.person, "date": p.date.isoformat(), "stops": stops, "work": p.work, "drive": p.drive})
+    return {"start": start.isoformat(), "end": end.isoformat(), "kind": kind, "days": days, "left": len(left)}
+
+
+def autoplan_recount(day):
+    """Work and estimated drive of a proposed day again (after a stop was removed)."""
+    buildings = Building.objects.in_bulk([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING])
+    orders = InstallationOrder.objects.in_bulk([s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
+    targets = [buildings.get(s.get("building")) if s["kind"] == StopKind.READING else orders.get(s.get("order")) for s in day["stops"]]
+    targets = [t for t in targets if t is not None]
+    points = [geocoding.position(t, None)[0] for t in targets]
+    day["work"] = sum(t.reading_minutes if isinstance(t, Building) else t.duration_minutes for t in targets)
+    day["drive"] = sum(autoplan_rules.estimated_drive(a, b) for a, b in zip(points, points[1:]))
+    return day
+
+
+def autoplan_draft(day):
+    """One proposed day as a normal draft (then "Fahrplan prüfen" with exact TomTom times)."""
+    employee = Employee.objects.get(pk=day["employee"])
+    return create_draft([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING], employee,
+                        datetime.date.fromisoformat(day["date"]), employee.default_start_time, 30, "far",
+                        order_ids=[s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
+
+
+def autoplan_save_all(proposal, user):
+    """Save every proposed day as a PROVISIONAL plan. Returns (saved tours, problems)."""
+    saved, problems = [], []
+    for day in proposal["days"]:
+        try:
+            with transaction.atomic():
+                saved.append(save_draft(autoplan_draft(day), user, confirm=False))
+        except (ValueError, ConcurrentChange) as error:
+            problems.append(f"{day['date']}: {error}")
+    return saved, problems

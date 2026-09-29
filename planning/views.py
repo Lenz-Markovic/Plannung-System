@@ -660,3 +660,94 @@ def map_tile(request, z, x, y):
     response = HttpResponse(png, content_type="image/png")
     response["Cache-Control"] = "private, max-age=604800"  # the browser keeps it for a week
     return response
+
+
+# --- 🤖 Automatic planning ---------------------------------------------------------------
+
+def _autoplan_context(request):
+    """The proposal from the session, with the names and addresses for the page."""
+    proposal = request.session.get(services.AUTOPLAN_KEY)
+    if not proposal:
+        return None
+    employees = Employee.objects.in_bulk([d["employee"] for d in proposal["days"]])
+    buildings = Building.objects.in_bulk([s["building"] for d in proposal["days"] for s in d["stops"] if s.get("building")])
+    orders = InstallationOrder.objects.in_bulk([s["order"] for d in proposal["days"] for s in d["stops"] if s.get("order")])
+    days = []
+    for index, day in enumerate(proposal["days"]):
+        stops = []
+        for s in day["stops"]:
+            target = buildings.get(s.get("building")) if s["kind"] == StopKind.READING else orders.get(s.get("order"))
+            if target is None:
+                continue
+            minutes = target.reading_minutes if s["kind"] == StopKind.READING else target.duration_minutes
+            stops.append({"kind": s["kind"], "target": target, "minutes": minutes,
+                          "label": target.file_number if s["kind"] == StopKind.READING else target.re_number})
+        net = day["work"] + day["drive"]
+        days.append({"index": index, "employee": employees.get(day["employee"]), "date": datetime.date.fromisoformat(day["date"]),
+                     "stops": stops, "work": day["work"], "drive": day["drive"], "net": net,
+                     "percent": min(100, round(net / 450 * 100)), "under": net < 360})
+    days.sort(key=lambda d: (d["date"], d["employee"].short_name if d["employee"] else ""))
+    return {**proposal, "day_cards": days, "stop_count": sum(len(d["stops"]) for d in days),
+            "start_date": datetime.date.fromisoformat(proposal["start"]), "end_date": datetime.date.fromisoformat(proposal["end"])}
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def autoplan_page(request):
+    """🤖 Automatisch planen: choose a period, see the proposals, change them, save them."""
+    today = timezone.localdate()
+    monday = today + datetime.timedelta(days=7 - today.weekday())  # next Monday
+    if request.method == "POST":
+        action = request.POST.get("action")
+        proposal = request.session.get(services.AUTOPLAN_KEY)
+        if action == "compute":
+            try:
+                start = datetime.date.fromisoformat(request.POST["von"])
+                end = datetime.date.fromisoformat(request.POST["bis"])
+            except (KeyError, ValueError):
+                messages.error(request, "Bitte einen gültigen Zeitraum wählen.")
+                return redirect("planning:autoplan")
+            if end < start or (end - start).days > 31:
+                messages.error(request, "Zeitraum: höchstens ein Monat, „bis“ nach „von“.")
+                return redirect("planning:autoplan")
+            people = Employee.objects.filter(active=True)
+            if request.POST.getlist("person"):
+                people = people.filter(pk__in=request.POST.getlist("person"))
+            kind = request.POST.get("art") if request.POST.get("art") in ("reading", "installation") else ""
+            request.session[services.AUTOPLAN_KEY] = services.autoplan(people, max(start, today), end, kind)
+        elif proposal and action in ("remove_stop", "remove_day", "open"):
+            index = int(request.POST.get("day", -1))
+            if not 0 <= index < len(proposal["days"]):
+                return redirect("planning:autoplan")
+            day = proposal["days"][index]
+            if action == "remove_stop":
+                stop = int(request.POST.get("stop", -1))
+                if 0 <= stop < len(day["stops"]):
+                    day["stops"].pop(stop)
+                    services.autoplan_recount(day)
+                if not day["stops"]:
+                    proposal["days"].pop(index)
+            elif action == "remove_day":
+                proposal["days"].pop(index)
+            elif action == "open":
+                # this day into "Fahrplan prüfen" (exact TomTom times, change, create)
+                request.session[services.DRAFT_KEY] = services.autoplan_draft(day)
+                proposal["days"].pop(index)
+                request.session[services.AUTOPLAN_KEY] = proposal
+                return redirect("planning:draft")
+            request.session[services.AUTOPLAN_KEY] = proposal
+        elif proposal and action == "save_all":
+            saved, problems = services.autoplan_save_all(proposal, request.user)
+            del request.session[services.AUTOPLAN_KEY]
+            messages.success(request, f"{len(saved)} Fahrpläne vorläufig gespeichert – bitte einzeln prüfen und bestätigen.")
+            for problem in problems:
+                messages.error(request, problem)
+            first = min((t.date for t in saved), default=today)
+            return redirect(f"{reverse('planning:calendar')}?datum={first.isoformat()}")
+        elif action == "discard":
+            request.session.pop(services.AUTOPLAN_KEY, None)
+        return redirect("planning:autoplan")
+    return render(request, "planning/autoplan.html", {
+        "proposal": _autoplan_context(request),
+        "default_start": monday, "default_end": monday + datetime.timedelta(days=4),
+        "employees": Employee.objects.filter(active=True),
+    })

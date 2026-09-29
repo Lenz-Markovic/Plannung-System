@@ -228,6 +228,21 @@ The only JavaScript is `static/js/calendar.js` (commented).
   Calendar ("🤝 1× Hilfe"), Excel and "Mein Tag" show the help stop. Deleting one of
   the plans marks the other one for recalculation.
 
+## 🤖 Automatic planning
+
+- Calendar → **🤖 Automatisch planen**: choose the period (max. one month), the kind
+  (📖 / 🔧 / both) and the people (none ticked = all) → **Vorschlag berechnen**.
+- The system (pure rule `planning/rules/autoplan.py`) spreads every unplanned stop
+  over the free working days (no plan, not in a team, not absent): never over 7,5 h,
+  never more than 1 h drive between two stops, always the nearest next stop; assigned
+  stops go to their person first, the most urgent first. Montage rule: an installation
+  at least 8 days before the reading of its building - also inside one run (the reading
+  waits for its installation). Released buildings and done orders are not planned.
+- The proposal page shows one card per person and day (estimated hours). Remove single
+  stops (✕) or whole days, or open a day in "Fahrplan prüfen" (exact TomTom times).
+  **Alle … vorläufig erstellen** (after "Bist du sicher?") saves all days as provisional
+  plans - confirm them one by one in the calendar as usual.
+
 ## Project layout
 
 | Folder | Contents |

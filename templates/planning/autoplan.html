@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Automatisch planen{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🤖 Automatisch planen</h1>
+  <span class="sub">Das System verteilt alle ungeplanten Stopps auf freie Tage – nie über 7,5 h, nahe beieinander. Gespeichert wird erst, wenn du zustimmst.</span>
+  <span class="spacer"></span>
+  <a class="btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>
+</header>
+
+{# 1. What should be planned #}
+<form method="post" class="filters ap-form">
+  {% csrf_token %}<input type="hidden" name="action" value="compute">
+  <div class="f"><label for="ap-von">von</label><input id="ap-von" type="date" name="von" value="{% if proposal %}{{ proposal.start }}{% else %}{{ default_start|date:'Y-m-d' }}{% endif %}" required></div>
+  <div class="f"><label for="ap-bis">bis</label><input id="ap-bis" type="date" name="bis" value="{% if proposal %}{{ proposal.end }}{% else %}{{ default_end|date:'Y-m-d' }}{% endif %}" required></div>
+  <div class="f"><label for="ap-art">Art</label>
+    <select id="ap-art" name="art">
+      <option value="">📖 Ablesung + 🔧 Montage</option>
+      <option value="reading" {% if proposal.kind == "reading" %}selected{% endif %}>nur 📖 Ablesung</option>
+      <option value="installation" {% if proposal.kind == "installation" %}selected{% endif %}>nur 🔧 Montage</option>
+    </select></div>
+  <div class="f ap-people"><label>Personen (keine angekreuzt = alle)</label>
+    <div>{% for e in employees %}<label class="chk"><input type="checkbox" name="person" value="{{ e.pk }}"> {{ e }} {% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</label>{% endfor %}</div></div>
+  <button class="btn primary">🤖 Vorschlag berechnen</button>
+</form>
+
+{% if proposal %}
+  {# 2. The proposal #}
+  <div class="pr-status info">
+    <b>{{ proposal.day_cards|length }} Tag{{ proposal.day_cards|length|pluralize:"e" }} · {{ proposal.stop_count }} Stopp{{ proposal.stop_count|pluralize:"s" }}</b> vom {{ proposal.start_date|date:"d.m.Y" }} bis {{ proposal.end_date|date:"d.m.Y" }}.
+    {% if proposal.left %}{{ proposal.left }} Stopp{{ proposal.left|pluralize:"s" }} {{ proposal.left|pluralize:"passt,passen" }} nicht mehr in diesen Zeitraum (oder {{ proposal.left|pluralize:"ist,sind" }} länger als ein Tag).{% endif %}
+    Fahrzeiten sind geschätzt – beim Speichern rechnet TomTom genau.
+  </div>
+
+  <div class="ap-days">
+    {% for d in proposal.day_cards %}
+      <div class="ap-day card-lite">
+        <div class="d-flex justify-content-between align-items-start">
+          <div><span class="dot" style="background:{{ d.employee.calendar_color }}"></span> <b>{{ d.employee }}</b> · {{ d.date|date:"D d.m." }}</div>
+          <form method="post" class="m-0">{% csrf_token %}<input type="hidden" name="action" value="remove_day"><input type="hidden" name="day" value="{{ d.index }}">
+            <button class="dlg-x position-static" title="Diesen Tag verwerfen" aria-label="Tag verwerfen">✕</button></form>
+        </div>
+        <div class="pp-week mt-1"><span class="na small">netto</span><div class="pp-bar"><span style="width:{{ d.percent }}%"></span></div>
+          <span class="small {% if d.under %}t-warn{% endif %}"><b>{{ d.net|hours }}</b></span></div>
+        <div class="na small">{{ d.work }} min Arbeit + ca. {{ d.drive }} min Fahrt{% if d.under %} · ⏱ unter 6 h{% endif %}</div>
+        <ol class="ap-stops">
+          {% for s in d.stops %}
+            <li><span class="art-tag {{ s.kind }}">{% if s.kind == "installation" %}🔧{% else %}📖{% endif %}</span>
+              {{ s.target.street }}, {{ s.target.city }} <span class="na small">· {{ s.label }} · {{ s.minutes }} min</span>
+              <form method="post" class="d-inline m-0">{% csrf_token %}<input type="hidden" name="action" value="remove_stop">
+                <input type="hidden" name="day" value="{{ d.index }}"><input type="hidden" name="stop" value="{{ forloop.counter0 }}">
+                <button class="chip-x" title="Diesen Stopp nicht planen" aria-label="Stopp entfernen">✕</button></form></li>
+          {% endfor %}
+        </ol>
+        <form method="post" class="m-0">{% csrf_token %}<input type="hidden" name="action" value="open"><input type="hidden" name="day" value="{{ d.index }}">
+          <button class="btn mini">🗺 In „Fahrplan prüfen“ öffnen</button></form>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# 3. Save everything (provisional) or throw it away #}
+  <div class="dlg-btns">
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="discard"><button class="btn">Vorschlag verwerfen</button></form>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save_all">
+      <button class="btn primary" {% if not proposal.day_cards %}disabled{% endif %}
+              onclick="return confirm('Bist du sicher? {{ proposal.day_cards|length }} Fahrpläne werden vorläufig gespeichert. Danach jeden im Kalender prüfen und bestätigen.')">
+        ✓ Alle {{ proposal.day_cards|length }} Fahrpläne vorläufig erstellen</button></form>
+  </div>
+{% endif %}
+{% endblock %}
