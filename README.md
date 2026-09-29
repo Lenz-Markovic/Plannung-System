@@ -191,9 +191,13 @@ The only JavaScript is `static/js/calendar.js` (commented).
   up to 5 min, can be switched off), team members see the plan in "Mein Tag" and may
   tick stops. Calendar, side panel and Excel show "Keller + Kaiser". A team member who
   is absent or already planned that day is refused (also for "vorläufig").
-- **🗓 Erster freier Tag** (calendar): every reader / installer with the first working
-  day (Mon–Fri) without a plan (also not in a team) and without absence; filter
-  Ableser / Monteure; click = that day with "planen". Also in the person overview.
+- **🗓 Erste freie Tage** (calendar button, on/off): a green marker "🟢 frei: Kaiser" on
+  the first free working day (Mon–Fri, no plan, not in a team, not absent) of every
+  person, plus the list on the right. Works with the filters (📖 only readers, 🔧 only
+  installers). Click a marker → planning panel for that person and day with the
+  system's suggestions (assigned buildings / orders first, then the usual region, close
+  together); the ones that fit into 7,5 h are ticked → "Fahrplan erstellen" opens the
+  preview. Also in the person overview.
 - **Weekly hours** in the person overview only with the permission "Wochenstunden je
   Mitarbeiter sehen" (only Admin by default, changeable in the admin). After updating
   run `python manage.py setup_roles` once so the Admin role gets it. Daily hours stay

@@ -13,7 +13,7 @@ from buildings.models import Building
 from core import roles
 from planning import services
 from planning.excel import build_workbook
-from planning.models import Absence, Employee, Tour
+from planning.models import Absence, Employee, StopKind, Tour
 
 pytestmark = pytest.mark.django_db
 DAY = datetime.date(2026, 11, 10)
@@ -157,3 +157,53 @@ def test_weekly_hours_only_for_admin(demo):
     assert "pp-weeks" in admin_html and "KW" in admin_html
     # daily hours stay visible for everybody who sees the plans
     assert "Std" in login(roles.DISPATCHER, "dispo2").get(url).content.decode()
+
+
+# --- green markers + planning a free day ---------------------------------------------
+
+def test_free_day_markers_in_the_calendar_feed(demo):
+    dispo = login(roles.DISPATCHER, "dispo")
+    url = reverse("planning:calendar_feed")
+    params = {"start": TODAY.isoformat(), "end": (TODAY + datetime.timedelta(days=60)).isoformat()}
+    assert not [e for e in json.loads(dispo.get(url, params).content) if "free-day" in e.get("classNames", [])]
+    markers = [e for e in json.loads(dispo.get(url, {**params, "frei": "1"}).content) if "free-day" in e.get("classNames", [])]
+    assert len(markers) == Employee.objects.filter(active=True).count()
+    assert all(m["title"].startswith("🟢 frei:") for m in markers)
+    assert all(reverse("planning:free_plan") in m["extendedProps"]["freeUrl"] for m in markers)
+    installers = [e for e in json.loads(dispo.get(url, {**params, "frei": "1", "art": "installation"}).content)
+                  if "free-day" in e.get("classNames", [])]
+    assert len(installers) == Employee.objects.filter(active=True, can_install=True).count()
+    # Leitung may look, but not plan: the marker opens the day overview
+    chef = login(roles.MANAGEMENT, "chef")
+    marker = next(e for e in json.loads(chef.get(url, {**params, "frei": "1"}).content) if "free-day" in e.get("classNames", []))
+    assert reverse("planning:day") in marker["extendedProps"]["freeUrl"]
+
+
+def test_plan_a_free_day_from_the_suggestions(demo):
+    dispo = login(roles.DISPATCHER, "dispo")
+    installer = Employee.objects.filter(can_install=True).exclude(tours__date=DAY).first()
+    panel = dispo.get(reverse("planning:free_plan"), {"person": installer.pk, "datum": DAY.isoformat(), "art": "installation"})
+    html = panel.content.decode()
+    assert f"{installer} planen" in html and "🔧 Montage" in html and "📖 Ablesung" not in html
+    suggestions, ticked = services.free_day_suggestions(installer, DAY, "installation")
+    ticked_minutes = sum(s.minutes + services.SUGGESTION_DRIVE_MINUTES for s in suggestions if (s.kind, s.pk) in ticked)
+    assert ticked and ticked_minutes <= 450  # the system keeps to 7,5 h
+
+    orders = [pk for kind, pk in ticked]
+    response = dispo.post(reverse("planning:free_plan"), {"person": installer.pk, "datum": DAY.isoformat(), "order": orders})
+    assert response["HX-Redirect"] == reverse("planning:draft")
+    draft = dispo.session[services.DRAFT_KEY]
+    assert draft["employee"] == installer.pk and draft["date"] == DAY.isoformat()
+    assert sorted(s["order"] for s in draft["stops"]) == sorted(orders)
+    # nothing ticked: a message instead of an empty plan
+    assert "mindestens einen Stopp" in dispo.post(reverse("planning:free_plan"), {"person": installer.pk, "datum": DAY.isoformat()}).content.decode()
+
+
+def test_reader_suggestions_prefer_their_own_buildings(demo):
+    reader = Employee.objects.filter(can_read=True, can_install=False).first()
+    own = Building.objects.filter(tour_stops__isnull=True).order_by("file_number")[5]
+    own.assigned_reader = reader
+    own.save()
+    suggestions, ticked = services.free_day_suggestions(reader, DAY)
+    assert suggestions[0].pk == own.pk and "zugeordnet" in suggestions[0].reason
+    assert all(s.kind == StopKind.READING for s in suggestions)

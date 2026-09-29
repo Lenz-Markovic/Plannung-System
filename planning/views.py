@@ -25,7 +25,7 @@ from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 
 from . import dayplan, services
-from .calendar import calendar_events, tour_kind
+from .calendar import calendar_events, free_day_events, tour_kind
 from .display import preview_map_data, route_sketch, tour_map_data
 from .excel import build_workbook
 from .forms import DraftSettingsForm, PlanForm
@@ -254,7 +254,11 @@ def calendar_feed(request):
         employees = employees.filter(pk=request.GET["person"])
     editable = request.user.has_perm("planning.change_tour")
     kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed") else ""
-    return JsonResponse(calendar_events(start, end, employees, editable, kind), safe=False)
+    events = calendar_events(start, end, employees, editable, kind)
+    if request.GET.get("frei") == "1" and request.user.has_perm("planning.view_tour"):
+        # 🗓 button: first free day of everybody
+        events += free_day_events(start, end, employees, kind, can_plan=request.user.has_perm(PLAN_PERMISSION))
+    return JsonResponse(events, safe=False)
 
 
 @login_required
@@ -280,6 +284,40 @@ def day_overview(request):
     return render(request, "planning/_day_panel.html", {
         "date": date, "tours": tours, "absent": list(absent.values()), "free": free,
         "selected": selection["selected_count"] + selection["other_count"], "weekend": date.weekday() >= 5,
+    })
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def free_plan(request):
+    """Click on a green "🟢 frei" marker: plan this person's free day with suggestions."""
+    employee = get_object_or_404(Employee, pk=request.GET.get("person") or request.POST.get("person") or 0, active=True)
+    try:
+        date = datetime.date.fromisoformat(request.GET.get("datum") or request.POST.get("datum") or "")
+    except ValueError:
+        return HttpResponse(status=400)
+    kind = request.GET.get("art", "")
+    if request.method == "POST":
+        building_ids = [int(pk) for pk in request.POST.getlist("building")]
+        order_ids = [int(pk) for pk in request.POST.getlist("order")]
+        if request.POST.get("with_selection"):  # also what is ticked in the lists
+            building_ids += services.get_selection(request.session)
+            order_ids += services.get_order_selection(request.session)
+        if not building_ids and not order_ids:
+            return render(request, "core/_toast.html", {"message": "Bitte mindestens einen Stopp ankreuzen.", "error": True})
+        request.session[services.DRAFT_KEY] = services.create_draft(
+            list(dict.fromkeys(building_ids)), employee, date, employee.default_start_time, 30, "far",
+            order_ids=list(dict.fromkeys(order_ids)))
+        response = HttpResponse("")
+        response["HX-Redirect"] = reverse("planning:draft")
+        return response
+    suggestions, ticked = services.free_day_suggestions(employee, date, kind)
+    for suggestion in suggestions:
+        suggestion.ticked = (suggestion.kind, suggestion.pk) in ticked
+    selection = services.plan_bar_context(request.session)
+    return render(request, "planning/_free_plan.html", {
+        "employee": employee, "date": date, "suggestions": suggestions,
+        "selected_buildings": selection["selected_count"], "selected_orders": selection["other_count"],
+        "ticked_minutes": sum(s.minutes for s in suggestions if (s.kind, s.pk) in ticked),
     })
 
 

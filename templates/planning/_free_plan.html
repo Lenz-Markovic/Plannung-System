@@ -1,0 +1,32 @@
+{# Side panel after clicking a green "🟢 frei" marker (planning/views.py: free_plan). #}
+<div class="card-lite person-panel">
+  <div class="d-flex justify-content-between align-items-start">
+    <div>
+      <h3 class="h6 mb-1"><span class="dot" style="background:{{ employee.calendar_color }}"></span> {{ employee }} planen</h3>
+      <div class="small"><b>{{ date|date:"l, d.m.Y" }}</b> – erster freier Tag ·
+        {% if employee.can_read %}<span class="art-tag reading">📖 Ableser</span>{% endif %}{% if employee.can_install %}<span class="art-tag installation">🔧 Monteur</span>{% endif %}</div>
+    </div>
+    <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen">✕</button>
+  </div>
+
+  <form hx-post="{% url 'planning:free_plan' %}" hx-target="#toast" class="mt-2">
+    <input type="hidden" name="person" value="{{ employee.pk }}">
+    <input type="hidden" name="datum" value="{{ date|date:'Y-m-d' }}">
+    <h4 class="pp-h">Vorschlag des Systems (bis 7,5 h)</h4>
+    {% for f in suggestions %}
+      <label class="free-sugg">
+        <input type="checkbox" name="{% if f.kind == 'installation' %}order{% else %}building{% endif %}" value="{{ f.pk }}"
+               data-minutes="{{ f.minutes }}" {% if f.ticked %}checked{% endif %}>
+        <span><b>{{ f.title }}</b><br><span class="na small">{{ f.reason }}</span></span>
+      </label>
+    {% empty %}
+      <div class="na small">Keine passenden offenen Stopps gefunden – in „🏢 Liegenschaften“ oder „🔧 Montage“ ankreuzen.</div>
+    {% endfor %}
+    {% if selected_buildings or selected_orders %}
+      <label class="free-sugg"><input type="checkbox" name="with_selection" value="1" checked>
+        <span>auch die angekreuzten {% if selected_buildings %}📖 {{ selected_buildings }}{% endif %}{% if selected_orders %} 🔧 {{ selected_orders }}{% endif %} aus den Listen mitnehmen</span></label>
+    {% endif %}
+    <div class="na small mt-1">Angekreuzt: <b id="free-minutes">{{ ticked_minutes }}</b> min Arbeit (+ Fahrten) · danach prüfst du alles in „Fahrplan prüfen“.</div>
+    <div class="side-actions"><button class="btn primary">🗺 Fahrplan erstellen →</button></div>
+  </form>
+</div>

@@ -11,9 +11,11 @@ import datetime
 
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 
 from conflicts.models import Conflict, Severity
 
+from . import services
 from .models import Absence, StopKind, Tour, TourStatus
 
 
@@ -122,5 +124,35 @@ def calendar_events(start, end, employees, editable, kind=""):
             "end": (absence.end_date + datetime.timedelta(days=1)).isoformat(),
             "allDay": True, "editable": False, "classNames": ["absence-label"],
             "backgroundColor": "transparent", "borderColor": absence.employee.calendar_color, "textColor": "#52514e",
+        })
+    return events
+
+
+def free_day_events(start, end, employees, kind="", can_plan=True):
+    """Green markers "🟢 frei: Kaiser" on the first free working day of every person.
+
+    kind "reading" / "installation" (calendar filter): only readers / installers;
+    "mixed": only people who can do both. A click opens the planning panel for that day.
+    """
+    people = employees.filter(active=True)
+    if kind in ("reading", "mixed"):
+        people = people.filter(can_read=True)
+    if kind in ("installation", "mixed"):
+        people = people.filter(can_install=True)
+    events = []
+    for employee, day in services.first_free_days(people, timezone.localdate()).items():
+        if day is None or not (start <= day < end):
+            continue
+        roles = ("📖" if employee.can_read else "") + ("🔧" if employee.can_install else "")
+        events.append({
+            "title": f"🟢 frei: {employee.short_name} {roles}",
+            "start": day.isoformat(), "allDay": True, "editable": False,
+            "classNames": ["free-day"],
+            "backgroundColor": "#e8f6ea", "borderColor": employee.calendar_color, "textColor": "#1f5130",
+            # planners: the planning panel with suggestions; others (e.g. Leitung): the day overview
+            "extendedProps": {"freeUrl": (f"{reverse('planning:free_plan')}?person={employee.pk}&datum={day.isoformat()}"
+                                          f"&art={kind if kind != 'mixed' else ''}") if can_plan
+                              else f"{reverse('planning:day')}?datum={day.isoformat()}",
+                              "tooltip": f"Erster freier Tag von {employee.short_name}" + (" – klicken zum Planen" if can_plan else "")},
         })
     return events

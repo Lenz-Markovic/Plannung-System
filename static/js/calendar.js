@@ -14,12 +14,15 @@
  *    Buttons "alle / Ablesung / Montage / beides": only plans of that kind.
  * 6. Mouse over a plan: its stops as a tooltip.
  * 7. Click on an empty part of a day: that day in the side panel (who is free).
+ * 8. "🗓 Erste freie Tage": green markers on everybody's first free day; a click
+ *    on a marker opens the planning panel with suggestions for that person and day.
  */
 document.addEventListener("DOMContentLoaded", function () {
   var element = document.getElementById("calendar");
   var personSelect = document.getElementById("cal-person");
   var csrfToken = element.dataset.csrf;
   var kind = "";  // "" = all plans, "reading", "installation", "mixed"
+  var showFree = false;  // 8: green markers on everybody's first free day
 
   var calendar = new FullCalendar.Calendar(element, {
     locale: "de",
@@ -42,7 +45,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 1 + 2: events from the server, with the chosen person
     events: {
       url: element.dataset.feedUrl,
-      extraParams: function () { return { person: personSelect.value, art: kind }; }
+      extraParams: function () { return { person: personSelect.value, art: kind, frei: showFree ? "1" : "" }; }
     },
 
     // 6: the stops of a plan when the mouse is over it
@@ -57,6 +60,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // 3: side panel
     eventClick: function (info) {
+      if (info.event.extendedProps.freeUrl) {  // 8: green marker -> plan this free day
+        htmx.ajax("GET", info.event.extendedProps.freeUrl, "#cal-side");
+        return;
+      }
       if (!info.event.extendedProps.detailUrl) return;
       htmx.ajax("GET", info.event.extendedProps.detailUrl, "#cal-side");
     },
@@ -105,7 +112,33 @@ document.addEventListener("DOMContentLoaded", function () {
       kind = button.dataset.kind;
       document.querySelectorAll(".cal-kinds [data-kind]").forEach(function (b) { b.classList.toggle("an", b === button); });
       calendar.refetchEvents();
+      if (showFree) { loadFreeList(); }
     });
+  });
+
+  // 8: "🗓 Erste freie Tage" on/off: green markers in the calendar + the list on the right
+  var freeButton = document.getElementById("cal-free");
+  function loadFreeList() {
+    var art = kind === "mixed" ? "" : kind;
+    htmx.ajax("GET", freeButton.dataset.listUrl + (art ? "?art=" + art : ""), "#cal-side");
+  }
+  if (freeButton) {
+    freeButton.addEventListener("click", function () {
+      showFree = !showFree;
+      freeButton.classList.toggle("primary", showFree);
+      freeButton.setAttribute("aria-pressed", showFree ? "true" : "false");
+      calendar.refetchEvents();
+      if (showFree) { loadFreeList(); } else { document.getElementById("cal-side").innerHTML = ""; calendar.updateSize(); }
+    });
+  }
+
+  // Planning panel of a free day: live sum of the ticked work minutes
+  document.getElementById("cal-side").addEventListener("change", function (event) {
+    if (!event.target.matches("input[data-minutes]")) { return; }
+    var sum = 0;
+    event.target.form.querySelectorAll("input[data-minutes]:checked").forEach(function (box) { sum += Number(box.dataset.minutes); });
+    var out = document.getElementById("free-minutes");
+    if (out) { out.textContent = sum; }
   });
 
   // In the person overview: a click on a plan also jumps the calendar to its day

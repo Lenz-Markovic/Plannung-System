@@ -542,3 +542,9 @@ button.cal-pill:hover { border-color: var(--axis); }
 .help-pick form { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
 .help-pick select { font: inherit; font-size: 12px; border: 1px solid var(--grid); border-radius: 6px; padding: 1px 4px; }
 .pr-stopp.help { border-left-color: #1f7a4d; background-image: repeating-linear-gradient(135deg, rgba(31,122,77,.06) 0 8px, transparent 8px 16px); }
+
+/* ---- 🟢 first free day markers + planning panel -------------------------------- */
+.fc-event.free-day { cursor: pointer; border-width: 2px; border-style: dashed; font-weight: 600; }
+.fc-event.free-day .fc-event-title { color: #1f5130; text-shadow: none; }
+.free-sugg { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed var(--grid); font-size: 13px; cursor: pointer; }
+.free-sugg input { margin-top: 3px; }

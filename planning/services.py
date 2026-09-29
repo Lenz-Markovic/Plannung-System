@@ -32,7 +32,7 @@ from documents.services import refresh_deadline
 from . import geocoding
 from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop
 from .rules.availability import HORIZON_DAYS, first_free_day
-from .rules.drive_time import estimate_drive_minutes, planned_drive_minutes
+from .rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
 from .rules.working_time import confirmation_problems, fits_in_day, schedule_day, team_minutes, time_notice
 from .tomtom import TomTomError, get_client, local_datetime
@@ -363,6 +363,76 @@ def team_problems(draft, lead, date, team):
         elif clash:
             problems.append(f"{person} ist an diesem Tag schon im Plan von {clash.employee}.")
     return problems
+
+
+FREE_DAY_SUGGESTIONS = 12
+
+
+def _usual_region(employee):
+    """The region this person mostly works in (from the buildings of their plans)."""
+    regions = {}
+    for stop in TourStop.objects.filter(Q(tour__employee=employee) | Q(tour__team=employee)).select_related(
+            "building", "installation_order__building"):
+        building = stop.building or (stop.installation_order.building if stop.installation_order else None)
+        if building and building.region:
+            regions[building.region] = regions.get(building.region, 0) + 1
+    return max(regions, key=regions.get) if regions else ""
+
+
+def _nearest_first(items):
+    """Keep stops close together: start with the first one, then always the nearest next one."""
+    placed = [(item, geocoding.position(item, None)[0]) for item in items]
+    if not placed:
+        return []
+    route, rest = [placed[0]], placed[1:]
+    while rest:
+        last = route[-1][1]
+        rest.sort(key=lambda entry: distance_km(last, entry[1]) if last and entry[1] else 9999)
+        route.append(rest.pop(0))
+    return [item for item, _ in route]
+
+
+def free_day_suggestions(employee, date, kind=""):
+    """What the system proposes for a free day of this person (AUTOMATIC: keeps to 7,5 h).
+
+    Readers: assigned, still unplanned buildings, then others in their usual region.
+    Installers: assigned orders without date, then open orders in their usual region.
+    kind: "reading" / "installation" = only that (the calendar filter), "" = what the person can do.
+    Returns (suggestions, ids pre-ticked because they fit into the day).
+    """
+    region = _usual_region(employee)
+    found = []
+    if employee.can_install and kind != "reading":
+        open_orders = InstallationOrder.objects.exclude(status=OrderStatus.DONE).filter(tour_stops__isnull=True)
+        assigned = list(open_orders.filter(assigned_installers=employee).order_by("re_number"))
+        rest = open_orders.exclude(pk__in=[o.pk for o in assigned]).order_by("zip_code", "re_number")
+        # first the usual region, then the others (many orders have no building, so no region)
+        nearby = list(rest.filter(building__region=region)[:30]) if region else []
+        nearby += list(rest.exclude(pk__in=[o.pk for o in nearby])[:30 - len(nearby)])
+        for order in assigned + _nearest_first(nearby):
+            why = (f"{employee} zugewiesen" if order in assigned
+                   else f"Region {region}" if region and order.building and order.building.region == region else "noch ohne Termin")
+            found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
+                                    f"{why} · {order.duration_minutes} min", order.duration_minutes))
+    if employee.can_read and kind != "installation":
+        unplanned = Building.objects.filter(tour_stops__isnull=True)
+        assigned = list(unplanned.filter(assigned_reader=employee).order_by("zip_code", "file_number"))
+        rest = unplanned.exclude(pk__in=[b.pk for b in assigned]).order_by("zip_code", "file_number")
+        nearby = list(rest.filter(region=region)[:30]) if region else []
+        nearby += list(rest.exclude(pk__in=[b.pk for b in nearby])[:30 - len(nearby)])
+        for building in assigned + _nearest_first(nearby):
+            why = (f"{employee} zugeordnet" if building in assigned
+                   else f"Region {region}" if region and building.region == region else "noch ungeplant")
+            found.append(Suggestion(StopKind.READING, building.pk, f"📖 Ablesung {building.file_number} · {building.street}, {building.city}",
+                                    f"{why} · {building.reading_minutes} min", building.reading_minutes))
+    found = found[:FREE_DAY_SUGGESTIONS]
+    ticked, used = set(), 0
+    for suggestion in found:
+        extra = suggestion.minutes + SUGGESTION_DRIVE_MINUTES
+        if fits_in_day(used, extra):
+            ticked.add((suggestion.kind, suggestion.pk))
+            used += extra
+    return found, ticked
 
 
 def first_free_days(employees, start):

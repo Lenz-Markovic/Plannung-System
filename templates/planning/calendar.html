@@ -32,7 +32,8 @@
   {# Which kind of plans: all / only readings / only installations / both in one plan #}
   {% if perms.planning.view_tour %}
     {# For every reader / installer: the first working day that is still free #}
-    <button type="button" class="btn cal-free-btn" hx-get="{% url 'planning:free_days' %}" hx-target="#cal-side">🗓 Erster freier Tag</button>
+    <button type="button" class="btn cal-free-btn" id="cal-free" aria-pressed="false"
+            data-list-url="{% url 'planning:free_days' %}" title="Zeigt im Kalender für jeden den ersten freien Tag – anklicken zum Planen">🗓 Erste freie Tage</button>
   {% endif %}
   <div class="cal-kinds" role="group" aria-label="Art der Fahrpläne">
     <button type="button" class="ul-f an" data-kind="">alle</button>
