@@ -23,6 +23,7 @@ from django.views.decorators.http import require_POST
 
 from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
+from core.models import Features
 
 from . import dayplan, services
 from .calendar import calendar_events, free_day_events, tour_kind
@@ -693,7 +694,13 @@ def _autoplan_context(request):
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
 def autoplan_page(request):
-    """🤖 Automatisch planen: choose a period, see the proposals, change them, save them."""
+    """🤖 Automatisch planen: choose a period, see the proposals, change them, save them.
+
+    FROZEN: only available when an admin switched it on (Verwaltung → Funktionen).
+    """
+    if not Features.load().autoplan:
+        messages.info(request, "„Automatisch planen“ ist ausgeschaltet (Verwaltung → Funktionen).")
+        return redirect("planning:calendar")
     today = timezone.localdate()
     monday = today + datetime.timedelta(days=7 - today.weekday())  # next Monday
     if request.method == "POST":

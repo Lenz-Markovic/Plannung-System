@@ -6,7 +6,8 @@
   <h1>📅 Kalender</h1>
   <span class="sub">Ablesungen und Montage je Person · Fahrplan per Ziehen auf einen anderen Tag verschieben, danach neu rechnen und bestätigen</span>
   <span class="spacer"></span>
-  {% if perms.planning.add_tour %}<a class="btn primary" href="{% url 'planning:autoplan' %}" title="Das System verteilt die ungeplanten Stopps auf freie Tage">🤖 Automatisch planen</a>{% endif %}
+  {# frozen: only visible when an admin switched it on (Verwaltung → Funktionen) #}
+  {% if perms.planning.add_tour and FEATURES.autoplan %}<a class="btn primary" href="{% url 'planning:autoplan' %}" title="Das System verteilt die ungeplanten Stopps auf freie Tage">🤖 Automatisch planen</a>{% endif %}
   <a class="btn" href="{% url 'planning:tours_excel' %}" title="Eine Excel-Mappe mit einem Blatt je Fahrplan zum Ausdrucken">📄 Alle Fahrpläne (Excel)</a>
 </header>
 

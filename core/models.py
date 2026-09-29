@@ -59,3 +59,30 @@ class GeocodedAddress(models.Model):
     @property
     def needs_geocoding(self):
         return self.geocode_status == GeocodeStatus.PENDING or self.geocoded_address != self.full_address
+
+
+class Features(models.Model):
+    """Switches for functions that are not released yet ("Funktionen" in Verwaltung).
+
+    There is only ONE row (pk=1); Features.load() returns it. A new function can
+    be built and tested, but stays invisible in the real system until an admin
+    switches it on here.
+    """
+
+    autoplan = models.BooleanField(
+        "🤖 Automatisch planen", default=False,
+        help_text="Eingefroren – soll später weiterentwickelt werden. Eingeschaltet erscheint im Kalender der "
+                  "Knopf „Automatisch planen“: das System verteilt ungeplante Stopps auf freie Tage (Vorschlag, "
+                  "erst nach Bestätigung gespeichert).",
+    )
+
+    class Meta:
+        verbose_name = "Funktionen"
+        verbose_name_plural = "Funktionen"
+
+    def __str__(self):
+        return "Funktionen (ein-/ausschalten)"
+
+    @classmethod
+    def load(cls):
+        return cls.objects.get_or_create(pk=1)[0]

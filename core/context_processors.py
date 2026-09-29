@@ -2,6 +2,8 @@ from pathlib import Path
 
 from django.conf import settings
 
+from .models import Features
+
 
 def _static_version():
     """Number that changes whenever a file in static/ changes (newest modification time).
@@ -15,4 +17,5 @@ def _static_version():
 
 def site(request):
     """Values every template may need."""
-    return {"DEMO_BANNER": settings.DEMO_BANNER, "STATIC_VERSION": _static_version()}
+    return {"DEMO_BANNER": settings.DEMO_BANNER, "STATIC_VERSION": _static_version(),
+            "FEATURES": Features.load() if request.user.is_authenticated else None}

@@ -8,8 +8,11 @@ and installers - their employee data (home address, colour, time window).
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
+from django.shortcuts import redirect
 
 from planning.models import Employee
+
+from .models import Features
 
 
 class EmployeeInline(admin.StackedInline):
@@ -38,3 +41,18 @@ admin.site.register(User, UserWithEmployeeAdmin)
 
 admin.site.site_header = "Planungssystem – Verwaltung"
 admin.site.site_title = "Planungssystem"
+
+
+@admin.register(Features)
+class FeaturesAdmin(admin.ModelAdmin):
+    """Only one row: no "add" (except the very first time) and no "delete"."""
+
+    def has_add_permission(self, request):
+        return not Features.objects.exists() and super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        # straight to the one row instead of a list with one entry
+        return redirect("admin:core_features_change", Features.load().pk)

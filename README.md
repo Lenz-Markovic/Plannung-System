@@ -228,7 +228,12 @@ The only JavaScript is `static/js/calendar.js` (commented).
   Calendar ("🤝 1× Hilfe"), Excel and "Mein Tag" show the help stop. Deleting one of
   the plans marks the other one for recalculation.
 
-## 🤖 Automatic planning
+## 🤖 Automatic planning (FROZEN – switched off)
+
+> Decided with the team: this function is frozen for now and will be developed further
+> later. It is **switched off** in the real system: no button, the page cannot be opened.
+> An admin can switch it on in **⚙ Verwaltung → Funktionen → „🤖 Automatisch planen“**
+> (model `core.Features`, one row). The code and its tests stay.
 
 - Calendar → **🤖 Automatisch planen**: choose the period (max. one month), the kind
   (📖 / 🔧 / both) and the people (none ticked = all) → **Vorschlag berechnen**.

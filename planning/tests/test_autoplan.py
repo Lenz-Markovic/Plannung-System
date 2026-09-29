@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from buildings.models import Building, BuildingStatus, InstallationOrder
 from core import roles
+from core.models import Features
 from planning import services
 from planning.models import Absence, Employee, StopKind, Tour
 
@@ -26,6 +27,7 @@ def demo(demo_import, monkeypatch):
 
 @pytest.fixture
 def dispo(demo):
+    Features.objects.update_or_create(pk=1, defaults={"autoplan": True})  # frozen function: switched on for these tests
     user = User.objects.create_user(username="dispo")
     user.groups.add(Group.objects.get(name=roles.DISPATCHER))
     client = Client()
@@ -125,3 +127,40 @@ def test_automatic_plans_create_no_new_conflicts(demo):
     saved, problems = services.autoplan_save_all(proposal, None)
     assert saved and not problems
     assert open_conflicts() <= before  # the system keeps the montage rule itself
+
+
+# --- frozen: switched off by default, only an admin switches it on ----------------------
+
+def test_switched_off_by_default_no_button_and_no_page(demo):
+    user = User.objects.create_user(username="d2")
+    user.groups.add(Group.objects.get(name=roles.DISPATCHER))
+    client = Client()
+    client.force_login(user)
+    assert Features.load().autoplan is False
+    assert "Automatisch planen" not in client.get(reverse("planning:calendar")).content.decode()
+    response = client.get(reverse("planning:autoplan"))
+    assert response.status_code == 302 and response.url == reverse("planning:calendar")
+    client.post(reverse("planning:autoplan"), {"action": "compute", "von": MON.isoformat(), "bis": FRI.isoformat()})
+    assert services.AUTOPLAN_KEY not in client.session  # also no computing through the address
+
+
+def test_admin_switches_it_on_in_verwaltung(demo):
+    admin_user = User.objects.create_user(username="chefadmin", is_staff=True)
+    admin_user.groups.add(Group.objects.get(name=roles.ADMIN))
+    client = Client()
+    client.force_login(admin_user)
+    page = client.get(reverse("admin:index")).content.decode()
+    assert "Funktionen" in page
+    form = client.get(reverse("admin:core_features_changelist"), follow=True)
+    assert "Eingefroren" in form.content.decode()
+    client.post(reverse("admin:core_features_change", args=[Features.load().pk]), {"autoplan": "on"})
+    assert Features.load().autoplan is True
+    assert "Automatisch planen" in client.get(reverse("planning:calendar")).content.decode()
+
+
+def test_dispatcher_cannot_open_the_switch(demo):
+    user = User.objects.create_user(username="d3", is_staff=True)  # even if somebody made them staff
+    user.groups.add(Group.objects.get(name=roles.DISPATCHER))
+    client = Client()
+    client.force_login(user)
+    assert client.get(reverse("admin:core_features_change", args=[Features.load().pk])).status_code in (302, 403)
