@@ -27,6 +27,11 @@ python manage.py runserver           # http://127.0.0.1:8000
 pytest                               # run all tests
 ```
 
+`pytest` takes about a minute. Tests that need the demo data ask for the
+`demo_import` fixture (`conftest.py`): the data is imported once per test file
+and every test is rolled back afterwards, so each test starts with the same
+fresh data. Only one file: `pytest planning/tests/test_excel.py`.
+
 After changing a `models.py`: `python manage.py makemigrations` and then
 `python manage.py migrate`.
 

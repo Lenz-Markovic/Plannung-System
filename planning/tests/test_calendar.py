@@ -1,11 +1,9 @@
 """Calendar: events, drag & drop (-> draft -> confirm), permissions."""
 
 import datetime
-import io
 
 import pytest
 from django.contrib.auth.models import Group, User
-from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
@@ -19,10 +17,9 @@ FREE_DAY = datetime.date(2027, 3, 2)  # no tours in the demo data
 
 
 @pytest.fixture
-def demo(monkeypatch):
+def demo(demo_import, monkeypatch):
     monkeypatch.setattr(timezone, "localdate", lambda *args: datetime.date(2026, 9, 28))
     monkeypatch.setattr(services, "get_client", lambda: FakeTomTom())
-    call_command("import_prototype", stdout=io.StringIO())
 
 
 def login(client, role, username="u"):

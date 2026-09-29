@@ -5,7 +5,6 @@ import io
 
 import pytest
 from django.contrib.auth.models import Group, User
-from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 from openpyxl import load_workbook
@@ -18,9 +17,8 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def demo(monkeypatch):
+def demo(demo_import, monkeypatch):
     monkeypatch.setattr(timezone, "localdate", lambda *args: datetime.date(2026, 9, 28))
-    call_command("import_prototype", stdout=io.StringIO())
 
 
 def reading_tour(min_stops=3):

@@ -23,9 +23,8 @@ def test_js_single_quoted_strings():
 
 
 @pytest.fixture
-def imported(db):
-    """Run the real import (each test gets a fresh, empty test database)."""
-    call_command("import_prototype", stdout=io.StringIO())
+def imported(demo_import, db):
+    """The demo import (done once for this file, see conftest.py)."""
 
 
 def test_counts(imported):

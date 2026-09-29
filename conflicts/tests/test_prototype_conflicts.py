@@ -27,8 +27,7 @@ def expected():
             for r in rows}
 
 
-def test_messages_are_the_same_as_in_the_prototype(expected):
-    call_command("import_prototype", stdout=io.StringIO())
+def test_messages_are_the_same_as_in_the_prototype(demo_import, expected):
     result = services.evaluate(Building.objects.all())
     ours = {(b.source_system, b.file_number): [(m.severity, m.re_number, m.via, m.text) for m, *_ in items]
             for b, items in result.items()}
@@ -50,9 +49,8 @@ from planning.models import StopKind, TourStop  # noqa: E402
 
 
 @pytest.fixture
-def imported():
-    call_command("import_prototype", stdout=io.StringIO())
-    services.refresh_conflicts()
+def imported(demo_import):
+    """The demo data (conftest.py); the import already stored the conflicts."""
 
 
 def test_import_stores_the_conflicts_without_ok_messages(imported, expected):

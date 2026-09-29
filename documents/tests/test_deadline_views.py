@@ -1,11 +1,9 @@
 """Status workflow and 14-day deadline through the web interface."""
 
 import datetime
-import io
 
 import pytest
 from django.contrib.auth.models import Group, User
-from django.core.management import call_command
 from django.urls import reverse
 from django.utils import timezone
 
@@ -18,10 +16,9 @@ TODAY = datetime.date(2026, 9, 28)
 
 
 @pytest.fixture(autouse=True)
-def demo_data(monkeypatch):
+def demo_data(demo_import, monkeypatch):
     """Demo data + a fixed 'today', so the results do not depend on the real date."""
     monkeypatch.setattr(timezone, "localdate", lambda *args: TODAY)
-    call_command("import_prototype", stdout=io.StringIO())
 
 
 def login(client, role):

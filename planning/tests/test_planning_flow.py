@@ -38,9 +38,8 @@ class FakeTomTom:
 
 
 @pytest.fixture
-def demo(monkeypatch):
+def demo(demo_import, monkeypatch):
     monkeypatch.setattr(timezone, "localdate", lambda *args: datetime.date(2026, 9, 28))
-    call_command("import_prototype", stdout=io.StringIO())
     return Employee.objects.get(short_name="Keller")
 
 

@@ -17,9 +17,8 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def office_client(client):
+def office_client(demo_import, client):
     """Logged in as Sachbearbeitung, with the demo data imported."""
-    call_command("import_prototype", stdout=io.StringIO())
     user = User.objects.create_user(username="sb", password="x")
     user.groups.add(Group.objects.get(name=roles.PROCESSING))
     client.force_login(user)
