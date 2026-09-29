@@ -73,6 +73,7 @@ class Line:
     description: str
     category: str              # category code, "" = none
     quantity: int
+    place: str = ""            # address of the order (for the table "Je Auftrag")
 
 
 @dataclass
@@ -96,6 +97,23 @@ class Row:
 
 
 @dataclass
+class OrderRow:
+    """One contract (RE) in the table "Je Auftrag": pieces per category and money."""
+
+    order: str
+    group: str
+    date: datetime.date | None
+    place: str
+    pieces: dict = field(default_factory=dict)    # category code -> pieces
+    articles: list = field(default_factory=list)  # (article, description, pieces, € of the line)
+    money: Decimal = Decimal(0)
+
+    @property
+    def total_pieces(self):
+        return sum(self.pieces.values())
+
+
+@dataclass
 class Summary:
     start: datetime.date
     end: datetime.date
@@ -107,6 +125,8 @@ class Summary:
     by_category: list          # (category, pieces, €) of the counted groups, most expensive first
     by_week: list              # (monday, €) of PLANNED + DUE
     without_price: list        # articles in the total without a price (price 0)
+    order_rows: list = field(default_factory=list)   # OrderRow of the counted groups, by date
+    order_columns: list = field(default_factory=list)  # category codes used by them (table columns)
 
     @property
     def total(self):
@@ -117,6 +137,11 @@ class Summary:
         return sum(self.pieces[g] for g in self.counted)
 
     @property
+    def column_totals(self):
+        """Pieces per column of the table "Je Auftrag"."""
+        return [sum(o.pieces.get(c, 0) for o in self.order_rows) for c in self.order_columns]
+
+    @property
     def total_orders(self):
         return sum(self.orders[g] for g in self.counted)
 
@@ -124,9 +149,16 @@ class Summary:
 def summarize(lines, start, end, article_prices, category_prices, with_open=False):
     counted = (PLANNED, DUE, OPEN) if with_open else (PLANNED, DUE)
     rows, orders = {}, {g: set() for g in GROUPS}
-    weeks = {}
+    weeks, per_order = {}, {}
     for line in lines:
         price = price_for(line.article, line.category, article_prices, category_prices)
+        if line.group in counted:
+            entry = per_order.get(line.order)
+            if entry is None:
+                entry = per_order[line.order] = OrderRow(line.order, line.group, line.date, line.place)
+            entry.pieces[line.category] = entry.pieces.get(line.category, 0) + line.quantity
+            entry.articles.append((line.article, line.description, line.quantity, price * line.quantity))
+            entry.money += price * line.quantity
         row = rows.get(line.article)
         if row is None:
             row = rows[line.article] = Row(line.article, line.description, line.category, price)
@@ -155,4 +187,7 @@ def summarize(lines, start, end, article_prices, category_prices, with_open=Fals
         by_category=sorted(((c, p, m) for c, (p, m) in categories.items() if p), key=lambda x: -x[2]),
         by_week=sorted(weeks.items()),
         without_price=[r for r in ordered if r.count(counted) and not r.price],
+        order_rows=sorted(per_order.values(), key=lambda o: (o.date is None, o.date or start, o.order)),
+        order_columns=[c for c in dict.fromkeys(r.category for r in ordered)
+                       if any(c in o.pieces for o in per_order.values())],
     )

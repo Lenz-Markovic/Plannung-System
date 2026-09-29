@@ -58,3 +58,13 @@ def test_with_open_orders_and_missing_prices():
     s = summarize(lines(), START, END, {}, CATS, with_open=True)
     assert s.total == Decimal(35 * 12 + 14 * 25) and s.total_orders == 3
     assert [r.article for r in s.without_price] == ["999"]
+
+
+def test_per_contract_table():
+    s = summarize(lines(), START, END, {}, CATS)
+    assert [o.order for o in s.order_rows] == ["RE2", "RE1"]  # by date; RE3 (open) is not counted
+    re1 = s.order_rows[1]
+    assert re1.pieces == {"EHKV": 30, "RWM": 10} and re1.total_pieces == 40 and re1.money == Decimal(30 * 12 + 10 * 25)
+    assert s.order_columns == ["EHKV", "RWM"] and s.column_totals == [35, 10]
+    with_open = summarize(lines(), START, END, {}, CATS, with_open=True)
+    assert with_open.order_rows[-1].order == "RE3" and with_open.order_columns == ["EHKV", "RWM", "SONST"]

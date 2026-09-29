@@ -18,6 +18,10 @@ from .models import DeviceCategory
 from .rules.material import DUE, GROUP_LABELS, OPEN, PLANNED, PRESETS, preset_window
 
 COSTS = "buildings.view_costs"
+# column heads of the table "Je Auftrag" (\u00ad = soft hyphen: the browser may break there)
+SHORT = {"EHKV": "EHKV", "FUNKMODUL": "Funk\u00admodul", "GATEWAY": "Gate\u00adway", "STECKBL": "Steck\u00adblende",
+         "WMZ": "WMZ", "SQ1": "Wasser SQ1", "RWM": "RWM", "PULS": "Puls\u00adadapter", "MANSCH": "Man\u00adschette",
+         "SONST": "Sonst\u00adiges", "": "ohne Kat."}
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 
@@ -38,17 +42,19 @@ def _window(params):
 def _context(params):
     start, end, preset = _window(params)
     with_open = params.get("offen") == "1"
+    view = "auftrag" if params.get("ansicht") == "auftrag" else "artikel"  # table per article or per contract
     summary = material_summary(start, end, with_open)
     categories = list(DeviceCategory.objects.all())
     return {
-        "s": summary, "preset": preset, "presets": PRESETS, "with_open": with_open,
+        "s": summary, "view": view, "short": SHORT, "preset": preset, "presets": PRESETS, "with_open": with_open,
         "categories": categories, "labels": {c.code: c.label for c in categories},
         "groups": [(g, GROUP_LABELS[g]) for g in (PLANNED, DUE, OPEN)],
         "week_max": max((m for _, m in summary.by_week), default=0),
         "category_max": max((m for _, _, m in summary.by_category), default=0),
         "PLANNED": PLANNED, "DUE": DUE, "OPEN": OPEN,
         # the same window for the Excel download (also after a price change, which is a POST)
-        "query": urlencode({"z": preset, "von": start.isoformat(), "bis": end.isoformat(), **({"offen": "1"} if with_open else {})}),
+        "query": urlencode({"z": preset, "von": start.isoformat(), "bis": end.isoformat(), "ansicht": view,
+                            **({"offen": "1"} if with_open else {})}),
     }
 
 

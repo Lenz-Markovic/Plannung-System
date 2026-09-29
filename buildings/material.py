@@ -39,9 +39,10 @@ def material_lines(start, end):
         group = order_group(order.planned, day, start, end)
         if group is None:
             continue
+        place = f"{order.street}, {order.zip_code} {order.city}".strip(", ")
         for item in order.items.all():
             lines.append(Line(order.re_number, group, order.planned or day, item.article_number, item.description,
-                              item.category.code if item.category else "", item.quantity))
+                              item.category.code if item.category else "", item.quantity, place))
     return lines
 
 

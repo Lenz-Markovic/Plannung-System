@@ -12,6 +12,7 @@
 {# Every change reloads only #material-results (and the URL, so the window can be bookmarked) #}
 <form id="material-filter" class="filters mat-filter" method="get" action="{% url 'orders:material' %}"
       hx-get="{% url 'orders:material' %}" hx-target="#material-results" hx-indicator="#loading" hx-trigger="change, submit" hx-sync="this:replace">
+  <input type="hidden" name="ansicht" value="{{ view }}">
   <div class="f"><label>Zeitraum ab heute</label>
     <div class="mat-presets" role="radiogroup">
       {% for key, label in presets.items %}
@@ -42,6 +43,7 @@
     document.body.addEventListener("htmx:afterSwap", function (e) {
       if (e.detail.target.id !== "material-results") return;
       var box = document.getElementById("mat-window");  // the server's window -> date fields
+      if (box) { form.querySelector("[name=ansicht]").value = box.dataset.ansicht; }
       if (box && box.dataset.preset !== "frei") { form.querySelector("[name=von]").value = box.dataset.von; form.querySelector("[name=bis]").value = box.dataset.bis; }
     });
   })();

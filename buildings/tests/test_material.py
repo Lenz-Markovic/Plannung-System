@@ -102,3 +102,19 @@ def test_done_orders_without_plan_are_not_bought_again(demo):
     order.save()
     s = material_summary(datetime.date(2026, 1, 1), datetime.date(2027, 12, 31), with_open=True)
     assert order.re_number not in {u.order for r in s.rows for u in r.uses}
+
+
+def test_per_contract_view_and_excel_sheet(demo):
+    stop = a_planned_installation()
+    day = stop.tour.date.isoformat()
+    admin = login(roles.ADMIN, "admin")
+    params = {"z": "frei", "von": day, "bis": day, "ansicht": "auftrag"}
+    page = admin.get(reverse(URL), params).content.decode()
+    order = stop.installation_order
+    assert "Je Auftrag ·" in page and order.re_number in page and order.street in page
+    response = admin.get(reverse(URL), {**params, "format": "xlsx"})
+    ws = load_workbook(io.BytesIO(response.content))["Je Auftrag"]
+    assert ws["C1"].value == "RE-Nr." and order.re_number in [c.value for c in ws["C"]]
+    # a price change keeps the chosen view
+    kept = admin.post(reverse("orders:material_price"), {"category": "EHKV", "price": "12,00", **params}).content.decode()
+    assert "Je Auftrag ·" in kept

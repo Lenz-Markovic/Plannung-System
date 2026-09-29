@@ -52,6 +52,31 @@ def material_workbook(summary, labels):
         ws.column_dimensions[column].width = width
     ws.freeze_panes = "A5"
 
+    per_order = wb.create_sheet("Je Auftrag")
+    per_order.append(["Termin", "Gruppe", "RE-Nr.", "Adresse",
+                      *[labels.get(c, c or "ohne Kategorie") for c in summary.order_columns], "Stück", "Summe"])
+    for cell in per_order[1]:
+        cell.font, cell.fill = Font(bold=True, color="FFFFFF"), HEAD
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    short = {PLANNED: "geplant", DUE: "fällig bis", OPEN: "ohne Frist"}
+    for o in summary.order_rows:
+        per_order.append([o.date, short[o.group], o.order, o.place,
+                          *[o.pieces.get(c) or None for c in summary.order_columns], o.total_pieces, float(o.money)])
+        line = per_order.max_row
+        per_order.cell(line, 1).number_format = "DD.MM.YYYY"
+        per_order.cell(line, per_order.max_column).number_format = EUR
+        for cell in per_order[line]:
+            cell.border = THIN
+    per_order.append(["", "", "Gesamt", f"{len(summary.order_rows)} Aufträge", *summary.column_totals,
+                      summary.total_pieces, float(summary.total)])
+    for cell in per_order[per_order.max_row]:
+        cell.font, cell.fill = Font(bold=True), TOTAL
+    per_order.cell(per_order.max_row, per_order.max_column).number_format = EUR
+    per_order.column_dimensions["A"].width, per_order.column_dimensions["B"].width = 11, 11
+    per_order.column_dimensions["C"].width, per_order.column_dimensions["D"].width = 11, 36
+    per_order.row_dimensions[1].height = 45
+    per_order.freeze_panes = "E2"
+
     weeks = wb.create_sheet("Budget je Woche")
     weeks.append(["Woche ab", "Betrag"])
     for cell in weeks[1]:

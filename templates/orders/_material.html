@@ -1,6 +1,6 @@
 {% load core_tags %}
 {# Results of "💶 Material & Kosten" (also returned alone after every change) #}
-<div id="mat-window" data-preset="{{ preset }}" data-von="{{ s.start|date:'Y-m-d' }}" data-bis="{{ s.end|date:'Y-m-d' }}" hidden></div>
+<div id="mat-window" data-ansicht="{{ view }}" data-preset="{{ preset }}" data-von="{{ s.start|date:'Y-m-d' }}" data-bis="{{ s.end|date:'Y-m-d' }}" hidden></div>
 
 <div class="kpis mat-kpis">
   <div class="tile mat-total"><div class="lbl">Bedarf {{ s.start|date:"d.m." }} – {{ s.end|date:"d.m.Y" }}</div>
@@ -21,7 +21,56 @@
 {% endif %}
 
 <div class="mat-grid">
+{% if view == "auftrag" %}
   <div class="tablecard">
+    <div class="mat-tabs" role="tablist">
+      <button type="button" role="tab" class="{% if view == 'artikel' %}on{% endif %}" aria-selected="{% if view == 'artikel' %}true{% else %}false{% endif %}"
+              hx-get="{% url 'orders:material' %}" hx-include="#material-filter" hx-vals='{"ansicht": "artikel"}' hx-target="#material-results">📦 Je Artikel (Bestellliste)</button>
+      <button type="button" role="tab" class="{% if view == 'auftrag' %}on{% endif %}" aria-selected="{% if view == 'auftrag' %}true{% else %}false{% endif %}"
+              hx-get="{% url 'orders:material' %}" hx-include="#material-filter" hx-vals='{"ansicht": "auftrag"}' hx-target="#material-results">📋 Je Auftrag ({{ s.order_rows|length }})</button>
+    </div>
+    <div class="tbar">
+      <strong>Je Auftrag · {{ s.order_rows|length }} Aufträge</strong>
+      <span class="legend"><span>Geld und Stück je Material für jeden Auftrag · Zeile aufklappen für die Artikel</span></span>
+      <span class="spacer"></span>
+      <a class="btn mini primary" href="{% url 'orders:material' %}?{{ query }}&amp;format=xlsx" download>⬇ Excel (mit Blatt „Je Auftrag“)</a>
+    </div>
+    <div class="scroll">
+      <table class="list mat-table mat-orders">
+        <thead><tr>
+          <th>Termin</th><th>RE-Nr.</th><th style="min-width:190px">Adresse</th>
+          {% for code in s.order_columns %}<th class="num" title="{{ labels|get_item:code|default:'ohne Kategorie' }}">{{ short|get_item:code|default:code }}</th>{% endfor %}
+          <th class="num">Stück</th><th class="num">Summe</th>
+        </tr></thead>
+        <tbody>
+          {% for o in s.order_rows %}
+            <tr>
+              <td class="nowrap">{% if o.group == PLANNED %}📅{% elif o.group == DUE %}⏳ bis{% else %}❔{% endif %} {{ o.date|date:"D d.m."|default:"ohne Frist" }}</td>
+              <td class="mono"><a href="{% url 'orders:list' %}?q={{ o.order }}" title="Im Montage-Dashboard öffnen">{{ o.order }}</a></td>
+              <td><details class="mat-uses"><summary>{{ o.place }}</summary>
+                <div class="mat-uses-list">{% for art, desc, pieces, money in o.articles %}<div>{{ pieces }}× {{ desc }} <span class="na">{{ art }}</span> · <b>{{ money|eur }}</b></div>{% endfor %}</div></details></td>
+              {% for code in s.order_columns %}<td class="num">{{ o.pieces|get_item:code|default:"" }}</td>{% endfor %}
+              <td class="num"><b>{{ o.total_pieces }}</b></td><td class="num"><b>{{ o.money|eur }}</b></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="{{ s.order_columns|length|add:5 }}" class="na p-3">In diesem Zeitraum wird kein Material gebraucht.</td></tr>
+          {% endfor %}
+        </tbody>
+        {% if s.order_rows %}<tfoot><tr><td></td><td colspan="2"><b>Gesamt · {{ s.order_rows|length }} Aufträge</b></td>
+          {% for pieces in s.column_totals %}<td class="num">{{ pieces }}</td>{% endfor %}
+          <td class="num"><b>{{ s.total_pieces }}</b></td><td class="num"><b>{{ s.total|eur }}</b></td></tr></tfoot>{% endif %}
+      </table>
+    </div>
+  </div>
+
+{% else %}
+  <div class="tablecard">
+    <div class="mat-tabs" role="tablist">
+      <button type="button" role="tab" class="{% if view == 'artikel' %}on{% endif %}" aria-selected="{% if view == 'artikel' %}true{% else %}false{% endif %}"
+              hx-get="{% url 'orders:material' %}" hx-include="#material-filter" hx-vals='{"ansicht": "artikel"}' hx-target="#material-results">📦 Je Artikel (Bestellliste)</button>
+      <button type="button" role="tab" class="{% if view == 'auftrag' %}on{% endif %}" aria-selected="{% if view == 'auftrag' %}true{% else %}false{% endif %}"
+              hx-get="{% url 'orders:material' %}" hx-include="#material-filter" hx-vals='{"ansicht": "auftrag"}' hx-target="#material-results">📋 Je Auftrag ({{ s.order_rows|length }})</button>
+    </div>
     <div class="tbar">
       <strong>Bestellliste · {{ s.rows|length }} Artikel</strong>
       <span class="legend"><span>Preis anklicken zum Ändern – gilt dann fest für diese Art.-Nr.; leer = Preis der Kategorie</span></span>
@@ -70,6 +119,7 @@
     </div>
   </div>
 
+{% endif %}
   <div class="mat-side">
     <div class="card-lite">
       <h3 class="h6">📊 Budget je Woche</h3>

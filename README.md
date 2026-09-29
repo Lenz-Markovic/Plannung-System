@@ -264,6 +264,10 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - **Bestellliste** per article: pieces per group, price per piece, sum, "zuerst
   gebraucht" (first day it is needed) and which orders (click "n Auftr.").
   **⬇ Excel-Bestellliste** downloads the same list plus a sheet "Budget je Woche".
+- Tab **📋 Je Auftrag**: one row per contract (RE) - day, address, pieces of every
+  material category, total pieces and money; click the address for its articles with
+  prices, the RE number opens the order in the Montage dashboard. The Excel file has
+  the same table on the sheet "Je Auftrag".
 - Budget per calendar week and per category as bars.
 - **Prices**: per category (right side, the prototype prices as start values) and a fixed
   price per article number directly in the table (empty = category price again). A
