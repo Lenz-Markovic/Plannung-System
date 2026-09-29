@@ -68,3 +68,28 @@ class CostDocumentReceipt(TimeStampedModel):
 
     def __str__(self):
         return f"{self.building.file_number}: {self.received_on:%d.%m.%Y}"
+
+
+class NoticeSettings(models.Model):
+    """Contact data printed on every tenant notice ("Aushang-Einstellungen" in Verwaltung). One row."""
+
+    company = models.CharField("Firma", max_length=200, default="Ihr Messdienst (bitte in der Verwaltung eintragen)")
+    phone = models.CharField("Telefon", max_length=60, blank=True, default="")
+    email = models.CharField("E-Mail", max_length=120, blank=True, default="")
+    office_hours = models.CharField("Erreichbar", max_length=120, blank=True, default="Mo–Fr 8:00–16:00 Uhr")
+    change_until_days = models.PositiveSmallIntegerField(
+        "Terminänderung bis … Tage vorher", default=3,
+        help_text="Auf dem Aushang: „Passt der Termin nicht? Bitte bis … anrufen.“")
+    extra_text = models.TextField("Zusätzlicher Hinweis", blank=True, default="",
+                                  help_text="Erscheint unten auf jedem Aushang (z. B. Hinweis zur Heizung).")
+
+    class Meta:
+        verbose_name = "Aushang-Einstellungen"
+        verbose_name_plural = "Aushang-Einstellungen"
+
+    def __str__(self):
+        return "Aushang-Einstellungen (Kontakt auf dem Aushang)"
+
+    @classmethod
+    def load(cls):
+        return cls.objects.get_or_create(pk=1)[0]

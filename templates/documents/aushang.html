@@ -1,0 +1,107 @@
+{% load static %}<!doctype html>
+{# Tenant notices (Aushang): one A4 page per stop. Print, or "Als PDF speichern" in the print dialog. #}
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if pages|length == 1 %}Aushang {{ pages.0.target.street }}{% else %}Aushänge ({{ pages|length }}){% endif %}</title>
+  <style>
+    :root { --ink: #111; --muted: #555; --line: #bbb; --accent: #1f4e8c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9e9e6; color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
+    .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px;
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+    .toolbar button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+    .toolbar a { color: var(--accent); }
+    .page { width: 210mm; min-height: 297mm; margin: 12px auto; background: #fff; padding: 18mm 18mm 14mm; display: flex; flex-direction: column;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15); page-break-after: always; break-after: page; }
+    .company { font-size: 11pt; color: var(--muted); display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6pt; }
+    h1 { font-size: 30pt; margin: 18pt 0 4pt; letter-spacing: .5pt; }
+    .what { font-size: 16pt; margin: 0 0 14pt; }
+    .date { border: 2.5pt solid var(--ink); border-radius: 6pt; padding: 12pt 16pt; margin: 6pt 0 16pt; }
+    .date .label { font-size: 11pt; text-transform: uppercase; letter-spacing: 1pt; color: var(--muted); }
+    .date .when { font-size: 22pt; font-weight: bold; margin-top: 4pt; }
+    .address { font-size: 15pt; margin-bottom: 14pt; }
+    .box { border-left: 4pt solid var(--accent); padding: 4pt 0 4pt 12pt; margin: 8pt 0; font-size: 12.5pt; line-height: 1.45; }
+    .box b { display: block; font-size: 13pt; margin-bottom: 2pt; }
+    ul { margin: 4pt 0 0 16pt; padding: 0; }
+    .spacer { flex: 1; }
+    .contact { border-top: 1px solid var(--line); padding-top: 8pt; font-size: 12pt; line-height: 1.5; }
+    .ref { font-size: 9pt; color: var(--muted); margin-top: 8pt; }
+    @page { size: A4; margin: 0; }
+    @media print {
+      body { background: #fff; }
+      .toolbar { display: none; }
+      .page { margin: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+    <span>{{ pages|length }} {% if pages|length == 1 %}Aushang{% else %}Aushänge{% endif %} · je eine A4-Seite · im Druckdialog „Als PDF speichern“ wählen, um eine PDF-Datei zu bekommen</span>
+    <a href="{% url 'planning:calendar' %}">← Kalender</a>
+  </div>
+
+  {% for p in pages %}
+    <section class="page">
+      <div class="company"><span>{{ settings.company }}</span><span>{% if settings.phone %}☎ {{ settings.phone }}{% endif %}</span></div>
+
+      <h1>Wichtige Information</h1>
+      <p class="what">
+        {% if p.is_reading %}Ablesung der Heizkosten- und Wasserzähler in Ihrem Haus
+        {% else %}Montage / Austausch von Messgeräten in Ihrem Haus{% endif %}
+      </p>
+
+      <div class="address"><b>{{ p.target.street }}</b>, {{ p.target.zip_code }} {{ p.target.city }}</div>
+
+      <div class="date">
+        <div class="label">Termin</div>
+        <div class="when">{{ p.state.text }}</div>
+      </div>
+
+      <div class="box"><b>Bitte ermöglichen Sie uns den Zugang</b>
+        {% if p.is_reading %}
+          zu allen Räumen mit Heizkörpern, Heizkostenverteilern und Wasserzählern (auch Bad, Küche, Keller).
+        {% else %}
+          zu allen Räumen, in denen Geräte eingebaut oder getauscht werden{% if p.order.summary %} ({{ p.order.summary }}){% endif %}.
+        {% endif %}
+        Bitte räumen Sie Heizkörper und Zähler frei, damit wir gut herankommen.
+      </div>
+
+      {% if p.access.apartment or not p.is_reading %}
+        <div class="box"><b>Wir müssen Ihre Wohnung betreten</b>
+          Bitte seien Sie anwesend oder bitten Sie eine Person Ihres Vertrauens (z. B. Nachbarn), uns zu öffnen.
+          {% if p.access.units %}Betroffen sind die Wohnungen {{ p.access.units|join:", " }}.{% endif %}
+        </div>
+      {% endif %}
+      {% if p.rwm_check %}
+        <div class="box"><b>Prüfung der Rauchwarnmelder</b>
+          Bei diesem Termin prüfen wir auch die Rauchwarnmelder in Ihrer Wohnung.
+        </div>
+      {% endif %}
+      {% if p.access.room %}
+        <div class="box"><b>Heizraum / Keller</b>
+          Bitte sorgen Sie dafür, dass Heizraum bzw. Keller zugänglich sind.
+        </div>
+      {% endif %}
+
+      <div class="box"><b>Passt der Termin nicht?</b>
+        Bitte melden Sie sich bis {{ p.change_until|date:"l, d.m.Y" }}{% if settings.phone %} unter {{ settings.phone }}{% endif %}{% if settings.email %} oder {{ settings.email }}{% endif %}.
+        Ist niemand anzutreffen, hinterlassen wir eine Nachricht mit einem neuen Termin.
+      </div>
+
+      {% if settings.extra_text %}<div class="box">{{ settings.extra_text|linebreaksbr }}</div>{% endif %}
+
+      <div class="spacer"></div>
+      <div class="contact">
+        Vielen Dank für Ihre Unterstützung!<br>
+        <b>{{ settings.company }}</b>{% if settings.phone %} · ☎ {{ settings.phone }}{% endif %}{% if settings.email %} · {{ settings.email }}{% endif %}{% if settings.office_hours %} · {{ settings.office_hours }}{% endif %}
+      </div>
+      <div class="ref">{% if p.building %}AZ {{ p.building.file_number }}{% endif %}{% if p.order %}{% if p.building %} · {% endif %}{{ p.order.re_number }}{% endif %} · Aushang erstellt am {% now "d.m.Y" %}</div>
+    </section>
+  {% empty %}
+    <section class="page"><p>Keine Stopps ausgewählt.</p></section>
+  {% endfor %}
+</body>
+</html>

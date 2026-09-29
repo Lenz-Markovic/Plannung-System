@@ -17,14 +17,17 @@ import datetime
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from buildings.models import Building
 from buildings.services import change_status
+from planning.models import StopKind, TourStop
 
+from . import notices
+from .models import NoticeSettings
 from .rules import OVERDUE, RELEASED, SNOOZE_CHOICES, SOON, remind_again_at
 from .services import deadline_entries, set_received_on
 
@@ -181,3 +184,43 @@ def receipt_update(request, pk):
     response = render(request, "documents/_receipt_entry.html", {"e": entry, "removed_pk": pk})
     response["HX-Trigger"] = "deadlines-changed"
     return response
+
+
+# --- Tenant notices (Aushang) -------------------------------------------------------------
+
+def _notice_pages(stops):
+    """What every A4 page shows."""
+    settings = NoticeSettings.load()
+    pages = []
+    for stop in notices.notice_stops(stops):
+        building, order = stop.building, stop.installation_order
+        target = building if stop.kind == StopKind.READING else order
+        state = notices.state_of(stop)
+        change_until = stop.tour.date - datetime.timedelta(days=settings.change_until_days)
+        access = building.access if building else None
+        pages.append({
+            "stop": stop, "target": target, "building": building, "order": order, "state": state,
+            "is_reading": stop.kind == StopKind.READING, "access": access,
+            "rwm_check": bool(access and "RWM-Prüfung in den Wohnungen" in access.reasons),
+            "change_until": change_until,
+        })
+    return settings, pages
+
+
+@require_POST
+@permission_required("planning.change_tour", raise_exception=True)
+def notice_print(request):
+    """📄 Aushänge drucken: mark the chosen stops as printed, then show the print page."""
+    stops = list(TourStop.objects.filter(pk__in=request.POST.getlist("stop")).select_related(
+        "tour", "building", "installation_order").order_by("tour__date", "position"))
+    notices.mark_printed(stops)
+    return redirect(f"{reverse('documents:notice_page')}?{'&'.join(f'stop={s.pk}' for s in stops)}")
+
+
+@permission_required("planning.view_tour", raise_exception=True)
+def notice_page(request):
+    """The notices, one A4 page each - print or save as PDF with the browser."""
+    stops = list(TourStop.objects.filter(pk__in=request.GET.getlist("stop")).select_related(
+        "tour__employee", "building", "installation_order").order_by("tour__date", "position"))
+    settings, pages = _notice_pages(stops)
+    return render(request, "documents/aushang.html", {"settings": settings, "pages": pages})

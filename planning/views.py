@@ -24,6 +24,8 @@ from django.views.decorators.http import require_POST
 from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 from core.models import Features
+from documents import notices
+from documents.notice_rules import notice_deadline
 
 from . import dayplan, services
 from .calendar import calendar_events, free_day_events, tour_kind
@@ -420,13 +422,19 @@ def tour_detail(request, pk):
     for stop in stops:
         stop.helpers = [h for h in helps if h.kind == StopKind.HELP and services.same_object(
             h, stop.building_id, stop.installation_order_id)] if stop.kind != StopKind.HELP else []
+        # tenant notice (Aushang): missing / late / printed / outdated
+        stop.notice = notices.state_of(stop) if stop.kind != StopKind.HELP else None
+    notice_states = [s.notice.state for s in stops if s.notice]
     # who can help at one object: everybody active who is not in this plan and not fixed in a team that day
     in_teams = Tour.objects.filter(date=tour.date, team__isnull=False).values("team")  # no NULLs in "NOT IN"
     helper_candidates = (Employee.objects.filter(active=True).exclude(pk__in=[p.pk for p in tour.people])
                          .exclude(pk__in=in_teams).exclude(pk__in=Absence.objects.filter(
                              start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
-        "tour": tour, "stops": stops, "helper_candidates": helper_candidates, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
+        "tour": tour, "stops": stops, "helper_candidates": helper_candidates,
+        "notice_stops": [s for s in stops if s.notice], "notice_deadline": notice_deadline(tour.date),
+        "notices_open": sum(1 for state in notice_states if state != "printed"),
+        "notices_late": "late" in notice_states, "notices_outdated": "outdated" in notice_states, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
         # moving to another person: readers for readings, installers for installations, both for mixed plans
         "employees": _move_candidates(stops),
     })

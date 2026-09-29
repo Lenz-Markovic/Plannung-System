@@ -33,6 +33,18 @@
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
           {% if s.kind == "help" %}<div class="g help-line">🤝 Hilfe bei {{ s.help_tour.people_label|default:"(Plan gelöscht)" }}</div>
           {% elif s.installation_order.summary %}<div class="g">Montage {{ s.installation_order.re_number }}: {{ s.installation_order.summary }}</div>{% endif %}
+          {% if s.notice %}
+            <div class="g notice-line {{ s.notice.state }}">📄
+              {% if s.notice.state == "printed" %}✓ Aushang gedruckt {{ s.notice_printed_at|date:"d.m." }}
+              {% elif s.notice.state == "outdated" %}⚠ Aushang veraltet (Tag/Zeit geändert) – neu drucken
+              {% elif s.notice.state == "late" %}Aushang fehlt – schon zu spät
+              {% else %}Aushang noch nicht gedruckt{% endif %}
+              {% if perms.planning.change_tour %}
+                <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
+                  <input type="hidden" name="stop" value="{{ s.pk }}"><button class="linkish" title="Nur diesen Aushang drucken">drucken</button></form>
+              {% endif %}
+            </div>
+          {% endif %}
           {% for h in s.helpers %}<div class="g help-line">🤝 Helfer: {{ h.tour.employee }}{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %}</div>{% endfor %}
           {% if perms.planning.add_tour and s.kind != "help" %}
             {# Somebody with an own plan helps at THIS object: opens their day in "Fahrplan prüfen" #}
@@ -52,6 +64,22 @@
   <div class="side-actions">
     <a class="btn" href="{% url 'planning:tour_excel' tour.pk %}">📄 Excel zum Ausdrucken</a>
   </div>
+
+  {# Tenant notices (Aushang): one A4 page per stop; printing marks them as "ausgehängt" #}
+  {% if notice_stops %}
+    <div class="notice-box {% if notices_late %}late{% elif notices_outdated %}outdated{% elif not notices_open %}done{% endif %}">
+      <b>📄 Aushang für die Mieter</b>
+      {% if not notices_open %}– ✓ alle gedruckt
+      {% else %}– {{ notices_open }} von {{ notice_stops|length }} {% if notices_outdated %}fehlen oder sind veraltet{% else %}fehlen noch{% endif %}{% endif %}
+      <div class="small">spätestens am <b>{{ notice_deadline|date:"D d.m.Y" }}</b> aushängen (14 Tage vorher){% if notices_late %} – <b>schon zu spät!</b>{% endif %}</div>
+      {% if perms.planning.change_tour %}
+        <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="mt-1">{% csrf_token %}
+          {% for s in notice_stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
+          <button class="btn mini primary">📄 Aushänge drucken ({{ notice_stops|length }})</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
   {% if perms.planning.change_tour %}
   <div class="side-actions">
     <button class="btn primary" hx-post="{% url 'planning:tour_recalculate' tour.pk %}">↻ Neu rechnen / bearbeiten</button>

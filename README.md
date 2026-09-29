@@ -248,6 +248,20 @@ The only JavaScript is `static/js/calendar.js` (commented).
   **Alle … vorläufig erstellen** (after "Bist du sicher?") saves all days as provisional
   plans - confirm them one by one in the calendar as usual.
 
+## 📄 Tenant notices (Aushang)
+
+- Calendar side panel of a plan → **📄 Aushänge drucken**: one A4 page per stop
+  (reading or installation) for the tenants: what happens, address, date with a time
+  window (full hour before the start, at least 2 h), access (rooms, apartment,
+  smoke detectors, boiler room - from the access detection), "Passt der Termin
+  nicht?" with a date, contact. Print it, or "Als PDF speichern" in the print dialog
+  (no PDF library needed). Single stops can be printed with "drucken".
+- Printing marks the stops "✓ Aushang gedruckt"; the panel shows the deadline (14 days
+  before, red when late) and **⚠ veraltet** if the plan was moved or its time window
+  changed since (`documents/notice_rules.py`, pure functions).
+- Company name, phone, e-mail, hours, "change until" days and an extra text:
+  **⚙ Verwaltung → Aushang-Einstellungen** (placeholder text until an admin fills it in).
+
 ## Project layout
 
 | Folder | Contents |

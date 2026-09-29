@@ -569,3 +569,13 @@ button.cal-pill:hover { border-color: var(--axis); }
 .ap-stops li { margin-bottom: 3px; }
 .ap-people input[type=checkbox] { width: auto; height: auto; min-width: 0; padding: 0; margin-right: 3px; }
 .ap-people .chk { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; }
+
+/* ---- 📄 Tenant notices (Aushang) ---------------------------------------------------- */
+.notice-box { border: 1px solid var(--ring); border-left: 4px solid var(--warning); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 13px; background: var(--surface); }
+.notice-box.done { border-left-color: var(--good); }
+.notice-box.late { border-left-color: var(--critical); background: var(--crit-wash); }
+.notice-box.outdated { border-left-color: var(--warning); background: var(--warn-wash); }
+.notice-line.printed { color: var(--good) !important; }
+.notice-line.late { color: var(--critical) !important; }
+.notice-line.outdated { color: var(--warn-ink) !important; }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font: inherit; }
