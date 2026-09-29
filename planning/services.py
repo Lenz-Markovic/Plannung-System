@@ -24,6 +24,7 @@ from django.db.models import F, Prefetch, Q
 from django.utils import timezone
 
 from buildings.models import Building, InstallationOrder, OrderStatus
+from buildings.rules.file_numbers import normalize_file_number
 from conflicts.rules import Finding, OtherPlan, PlannedBuilding, planning_findings
 from conflicts.services import installation_findings
 from conflicts.services import refresh_for as refresh_conflicts_for
@@ -302,10 +303,13 @@ def search_targets(query, draft, limit=6):
     in_plan = {_stop_key(s) for s in draft["stops"]}
     buildings, orders = Building.objects.all(), InstallationOrder.objects.exclude(status=OrderStatus.DONE)
     for word in words:
+        # A Liegenschaftsnummer finds the building in both forms: BFW 0704806 = CEOS 70004806 (same "core")
+        core = normalize_file_number(word) if word.isdigit() and len(word) >= 6 else ""
         buildings = buildings.filter(Q(file_number__icontains=word) | Q(street__icontains=word) | Q(city__icontains=word)
-                                     | Q(zip_code__startswith=word))
+                                     | Q(zip_code__startswith=word) | (Q(file_number_core=core) if core else Q(pk__in=[])))
         orders = orders.filter(Q(re_number__icontains=word) | Q(building_file_number__icontains=word)
-                               | Q(street__icontains=word) | Q(city__icontains=word) | Q(zip_code__startswith=word))
+                               | Q(street__icontains=word) | Q(city__icontains=word) | Q(zip_code__startswith=word)
+                               | (Q(building_file_number_core=core) if core else Q(pk__in=[])))
     def planned(stops):
         """' · schon geplant: Keller 03.12.2026' - saving moves a reading here; an order would get a 2nd date."""
         stop = min(stops, key=lambda st: st.tour.date, default=None)

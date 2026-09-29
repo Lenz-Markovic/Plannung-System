@@ -196,3 +196,17 @@ def test_search_needs_two_characters_and_says_when_nothing_is_found(planner):
     start_plan(planner, unplanned()[:1])
     assert planner.get(reverse("planning:confirm_search"), {"q": "x"}).content == b""
     assert "Nichts gefunden" in planner.get(reverse("planning:confirm_search"), {"q": "RE99999999"}).content.decode()
+
+
+def test_search_by_liegenschaftsnummer_in_both_forms(planner):
+    from buildings.models import InstallationOrder
+
+    start_plan(planner, unplanned()[:1])
+    order = InstallationOrder.objects.exclude(building_file_number="").exclude(status="done").first()
+    core = order.building_file_number_core
+    bfw_form = "07" + core.zfill(5)   # e.g. 70008792 (CEOS) -> 0708792 (BFW)
+    found = planner.get(reverse("planning:confirm_search"), {"q": bfw_form}).content.decode()
+    assert order.re_number in found  # the order refers to the CEOS number, found with the BFW number
+    building = unplanned()[4]
+    found = planner.get(reverse("planning:confirm_search"), {"q": building.file_number}).content.decode()
+    assert f"Ablesung {building.file_number}" in found
