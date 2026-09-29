@@ -87,3 +87,29 @@ def test_reader_gets_only_own_excel(client, demo):
     user.groups.add(Group.objects.get(name=roles.READER))
     client.force_login(user)
     assert client.get(reverse("planning:tour_excel", args=[Tour.objects.first().pk])).status_code == 403
+
+
+# --- montage plans look like reading plans ------------------------------------------
+
+def montage_tour():
+    return next(t for t in Tour.objects.order_by("date")
+                if t.stops.exists() and not t.stops.filter(kind="reading").exists())
+
+
+def test_montage_sheet_has_the_same_layout_and_names_the_work(demo):
+    tour = montage_tour()
+    ws = build_workbook([tour])[0].active
+    assert [ws.cell(4, c).value for c in range(1, 9)] == ["Uhrzeit ab:", "AZ", "Adresse", "RE", "ToDo", "FUNK", "Zur Anmeldung", "Termin bestätigt"]
+    todo = [c.value for c in ws["E"] if c.value and str(c.value).startswith("Montage RE")]
+    assert todo, "the ToDo cell starts with the order number"
+    net = next(c.value for c in ws["A"] if c.value and "Netto" in str(c.value))
+    assert "(Montage " in net and "Ablesung" not in net
+    # the value below the "Stichtag" label comes from the order when there is no building
+    stichtag = [ws.cell(c.row + 1, 4).value for c in ws["D"] if c.value == "Stichtag"]
+    assert stichtag and "—" not in stichtag
+
+
+def test_reading_sheet_keeps_the_prototype_wording(demo):
+    ws = build_workbook([reading_tour()])[0].active
+    net = next(c.value for c in ws["A"] if c.value and "Netto" in str(c.value))
+    assert "(Ablesung " in net and "Montage" not in net

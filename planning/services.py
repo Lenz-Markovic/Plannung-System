@@ -257,6 +257,19 @@ class Preview:
         return all(s.drive_source == DriveSource.TOMTOM for s in self.stops[:-1])
 
     @property
+    def reading_minutes(self):
+        return sum(s.work_minutes for s in self.stops if s.kind == StopKind.READING)
+
+    @property
+    def installation_minutes(self):
+        return sum(s.work_minutes for s in self.stops if s.kind == StopKind.INSTALLATION)
+
+    @property
+    def ends_next_day(self):
+        """The calculated end is after midnight (only with far too long days)."""
+        return bool(self.day_plan.end and self.day_plan.end < self.start)
+
+    @property
     def estimated_count(self):
         return sum(1 for s in self.stops[:-1] if s.drive_source != DriveSource.TOMTOM)
 

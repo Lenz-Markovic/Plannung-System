@@ -127,6 +127,7 @@ def test_plan_an_order_on_the_reading_day_shows_the_conflict_and_saves_it(dispo)
     assert response["HX-Redirect"] == reverse("planning:draft")
     preview = dispo.get(reverse("planning:draft")).content.decode()
     assert "Montage und Ablesung am selben Tag" in preview and "kf-critical" in preview
+    assert f"Montagezeit {order.duration_minutes} min" in preview and "Ablesezeit" not in preview
 
     dispo.post(reverse("planning:draft_save"), {"confirm": "0"})
     order.refresh_from_db()

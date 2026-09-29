@@ -12,7 +12,7 @@
 
 <div class="pr-kopfzeile">
   <span>{{ preview.stops|length }} Stopps · {{ preview.start|time:"H:i" }}–{{ plan.end|time:"H:i" }} ·
-    Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="t-crit">– {{ plan.over_limit_minutes|hours }} über 7,5 h</b>{% endif %}</span>
+    {% if preview.ends_next_day %}<b class="t-crit">(endet nach Mitternacht!)</b> · {% endif %}Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="t-crit">– {{ plan.over_limit_minutes|hours }} über 7,5 h</b>{% endif %}</span>
   <span class="spacer"></span>
   {# change start / break / order: recalculates the preview #}
   <form class="pr-settings" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview" hx-trigger="change">
@@ -77,9 +77,9 @@
 </div>
 
 <div class="pr-fuss">
-  {% if plan.work_minutes %}Ablesezeit {{ plan.work_minutes }} min · Fahrzeit {{ plan.drive_minutes }} min{% if preview.distance_km %} · {{ preview.distance_km|floatformat:1 }} km{% endif %} · Pause {{ plan.break_minutes }} min{% endif %}
+  {% if plan.work_minutes %}{% if preview.reading_minutes or not preview.installation_minutes %}Ablesezeit {{ preview.reading_minutes }} min · {% endif %}{% if preview.installation_minutes %}Montagezeit {{ preview.installation_minutes }} min · {% endif %}Fahrzeit {{ plan.drive_minutes }} min{% if preview.distance_km %} · {{ preview.distance_km|floatformat:1 }} km{% endif %} · Pause {{ plan.break_minutes }} min{% endif %}
   {% if preview.commute_minutes %}<br>Anfahrt von zu Hause: {{ preview.commute_minutes }} min · {{ preview.commute_km|floatformat:1 }} km (zählt nicht zur Arbeitszeit){% endif %}
-  <br><span class="na">Fahrzeit im Plan auf 5 min aufgerundet. Max. 7,5 h netto (Ablesung + Fahrt); Pause 30 min ab 6 h nach der ersten Liegenschaft, die nach 12:00 endet.</span>
+  <br><span class="na">Fahrzeit im Plan auf 5 min aufgerundet. Max. 7,5 h netto (Ablesung/Montage + Fahrt); Pause 30 min ab 6 h nach der ersten Liegenschaft, die nach 12:00 endet.</span>
 </div>
 
 {% if preview.critical_count %}<div class="pr-status warn">⚠ {{ preview.critical_count }} Konflikt{{ preview.critical_count|pluralize:"e" }} – Liegenschaften aus anderen Fahrplänen werden beim Speichern hierher verschoben, der alte Plan wird zum Neurechnen markiert.</div>{% endif %}

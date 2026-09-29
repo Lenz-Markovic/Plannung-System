@@ -92,6 +92,7 @@ class TourSheet:
     person: str
     stops: list = field(default_factory=list)
     work: int = 0
+    installation_work: int = 0  # part of `work` that is installation (Montage)
     drive: int = 0
     break_after: int | None = None
     break_minutes: int = 0
@@ -105,7 +106,11 @@ class TourSheet:
 
     def net_text(self):
         """nettoText() in the prototype."""
-        text = f"Netto-Arbeitszeit: {hh_mm(self.net)}   (Ablesung {self.work} min + Fahrzeit im Tag {self.drive} min)"
+        reading = self.work - self.installation_work
+        # Same words as the prototype for reading tours; Montage named where it is part of the day
+        parts = ([f"Ablesung {reading} min"] if reading or not self.installation_work else []) + (
+            [f"Montage {self.installation_work} min"] if self.installation_work else [])
+        text = f"Netto-Arbeitszeit: {hh_mm(self.net)}   ({' + '.join(parts)} + Fahrzeit im Tag {self.drive} min)"
         if self.net > MAX_NET_MINUTES:
             text += f"   |  {self.net - MAX_NET_MINUTES} min über 7,5 h"
         if self.provisional:
@@ -182,7 +187,8 @@ def stop_row(stop, start, end):
     return StopRow(
         start=start, end=end, address=target.street,
         zip_code=int(zip_code) if str(zip_code).isdigit() else zip_code, city=target.city,
-        az=az, re=_re_value(re_numbers), stichtag=_stichtag(building) if building else "—",
+        az=az, re=_re_value(re_numbers),
+        stichtag=_stichtag(building) if building else (order.raw_data or {}).get("stichtag") or "—",
         todo=todo, anlage=INSTALLATION_SHORT.get(building.installation_type, "") if building else "",
         hint=" · ".join(hints), highlight=bool(access and access.important),
         drive_after=stop.drive_to_next_minutes,
@@ -197,6 +203,7 @@ def tour_sheet(tour):
     plan = schedule_day(tour.start_time, work, drives, tour.break_minutes or 30)
     sheet = TourSheet(
         date=tour.date, person=str(tour.employee), work=sum(work), drive=sum(drives),
+        installation_work=sum(s.work_minutes for s in stops if s.kind == StopKind.INSTALLATION),
         provisional=tour.status == TourStatus.PROVISIONAL or tour.needs_recalculation or tour.routing_source != RoutingSource.TOMTOM,
         source=tour.routing_note, commute=tour.commute_to_minutes,
     )
