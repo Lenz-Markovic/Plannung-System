@@ -39,17 +39,23 @@
       <a class="tab {% if request.resolver_match.url_name == 'my_day' %}on{% endif %}" href="{% url 'planning:my_day' %}">📱 Mein Tag</a>
     {% endif %}
     {% if user.is_staff %}<a class="tab" href="{% url 'admin:index' %}">⚙ Verwaltung</a>{% endif %}
-    {% if perms.journal.view_activity %}
-      {# 🕘 who changed what - opens a drawer on the right side #}
-      <button class="tab linkish" type="button" hx-get="{% url 'journal:activity' %}" hx-target="#drawer" title="Wer hat was geändert?">🕘 Verlauf</button>
-    {% endif %}
     {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
       {# 14-day warning: checked on load, every 30 s and right after changes (documents/views.py). #}
       {# The pop-up itself is a fixed overlay; the reminder bar appears right here in the navigation. #}
       <div id="deadline-warning" hx-get="{% url 'documents:warning' %}"
            hx-trigger="load, every 30s, deadlines-changed from:body"></div>
     {% endif %}
-    <span class="user">{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %}</span>
+    {% if perms.journal.view_activity %}
+      {# behind the user name, not a button of its own: 🕘 Verlauf (who changed what - to know whom to ask) #}
+      <details class="user user-menu"><summary>{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %} ▾</summary>
+        <div class="user-menu-box">
+          <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}" hx-target="#drawer"
+                  onclick="this.closest('details').open = false">🕘 Verlauf – wer hat was geändert?</button>
+        </div>
+      </details>
+    {% else %}
+      <span class="user">{{ user.get_full_name|default:user.username }}{% for g in user.groups.all %} · {{ g.name }}{% endfor %}</span>
+    {% endif %}
     <form method="post" action="{% url 'logout' %}" class="m-0">
       {% csrf_token %}
       <button class="btn mini">Abmelden</button>

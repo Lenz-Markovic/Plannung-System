@@ -226,7 +226,7 @@ def notice_toggle(request):
 def notice_print(request):
     """📄 Aushänge drucken / als Word: mark the chosen stops as printed, then the page or the .docx."""
     stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
-    notices.mark_printed(stops)
+    notices.mark_printed(stops, request.user)
     for tour in {s.tour for s in stops}:  # one line per plan
         mine = [s for s in stops if s.tour == tour]
         record(request.user, ActivityKind.NOTICE,

@@ -266,15 +266,20 @@ The only JavaScript is `static/js/calendar.js` (commented).
 
 ## 🕘 Verlauf (who changed what)
 
-- **🕘 Verlauf** in the navigation opens a side drawer: newest first, grouped by day,
+- Purpose: to know **whom to ask** about a step. So it is kept out of the way: click
+  your **name in the navigation (▾) → 🕘 Verlauf – wer hat was geändert?**. It opens a side drawer: newest first, grouped by day,
   with who and when. Filters: Fahrpläne, Aushänge, Aufträge, Status, Notizen,
   Unterlagen; "nur meine"; last 24 h / 7 / 30 days. Refreshes itself every 30 s.
 - Recorded (`journal/activity.py`): plan created / changed / **confirmed** / **Termin
   verschoben** (old → new person and day) / deleted, stop done (Mein Tag), **Aushang
   gedruckt / als Word geladen / ja-nein**, order priority / status / Montagezeit /
   Monteure, building status and status proposals, Unterlagen-Eingang, notes.
-- Per object: "🕘 Verlauf dieses Plans" in the calendar side panel, "🕘 Verlauf" in
-  every notes box (Liegenschaft / Auftrag).
+- Quietly where it matters: the calendar side panel ends with a small grey line
+  "erstellt von … · bestätigt von … · zuletzt: … – <person>, <time> · wer hat was
+  geändert?"; a printed notice says "✓ Aushang gedruckt 29.09. von <person>"; every
+  note shows its author. The notes box has "wer hat was geändert?" for its object.
+- Ableser/Monteur see no Aushang information and no Verlauf on their side (calendar
+  panel of their own plan, Mein Tag).
 - **Who may see it**: permission `journal.view_activity` - Admin, Disposition,
   Sachbearbeitung, Leitung by default; not Ableser/Monteur. Change it per role in
   ⚙ Verwaltung → Gruppen. The Verlauf itself cannot be edited or deleted (admin read only).

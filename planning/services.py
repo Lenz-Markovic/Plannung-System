@@ -950,14 +950,16 @@ def save_draft(draft, user, confirm):
     helped_before = set(tour.stops.filter(kind=StopKind.HELP).values_list("help_tour_id", flat=True)) if tour.pk else set()
     # printed tenant notices stay with their object (they show "veraltet" if day or time changed)
     # (and so does the choice "Aushang ja")
-    notices = {(st.kind, st.building_id, st.installation_order_id): (st.notice_printed_at, st.notice_for, st.notice_wanted)
+    notices = {(st.kind, st.building_id, st.installation_order_id):
+               (st.notice_printed_at, st.notice_for, st.notice_wanted, st.notice_printed_by_id)
                for st in tour.stops.filter(Q(notice_wanted=True) | Q(notice_printed_at__isnull=False))} if tour.pk else {}
     tour.stops.all().delete()
     for position, stop in enumerate(preview.stops, start=1):
-        printed_at, printed_for, wanted = notices.get((stop.kind, stop.building.pk if stop.building else None,
-                                                       stop.order.pk if stop.order else None), (None, "", False))
+        printed_at, printed_for, wanted, printed_by = notices.get(
+            (stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None),
+            (None, "", False, None))
         TourStop.objects.create(
-            notice_printed_at=printed_at, notice_for=printed_for, notice_wanted=wanted,
+            notice_printed_at=printed_at, notice_for=printed_for, notice_wanted=wanted, notice_printed_by_id=printed_by,
             tour=tour, position=position, kind=stop.kind, building=stop.building, installation_order=stop.order,
             help_tour=stop.help_tour if stop.kind == StopKind.HELP else None,
             start_time=stop.start, end_time=stop.end, work_minutes=stop.work_minutes,

@@ -38,8 +38,8 @@
           {% elif s.installation_order.summary %}<div class="g">Montage {{ s.installation_order.re_number }}: {{ s.installation_order.summary }}</div>{% endif %}
           {% if s.notice %}
             <div class="g notice-line {{ s.notice.state }}">📄
-              {% if s.notice.state == "printed" %}✓ Aushang gedruckt {{ s.notice_printed_at|date:"d.m." }}
-              {% elif s.notice.state == "outdated" %}⚠ Aushang veraltet (Tag/Zeit geändert) – neu drucken
+              {% if s.notice.state == "printed" %}✓ Aushang gedruckt {{ s.notice_printed_at|date:"d.m." }}{% if s.notice_printed_by %} von {{ s.notice_printed_by }}{% endif %}
+              {% elif s.notice.state == "outdated" %}⚠ Aushang veraltet (Tag/Zeit geändert) – neu drucken{% if s.notice_printed_by %} <span class="na">(gedruckt von {{ s.notice_printed_by }})</span>{% endif %}
               {% elif s.notice.state == "late" %}Aushang fehlt – schon zu spät
               {% else %}Aushang noch nicht gedruckt{% endif %}
               {% if perms.planning.change_tour %}
@@ -103,12 +103,13 @@
       {% endif %}
     </div>
   {% endif %}
-  {% if perms.journal.view_activity %}
-    <details class="side-history" {% if activities %}open{% endif %}><summary>🕘 Verlauf dieses Plans</summary>
-      {% for a in activities %}<div class="act-mini">{{ a.icon }} {{ a.text|truncatechars:110 }} <span class="na">– {{ a.user|default:"System" }}, {{ a.created_at|date:"d.m. H:i" }}</span></div>
-      {% empty %}<div class="na">Noch keine Einträge.</div>{% endfor %}
-      <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}?tour={{ tour.pk }}" hx-target="#drawer">alles anzeigen →</button>
-    </details>
+  {# who to ask: quiet, at the bottom; the whole Verlauf is behind the user name in the navigation #}
+  {% if tour.created_by or tour.confirmed_by or last_change %}
+    <div class="who-line">
+      {% if tour.created_by %}erstellt von <b>{{ tour.created_by }}</b>{% endif %}{% if tour.confirmed_by %} · bestätigt von <b>{{ tour.confirmed_by }}</b> {{ tour.confirmed_at|date:"d.m. H:i" }}{% endif %}
+      {% if last_change %}<br>zuletzt: {{ last_change.text|truncatechars:70 }} – <b>{{ last_change.user|default:"System" }}</b>, {{ last_change.created_at|date:"d.m. H:i" }}
+        · <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}?tour={{ tour.pk }}" hx-target="#drawer">wer hat was geändert?</button>{% endif %}
+    </div>
   {% endif %}
   {% if perms.planning.change_tour %}
   <div class="side-actions">

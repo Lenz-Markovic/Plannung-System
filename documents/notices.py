@@ -51,10 +51,11 @@ def state_of(stop, today=None):
     return notice_state(stop.tour.date, window, stop.notice_for, today or timezone.localdate())
 
 
-def mark_printed(stops):
-    """Remember that the notices were printed - for the day and window printed on them."""
+def mark_printed(stops, user=None):
+    """Remember that the notices were printed (and by whom) - for the day and window printed on them."""
     now = timezone.now()
+    by = user if user is not None and user.is_authenticated else None
     for stop in notice_stops(stops):
-        stop.notice_printed_at, stop.notice_wanted = now, True
+        stop.notice_printed_at, stop.notice_wanted, stop.notice_printed_by = now, True, by
         stop.notice_for = state_of(stop).text
-        stop.save(update_fields=["notice_printed_at", "notice_for", "notice_wanted", "updated_at"])
+        stop.save(update_fields=["notice_printed_at", "notice_for", "notice_wanted", "notice_printed_by", "updated_at"])

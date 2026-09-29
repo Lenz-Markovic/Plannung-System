@@ -98,4 +98,36 @@ def test_drawer_by_role_and_filters(demo):
     assert "Fahrplan geändert" not in chef.get(reverse("journal:activity"), {"wer": "ich"}).content.decode()
     assert "Fahrplan geändert" in chef.get(reverse("journal:activity"), {"tour": tour.pk}).content.decode()
     panel = client_for(dispo_user).get(reverse("planning:tour_detail", args=[tour.pk])).content.decode()
-    assert "Verlauf dieses Plans" in panel and "Fahrplan geändert" in panel
+    assert "wer hat was geändert?" in panel and "Fahrplan geändert" in panel and "zuletzt:" in panel
+
+
+def test_verlauf_is_behind_the_user_name_not_a_button(demo):
+    page = client_for(user(roles.DISPATCHER, "dispo")).get(reverse("orders:list")).content.decode()
+    assert 'class="user user-menu"' in page and "🕘 Verlauf – wer hat was geändert?" in page
+    assert 'class="tab linkish"' not in page
+
+
+def test_printed_by_whom(demo):
+    dispo_user = user(roles.DISPATCHER, "dispo")
+    tour = a_tour()
+    stop = tour.stops.exclude(kind=StopKind.HELP).first()
+    client_for(dispo_user).post(reverse("documents:notice_print"), {"stop": [stop.pk]})
+    stop.refresh_from_db()
+    assert stop.notice_printed_by == dispo_user
+    panel = client_for(dispo_user).get(reverse("planning:tour_detail", args=[tour.pk])).content.decode()
+    assert "Aushang gedruckt" in panel and "von dispo" in panel
+    again = services.save_draft(services.draft_from_tour(Tour.objects.get(pk=tour.pk)), dispo_user, confirm=False)
+    assert again.stops.filter(notice_printed_by=dispo_user).count() == 1  # kept when the plan is saved again
+
+
+def test_reader_sees_no_aushang_and_no_verlauf(demo):
+    tour = a_tour()
+    stop = tour.stops.exclude(kind=StopKind.HELP).first()
+    client_for(user(roles.DISPATCHER, "dispo")).post(reverse("documents:notice_print"), {"stop": [stop.pk]})
+    reader = user(roles.READER, "abl")
+    tour.employee.user = reader
+    tour.employee.save()
+    panel = client_for(reader).get(reverse("planning:tour_detail", args=[tour.pk])).content.decode()
+    assert "Aushang" not in panel and "wer hat was geändert" not in panel
+    page = client_for(reader).get(reverse("planning:my_day")).content.decode()
+    assert "Aushang" not in page and "user-menu" not in page

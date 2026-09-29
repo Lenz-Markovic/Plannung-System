@@ -421,15 +421,16 @@ def tour_detail(request, pk):
     tour = get_object_or_404(Tour.objects.select_related("employee"), pk=pk)
     if not (request.user.has_perm("planning.view_tour") or tour.employee.user_id == request.user.pk):
         return HttpResponse(status=403)
-    stops = list(TourStop.objects.filter(tour=tour).select_related("building", "installation_order", "help_tour__employee")
-                 .order_by("position"))
+    stops = list(TourStop.objects.filter(tour=tour).select_related("building", "installation_order", "help_tour__employee",
+                                                                   "notice_printed_by").order_by("position"))
+    office = request.user.has_perm("planning.view_tour")  # Ableser/Monteur: no Aushang, no Verlauf on their side
     helps = list(TourStop.objects.filter(kind=StopKind.HELP, help_tour=tour).select_related("tour__employee"))
     for stop in stops:
         stop.helpers = [h for h in helps if h.kind == StopKind.HELP and services.same_object(
             h, stop.building_id, stop.installation_order_id)] if stop.kind != StopKind.HELP else []
         # tenant notice (Aushang), optional per stop: missing / late / printed / outdated
-        stop.notice_possible = stop.kind != StopKind.HELP
-        stop.notice = notices.state_of(stop) if notices.wanted(stop) else None
+        stop.notice_possible = office and stop.kind != StopKind.HELP
+        stop.notice = notices.state_of(stop) if office and notices.wanted(stop) else None
     notes.attach_notes(stops)  # 📝 open notes of each building / order
     notice_states = [s.notice.state for s in stops if s.notice]
     # who can help at one object: everybody active who is not in this plan and not fixed in a team that day
@@ -439,7 +440,8 @@ def tour_detail(request, pk):
                              start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
         "tour": tour, "stops": stops, "helper_candidates": helper_candidates,
-        "activities": list(tour.activities.select_related("user")[:5]) if request.user.has_perm("journal.view_activity") else [],
+        # the last change (who to ask) - the full Verlauf is behind the user name in the navigation
+        "last_change": tour.activities.select_related("user").first() if request.user.has_perm("journal.view_activity") else None,
         "notice_stops": [s for s in stops if s.notice], "notice_deadline": notice_deadline(tour.date),
         "notice_possible": [s for s in stops if s.notice_possible],
         "notice_off": [s for s in stops if s.notice_possible and not s.notice],
