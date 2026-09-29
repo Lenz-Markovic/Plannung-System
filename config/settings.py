@@ -82,6 +82,8 @@ MIDDLEWARE = [
     "simple_history.middleware.HistoryRequestMiddleware",
     # request.htmx / request.htmx_target (see core/middleware.py)
     "core.middleware.HtmxMiddleware",
+    # "Datenbank nicht aktuell - bitte migrate" instead of a crash after an update
+    "core.middleware.DatabaseNotUpToDateMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
