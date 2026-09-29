@@ -1,107 +1,113 @@
 {% load static %}<!doctype html>
-{# Tenant notices (Aushang): one A4 page per stop. Print, or "Als PDF speichern" in the print dialog. #}
+{# Tenant notices (Aushang) on the company template "VorlageAushänge": one A4 page per stop.
+   The picture is the page of the Word template; the fields sit where the Word form fields are
+   (positions in mm, measured from the filled template). Print, or "Als PDF speichern". #}
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% if pages|length == 1 %}Aushang {{ pages.0.target.street }}{% else %}Aushänge ({{ pages|length }}){% endif %}</title>
+  <title>{% if pages|length == 1 %}Aushang {{ pages.0.fields.number }}{% else %}Aushänge ({{ pages|length }}){% endif %}</title>
   <style>
-    :root { --ink: #111; --muted: #555; --line: #bbb; --accent: #1f4e8c; }
+    :root { --ink: #111; --accent: #1f4e8c; --line: #bbb; }
     * { box-sizing: border-box; }
-    body { margin: 0; background: #e9e9e6; color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
-    .toolbar { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px;
-      display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
-    .toolbar button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
-    .toolbar a { color: var(--accent); }
-    .page { width: 210mm; min-height: 297mm; margin: 12px auto; background: #fff; padding: 18mm 18mm 14mm; display: flex; flex-direction: column;
-      box-shadow: 0 2px 10px rgba(0,0,0,.15); page-break-after: always; break-after: page; }
-    .company { font-size: 11pt; color: var(--muted); display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 6pt; }
-    h1 { font-size: 30pt; margin: 18pt 0 4pt; letter-spacing: .5pt; }
-    .what { font-size: 16pt; margin: 0 0 14pt; }
-    .date { border: 2.5pt solid var(--ink); border-radius: 6pt; padding: 12pt 16pt; margin: 6pt 0 16pt; }
-    .date .label { font-size: 11pt; text-transform: uppercase; letter-spacing: 1pt; color: var(--muted); }
-    .date .when { font-size: 22pt; font-weight: bold; margin-top: 4pt; }
-    .address { font-size: 15pt; margin-bottom: 14pt; }
-    .box { border-left: 4pt solid var(--accent); padding: 4pt 0 4pt 12pt; margin: 8pt 0; font-size: 12.5pt; line-height: 1.45; }
-    .box b { display: block; font-size: 13pt; margin-bottom: 2pt; }
-    ul { margin: 4pt 0 0 16pt; padding: 0; }
-    .spacer { flex: 1; }
-    .contact { border-top: 1px solid var(--line); padding-top: 8pt; font-size: 12pt; line-height: 1.5; }
-    .ref { font-size: 9pt; color: var(--muted); margin-top: 8pt; }
+    body { margin: 0; background: #e9e9e6; color: var(--ink); font-family: Calibri, Carlito, Arial, sans-serif; }
+    .toolbar { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); padding: 10px 16px;
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font: 14px Arial, sans-serif; }
+    .toolbar button, .toolbar .btn { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent);
+      background: var(--accent); color: #fff; cursor: pointer; text-decoration: none; }
+    .toolbar .btn.light { background: #fff; color: var(--accent); }
+    .toolbar .hint { color: #555; }
+    .toolbar a.back { color: var(--accent); }
+    .label { width: 210mm; margin: 14px auto 4px; font: 12px Arial, sans-serif; color: #444; }
+    .label .late { color: #b3261e; font-weight: bold; }
+
+    .page { position: relative; width: 210mm; height: 297mm; margin: 0 auto 12px; background: #fff; overflow: hidden;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15); page-break-after: always; break-after: page;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page img.bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    /* a field: "left" and "base" (the baseline) in mm, like the Word form field */
+    .f { position: absolute; left: calc(var(--x) * 1mm); bottom: calc((297 - var(--base)) * 1mm - 0.22em);
+      line-height: 1; font-weight: bold; white-space: nowrap; outline: none; min-width: 12mm; }
+    .f:hover, .f:focus { background: rgba(255, 235, 59, .35); }
+    .f.number  { --x: 20.5;  --base: 36.9;  font-size: 14pt; }
+    .f.address { --x: 101.3; --base: 65.9;  font-size: 12pt; max-width: 96mm; }
+    .f.weekday { --x: 30.3;  --base: 113.7; font-size: 18pt; }
+    .f.date    { --x: 117.7; --base: 113.7; font-size: 18pt; }
+    .f.time    { --x: 81.9;  --base: 124.9; font-size: 18pt; }
+    .f.bottom  { --x: 88.2;  --base: 262.8; font-size: 16pt; font-style: italic; }
+    .f:empty::before { content: attr(data-empty); color: #999; font-weight: normal; font-size: 10pt; }
+    /* the boxes of the template: a cross in the printed box */
+    .box { position: absolute; width: 4.6mm; height: 4.6mm; left: calc(var(--x) * 1mm - 2.3mm); top: calc(var(--y) * 1mm - 2.3mm);
+      border: 0; padding: 0; background: transparent; cursor: pointer; }
+    .box:hover { background: rgba(255, 235, 59, .35); }
+    .box.on::before, .box.on::after { content: ""; position: absolute; left: 50%; top: 8%; width: .5mm; height: 84%; background: #111; }
+    .box.on::before { transform: translateX(-50%) rotate(45deg); }
+    .box.on::after { transform: translateX(-50%) rotate(-45deg); }
+    .box.ablesung { --x: 17.1;  --y: 76.5; }  .box.montage { --x: 56.9;  --y: 76.5; }
+    .box.austausch { --x: 95.0; --y: 76.5; }  .box.wartung { --x: 136.2; --y: 76.5; }
+    .box.hkv { --x: 15.0;  --y: 93.4; }       .box.wasser { --x: 70.4;  --y: 93.4; }
+    .box.waerme { --x: 111.8; --y: 93.4; }    .box.rwm { --x: 153.7; --y: 93.4; }
+
     @page { size: A4; margin: 0; }
     @media print {
       body { background: #fff; }
-      .toolbar { display: none; }
+      .toolbar, .label { display: none; }
       .page { margin: 0; box-shadow: none; }
+      .f:empty::before { content: none; }
+      .f:hover, .f:focus, .box:hover { background: none; }
     }
   </style>
 </head>
 <body>
   <div class="toolbar">
     <button onclick="window.print()">🖨 Drucken / als PDF speichern</button>
-    <span>{{ pages|length }} {% if pages|length == 1 %}Aushang{% else %}Aushänge{% endif %} · je eine A4-Seite · im Druckdialog „Als PDF speichern“ wählen, um eine PDF-Datei zu bekommen</span>
-    <a href="{% url 'planning:calendar' %}">← Kalender</a>
+    <a class="btn light" href="{% url 'documents:notice_page' %}?format=docx{% for pk in stop_ids %}&amp;stop={{ pk }}{% endfor %}"
+       title="Die Firmen-Vorlage mit ausgefüllten Feldern – zum Weiterbearbeiten in Word">⬇ Als Word-Datei</a>
+    <span class="hint">{{ pages|length }} {% if pages|length == 1 %}Aushang{% else %}Aushänge{% endif %} auf der Firmen-Vorlage ·
+      Text anklicken zum Ändern, Kästchen anklicken zum An-/Abhaken (gilt nur für diesen Ausdruck)</span>
+    <a class="back" href="{% url 'planning:calendar' %}">← Kalender</a>
   </div>
 
   {% for p in pages %}
+    <div class="label">{{ forloop.counter }}. {{ p.stop.tour.employee }} · {{ p.stop.tour.date|date:"D d.m.Y" }} ·
+      {% if p.stop.kind == "installation" %}🔧 Montage {{ p.stop.installation_order.re_number }}{% else %}📖 Ablesung{% endif %}
+      {% if p.state.state == "late" %}· <span class="late">schon zu spät (14 Tage vorher: {{ p.state.deadline|date:"d.m." }})</span>{% endif %}</div>
     <section class="page">
-      <div class="company"><span>{{ settings.company }}</span><span>{% if settings.phone %}☎ {{ settings.phone }}{% endif %}</span></div>
-
-      <h1>Wichtige Information</h1>
-      <p class="what">
-        {% if p.is_reading %}Ablesung der Heizkosten- und Wasserzähler in Ihrem Haus
-        {% else %}Montage / Austausch von Messgeräten in Ihrem Haus{% endif %}
-      </p>
-
-      <div class="address"><b>{{ p.target.street }}</b>, {{ p.target.zip_code }} {{ p.target.city }}</div>
-
-      <div class="date">
-        <div class="label">Termin</div>
-        <div class="when">{{ p.state.text }}</div>
-      </div>
-
-      <div class="box"><b>Bitte ermöglichen Sie uns den Zugang</b>
-        {% if p.is_reading %}
-          zu allen Räumen mit Heizkörpern, Heizkostenverteilern und Wasserzählern (auch Bad, Küche, Keller).
-        {% else %}
-          zu allen Räumen, in denen Geräte eingebaut oder getauscht werden{% if p.order.summary %} ({{ p.order.summary }}){% endif %}.
-        {% endif %}
-        Bitte räumen Sie Heizkörper und Zähler frei, damit wir gut herankommen.
-      </div>
-
-      {% if p.access.apartment or not p.is_reading %}
-        <div class="box"><b>Wir müssen Ihre Wohnung betreten</b>
-          Bitte seien Sie anwesend oder bitten Sie eine Person Ihres Vertrauens (z. B. Nachbarn), uns zu öffnen.
-          {% if p.access.units %}Betroffen sind die Wohnungen {{ p.access.units|join:", " }}.{% endif %}
-        </div>
-      {% endif %}
-      {% if p.rwm_check %}
-        <div class="box"><b>Prüfung der Rauchwarnmelder</b>
-          Bei diesem Termin prüfen wir auch die Rauchwarnmelder in Ihrer Wohnung.
-        </div>
-      {% endif %}
-      {% if p.access.room %}
-        <div class="box"><b>Heizraum / Keller</b>
-          Bitte sorgen Sie dafür, dass Heizraum bzw. Keller zugänglich sind.
-        </div>
-      {% endif %}
-
-      <div class="box"><b>Passt der Termin nicht?</b>
-        Bitte melden Sie sich bis {{ p.change_until|date:"l, d.m.Y" }}{% if settings.phone %} unter {{ settings.phone }}{% endif %}{% if settings.email %} oder {{ settings.email }}{% endif %}.
-        Ist niemand anzutreffen, hinterlassen wir eine Nachricht mit einem neuen Termin.
-      </div>
-
-      {% if settings.extra_text %}<div class="box">{{ settings.extra_text|linebreaksbr }}</div>{% endif %}
-
-      <div class="spacer"></div>
-      <div class="contact">
-        Vielen Dank für Ihre Unterstützung!<br>
-        <b>{{ settings.company }}</b>{% if settings.phone %} · ☎ {{ settings.phone }}{% endif %}{% if settings.email %} · {{ settings.email }}{% endif %}{% if settings.office_hours %} · {{ settings.office_hours }}{% endif %}
-      </div>
-      <div class="ref">{% if p.building %}AZ {{ p.building.file_number }}{% endif %}{% if p.order %}{% if p.building %} · {% endif %}{{ p.order.re_number }}{% endif %} · Aushang erstellt am {% now "d.m.Y" %}</div>
+      <img class="bg" src="{% static 'img/aushang_vorlage.jpg' %}" alt="">
+      <span class="f number" contenteditable="true" data-empty="Liegenschafts-Nr.">{{ p.fields.number }}</span>
+      <span class="f address fit" contenteditable="true" data-empty="Adresse">{{ p.fields.address }}</span>
+      {% for name, label in labels.items %}
+        <button type="button" class="box {{ name }}{% if name in p.fields.boxes %} on{% endif %}" title="{{ label }}"
+                aria-label="{{ label }}" aria-pressed="{% if name in p.fields.boxes %}true{% else %}false{% endif %}"></button>
+      {% endfor %}
+      <span class="f weekday" contenteditable="true" data-empty="Wochentag">{{ p.fields.weekday_name }}</span>
+      <span class="f date" contenteditable="true" data-empty="Datum">{{ p.fields.date }}</span>
+      <span class="f time" contenteditable="true" data-empty="Uhrzeit">{{ p.fields.time }}</span>
+      <span class="f bottom" contenteditable="true" data-empty="(freies Feld)">{{ p.fields.bottom }}</span>
     </section>
   {% empty %}
-    <section class="page"><p>Keine Stopps ausgewählt.</p></section>
+    <section class="page"><p style="padding: 20mm">Keine Stopps ausgewählt.</p></section>
   {% endfor %}
+
+  <script>
+    // Kästchen an/aus
+    document.querySelectorAll(".box").forEach(function (box) {
+      box.addEventListener("click", function () {
+        box.classList.toggle("on");
+        box.setAttribute("aria-pressed", box.classList.contains("on"));
+      });
+    });
+    // a long address gets smaller so it stays on the line
+    function fit(el) {
+      el.style.fontSize = "";
+      var size = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth + 1 && size > 7) { size -= 0.5; el.style.fontSize = size + "px"; }
+    }
+    document.querySelectorAll(".fit").forEach(function (el) { fit(el); el.addEventListener("input", function () { fit(el); }); });
+    // Enter ends the input (the fields have one line)
+    document.querySelectorAll(".f").forEach(function (el) {
+      el.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
+    });
+  </script>
 </body>
 </html>

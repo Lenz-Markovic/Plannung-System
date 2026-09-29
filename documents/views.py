@@ -27,7 +27,8 @@ from buildings.services import change_status
 from planning.models import StopKind, TourStop
 
 from . import notices
-from .models import NoticeSettings
+from .aushang_docx import DOCX_TYPE, build_docx
+from .aushang_fields import BOX_LABELS, WEEKDAYS
 from .rules import OVERDUE, RELEASED, SNOOZE_CHOICES, SOON, remind_again_at
 from .services import deadline_entries, set_received_on
 
@@ -188,39 +189,58 @@ def receipt_update(request, pk):
 
 # --- Tenant notices (Aushang) -------------------------------------------------------------
 
+def _chosen_stops(values):
+    return list(TourStop.objects.filter(pk__in=values).select_related(
+        "tour__employee", "building", "installation_order").prefetch_related("installation_order__items__category")
+        .order_by("tour__date", "tour__employee__short_name", "position"))
+
+
 def _notice_pages(stops):
-    """What every A4 page shows."""
-    settings = NoticeSettings.load()
-    pages = []
-    for stop in notices.notice_stops(stops):
-        building, order = stop.building, stop.installation_order
-        target = building if stop.kind == StopKind.READING else order
-        state = notices.state_of(stop)
-        change_until = stop.tour.date - datetime.timedelta(days=settings.change_until_days)
-        access = building.access if building else None
-        pages.append({
-            "stop": stop, "target": target, "building": building, "order": order, "state": state,
-            "is_reading": stop.kind == StopKind.READING, "access": access,
-            "rwm_check": bool(access and "RWM-Prüfung in den Wohnungen" in access.reasons),
-            "change_until": change_until,
-        })
-    return settings, pages
+    """What every page shows: the fields of the company template."""
+    return [{"stop": stop, "fields": notices.fields_of(stop), "state": notices.state_of(stop)}
+            for stop in notices.notice_stops(stops)]
+
+
+@require_POST
+@permission_required("planning.change_tour", raise_exception=True)
+def notice_toggle(request):
+    """📄 Aushang ja / nein for one or more stops (optional - not every building gets one)."""
+    stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
+    if not stops:
+        return HttpResponseBadRequest("Kein Stopp gewählt.")
+    for stop in stops:
+        notices.set_wanted(stop, request.POST.get("on") == "1")
+    from planning.views import tour_detail  # the side panel of the plan, shown again
+    return tour_detail(request, stops[0].tour_id)
 
 
 @require_POST
 @permission_required("planning.change_tour", raise_exception=True)
 def notice_print(request):
-    """📄 Aushänge drucken: mark the chosen stops as printed, then show the print page."""
-    stops = list(TourStop.objects.filter(pk__in=request.POST.getlist("stop")).select_related(
-        "tour", "building", "installation_order").order_by("tour__date", "position"))
+    """📄 Aushänge drucken / als Word: mark the chosen stops as printed, then the page or the .docx."""
+    stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
     notices.mark_printed(stops)
+    if request.POST.get("format") == "docx":
+        return _docx_response(stops)
     return redirect(f"{reverse('documents:notice_page')}?{'&'.join(f'stop={s.pk}' for s in stops)}")
+
+
+def _docx_response(stops):
+    data = build_docx([page["fields"] for page in _notice_pages(stops)])
+    first = stops[0] if stops else None
+    name = f"Aushang_{first.tour.date:%Y-%m-%d}_{first.tour.employee}.docx" if first else "Aushang.docx"
+    response = HttpResponse(data, content_type=DOCX_TYPE)
+    response["Content-Disposition"] = f'attachment; filename="{name}"'
+    return response
 
 
 @permission_required("planning.view_tour", raise_exception=True)
 def notice_page(request):
-    """The notices, one A4 page each - print or save as PDF with the browser."""
-    stops = list(TourStop.objects.filter(pk__in=request.GET.getlist("stop")).select_related(
-        "tour__employee", "building", "installation_order").order_by("tour__date", "position"))
-    settings, pages = _notice_pages(stops)
-    return render(request, "documents/aushang.html", {"settings": settings, "pages": pages})
+    """The notices on the company template, one A4 page each - print or save as PDF with the browser."""
+    stops = _chosen_stops(request.GET.getlist("stop"))
+    if request.GET.get("format") == "docx":
+        return _docx_response(stops)
+    return render(request, "documents/aushang.html", {
+        "pages": _notice_pages(stops), "stop_ids": [s.pk for s in stops],
+        "weekdays": WEEKDAYS, "labels": BOX_LABELS,
+    })

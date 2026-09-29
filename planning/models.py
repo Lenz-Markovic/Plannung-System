@@ -232,7 +232,9 @@ class TourStop(TimeStampedModel):
     route_warnings = models.JSONField("Hinweise zur Strecke", default=list, blank=True)
 
     field_note = models.TextField("Notiz vor Ort", blank=True)
-    # Tenant notice (Aushang): when it was printed, and for which day and time window
+    # Tenant notice (Aushang): optional - only stops switched on get one (not every building needs it)
+    notice_wanted = models.BooleanField("Aushang nötig", default=False)
+    # when it was printed, and for which day and time window
     notice_printed_at = models.DateTimeField("Aushang gedruckt am", null=True, blank=True)
     notice_for = models.CharField("Aushang für", max_length=120, blank=True,
                                   help_text="z. B. „Dienstag, 03.11.2026, zwischen 09:00 und 11:00 Uhr“")

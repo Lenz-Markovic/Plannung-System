@@ -41,9 +41,16 @@
               {% else %}Aushang noch nicht gedruckt{% endif %}
               {% if perms.planning.change_tour %}
                 <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
-                  <input type="hidden" name="stop" value="{{ s.pk }}"><button class="linkish" title="Nur diesen Aushang drucken">drucken</button></form>
+                  <input type="hidden" name="stop" value="{{ s.pk }}"><button class="linkish" title="Nur diesen Aushang drucken">drucken</button>
+                  <button class="linkish" name="format" value="docx" formtarget="_self" title="Als Word-Datei (Firmen-Vorlage)">Word</button></form>
+                · <button class="linkish" hx-post="{% url 'documents:notice_toggle' %}" hx-vals='{"stop": "{{ s.pk }}", "on": "0"}'
+                          hx-target="#cal-side" title="Für diesen Stopp keinen Aushang">✕ kein Aushang</button>
               {% endif %}
             </div>
+          {% elif s.notice_possible and perms.planning.change_tour %}
+            <div class="g notice-line off">📄 kein Aushang ·
+              <button class="linkish" hx-post="{% url 'documents:notice_toggle' %}" hx-vals='{"stop": "{{ s.pk }}", "on": "1"}'
+                      hx-target="#cal-side" title="Für diesen Stopp einen Aushang für die Mieter drucken">＋ Aushang</button></div>
           {% endif %}
           {% for h in s.helpers %}<div class="g help-line">🤝 Helfer: {{ h.tour.employee }}{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %}</div>{% endfor %}
           {% if perms.planning.add_tour and s.kind != "help" %}
@@ -65,18 +72,31 @@
     <a class="btn" href="{% url 'planning:tour_excel' tour.pk %}">📄 Excel zum Ausdrucken</a>
   </div>
 
-  {# Tenant notices (Aushang): one A4 page per stop; printing marks them as "ausgehängt" #}
-  {% if notice_stops %}
-    <div class="notice-box {% if notices_late %}late{% elif notices_outdated %}outdated{% elif not notices_open %}done{% endif %}">
-      <b>📄 Aushang für die Mieter</b>
-      {% if not notices_open %}– ✓ alle gedruckt
-      {% else %}– {{ notices_open }} von {{ notice_stops|length }} {% if notices_outdated %}fehlen oder sind veraltet{% else %}fehlen noch{% endif %}{% endif %}
-      <div class="small">spätestens am <b>{{ notice_deadline|date:"D d.m.Y" }}</b> aushängen (14 Tage vorher){% if notices_late %} – <b>schon zu spät!</b>{% endif %}</div>
+  {# Tenant notices (Aushang), optional: only the stops with "＋ Aushang"; one page of the company template each #}
+  {% if notice_possible %}
+    <div class="notice-box {% if not notice_stops %}off{% elif notices_late %}late{% elif notices_outdated %}outdated{% elif not notices_open %}done{% endif %}">
+      <b>📄 Aushang für die Mieter</b> <span class="small">(nur wo nötig)</span>
+      {% if not notice_stops %}
+        <div class="small">Für keinen Stopp gewählt. Bei Bedarf beim Stopp „＋ Aushang“ klicken.</div>
+      {% else %}
+        {% if not notices_open %}– ✓ alle gedruckt
+        {% else %}– {{ notices_open }} von {{ notice_stops|length }} {% if notices_outdated %}fehlen oder sind veraltet{% else %}fehlen noch{% endif %}{% endif %}
+        <div class="small">spätestens am <b>{{ notice_deadline|date:"D d.m.Y" }}</b> aushängen (14 Tage vorher){% if notices_late %} – <b>schon zu spät!</b>{% endif %}</div>
+      {% endif %}
       {% if perms.planning.change_tour %}
-        <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="mt-1">{% csrf_token %}
-          {% for s in notice_stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
-          <button class="btn mini primary">📄 Aushänge drucken ({{ notice_stops|length }})</button>
-        </form>
+        <div class="notice-actions mt-1">
+          {% if notice_stops %}
+            <form method="post" action="{% url 'documents:notice_print' %}" target="_blank" class="d-inline">{% csrf_token %}
+              {% for s in notice_stops %}<input type="hidden" name="stop" value="{{ s.pk }}">{% endfor %}
+              <button class="btn mini primary">🖨 Aushänge drucken ({{ notice_stops|length }})</button>
+              <button class="btn mini" name="format" value="docx" formtarget="_self" title="Firmen-Vorlage ausgefüllt, zum Bearbeiten in Word">⬇ Word ({{ notice_stops|length }})</button>
+            </form>
+          {% endif %}
+          {% if notice_off %}
+            <button class="btn mini" hx-post="{% url 'documents:notice_toggle' %}" hx-target="#cal-side"
+                    hx-vals='{"on": "1", "stop": [{% for s in notice_off %}"{{ s.pk }}"{% if not forloop.last %}, {% endif %}{% endfor %}]}'>＋ für alle {% if notice_stops %}{{ notice_off|length }} weiteren{% else %}{{ notice_off|length }} Stopps{% endif %}</button>
+          {% endif %}
+        </div>
       {% endif %}
     </div>
   {% endif %}

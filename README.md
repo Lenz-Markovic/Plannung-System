@@ -250,17 +250,34 @@ The only JavaScript is `static/js/calendar.js` (commented).
 
 ## 📄 Tenant notices (Aushang)
 
-- Calendar side panel of a plan → **📄 Aushänge drucken**: one A4 page per stop
-  (reading or installation) for the tenants: what happens, address, date with a time
-  window (full hour before the start, at least 2 h), access (rooms, apartment,
-  smoke detectors, boiler room - from the access detection), "Passt der Termin
-  nicht?" with a date, contact. Print it, or "Als PDF speichern" in the print dialog
-  (no PDF library needed). Single stops can be printed with "drucken".
-- Printing marks the stops "✓ Aushang gedruckt"; the panel shows the deadline (14 days
-  before, red when late) and **⚠ veraltet** if the plan was moved or its time window
-  changed since (`documents/notice_rules.py`, pure functions).
-- Company name, phone, e-mail, hours, "change until" days and an extra text:
-  **⚙ Verwaltung → Aushang-Einstellungen** (placeholder text until an admin fills it in).
+- **Optional per stop** - not every building gets a notice. In the calendar side panel
+  of a plan every stop shows "📄 kein Aushang · **＋ Aushang**"; switch it on only where
+  needed ("＋ für alle …" switches on all at once, "✕ kein Aushang" off again). Only
+  switched-on stops count for the deadline warning. The choice stays when the plan is
+  saved again or moved.
+- The page is the **company template** `documents/vorlage/Aushang_Vorlage.dotx`
+  ("VorlageAushänge", unchanged). Filled automatically (`documents/aushang_fields.py`):
+  - top left: **Liegenschaftsnummer** (AZ; for an order without building its number/RE)
+  - "in der Liegenschaft": street, ZIP, city
+  - boxes: Ablesung (+ Wartung/Sichtkontrolle and Rauchwarnmelder when the smoke
+    detectors are checked) or Montage / Austausch (order type); devices from the
+    building counts (HKV, Wasser, Wärme) or from the order items (EHKV, SQ1, WMZ, RWM)
+  - **am:** weekday (the template's list Montag–Samstag), **dem:** date,
+    **zwischen / ab:** time window, e.g. "08:00 – 10:00 Uhr" (full hour before the
+    start, at least 2 h - `documents/notice_rules.py`)
+  - the free field at the bottom stays empty.
+- **🖨 Aushänge drucken (n)** opens the pages in the browser: the template picture with
+  the fields at exactly the places of the Word form fields. Texts and boxes can be
+  clicked and changed before printing (only for that print). Print, or "Als PDF
+  speichern" in the print dialog.
+- **⬇ Word (n)** downloads ONE .docx with one page per notice: the template itself with
+  its form fields filled (standard library only, `documents/aushang_docx.py`) - to
+  change it further in Word.
+- Printing / Word marks the stops "✓ Aushang gedruckt"; the panel shows the deadline
+  (14 days before, red when late) and **⚠ veraltet** if the plan was moved or its time
+  window changed since.
+- A new version of the template: replace `documents/vorlage/Aushang_Vorlage.dotx` (same
+  field names) and `static/img/aushang_vorlage.jpg` (its page picture, `word/media/image1.jpeg`).
 
 ## Project layout
 
