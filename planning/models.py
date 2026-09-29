@@ -186,6 +186,8 @@ class Tour(TimeStampedModel):
 class StopKind(models.TextChoices):
     READING = "reading", "Ablesung"
     INSTALLATION = "installation", "Montage"
+    # A person with an own plan helps at ONE object of another plan (same building / order)
+    HELP = "help", "Hilfe bei Objekt"
 
 
 class DriveSource(models.TextChoices):
@@ -207,6 +209,11 @@ class TourStop(TimeStampedModel):
     installation_order = models.ForeignKey(
         "buildings.InstallationOrder", verbose_name="Montageauftrag", null=True, blank=True,
         on_delete=models.PROTECT, related_name="tour_stops",
+    )
+    # kind "help": the plan this person helps with (at the same building / order).
+    # Linked to the plan, not to its stop, because saving a plan creates new stops.
+    help_tour = models.ForeignKey(
+        "Tour", verbose_name="hilft im Plan", null=True, blank=True, on_delete=models.SET_NULL, related_name="help_stops",
     )
     # Fixed appointment: automatic re-ordering never moves this stop.
     is_fixed = models.BooleanField("Fixtermin", default=False)
@@ -243,6 +250,7 @@ class TourStop(TimeStampedModel):
                 condition=(
                     Q(kind="reading", building__isnull=False, installation_order__isnull=True)
                     | Q(kind="installation", installation_order__isnull=False)
+                    | Q(kind="help", building__isnull=False) | Q(kind="help", installation_order__isnull=False)
                 ),
                 name="stop_kind_matches_reference",
             ),

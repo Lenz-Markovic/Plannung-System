@@ -199,6 +199,20 @@ The only JavaScript is `static/js/calendar.js` (commented).
   run `python manage.py setup_roles` once so the Admin role gets it. Daily hours stay
   visible for everybody.
 
+## 🤝 Help at one object
+
+- A **team** (👥) is fixed for the whole day: its members cannot be planned anywhere
+  else that day (the team list only offers people who are still free).
+- **Help at ONE object:** in the calendar side panel every stop has **🤝 + Helfer**.
+  Choose a person → their day opens in "Fahrplan prüfen" with a stop
+  "🤝 Hilfe bei Keller" (in their own plan, or a new plan if they have none). The
+  work time at that object is shared (e.g. 350 min, 2 people → 175 min each). A warning
+  appears if the helper would come when the others are not there.
+- After saving, the helped plan is marked "⟳ neu rechnen"; recalculated, it shows
+  "🤝 Helfer: Becker 10:30–13:25" and its own time at the object is shared, too.
+  Calendar ("🤝 1× Hilfe"), Excel and "Mein Tag" show the help stop. Deleting one of
+  the plans marks the other one for recalculation.
+
 ## Project layout
 
 | Folder | Contents |

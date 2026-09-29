@@ -27,11 +27,22 @@
     {% for s in stops %}
       <tr>
         <td class="z">{{ s.start_time|time:"H:i"|default:"–" }}</td>
-        <td>{% if s.kind == "installation" %}🔧 {% endif %}
+        <td>{% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% endif %}
           {% if s.building %}<b>{{ s.building.street }}</b> <span class="o">{{ s.building.city }}</span>
           {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
-          {% if s.installation_order.summary %}<div class="g">Montage {{ s.installation_order.re_number }}: {{ s.installation_order.summary }}</div>{% endif %}
+          {% if s.kind == "help" %}<div class="g help-line">🤝 Hilfe bei {{ s.help_tour.people_label|default:"(Plan gelöscht)" }}</div>
+          {% elif s.installation_order.summary %}<div class="g">Montage {{ s.installation_order.re_number }}: {{ s.installation_order.summary }}</div>{% endif %}
+          {% for h in s.helpers %}<div class="g help-line">🤝 Helfer: {{ h.tour.employee }}{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %}</div>{% endfor %}
+          {% if perms.planning.add_tour and s.kind != "help" %}
+            {# Somebody with an own plan helps at THIS object: opens their day in "Fahrplan prüfen" #}
+            <details class="help-pick"><summary title="Jemand mit eigenem Plan hilft bei diesem Objekt">🤝 + Helfer</summary>
+              <form hx-post="{% url 'planning:help_request' s.pk %}" hx-target="#toast">
+                <select name="helper" aria-label="Helfer">{% for e in helper_candidates %}<option value="{{ e.pk }}">{{ e }} {% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</option>{% endfor %}</select>
+                <button class="btn mini primary">Tag des Helfers öffnen →</button>
+              </form>
+            </details>
+          {% endif %}
           <div class="g">{% if s.building %}AZ {{ s.building.file_number }}{% endif %}{% if s.installation_order %}{% if s.building %} · {% endif %}{{ s.installation_order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.done_at %} · ✓ erledigt{% endif %}</div></td>
         <td class="f">{% if not forloop.last and s.drive_to_next_minutes %}↓ {{ s.drive_to_next_minutes }} min{% endif %}</td>
       </tr>

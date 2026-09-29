@@ -21,6 +21,7 @@ urlpatterns = [
     path("tag/", views.day_overview, name="day"),
     path("frei/", views.free_days, name="free_days"),
     path("fahrplan/<int:pk>/verschieben/", views.tour_move, name="tour_move"),
+    path("stopp/<int:pk>/helfer/", views.help_request, name="help_request"),
     path("fahrplan/<int:pk>/neu-rechnen/", views.tour_recalculate, name="tour_recalculate"),
     path("fahrplan/<int:pk>/loeschen/", views.tour_delete, name="tour_delete"),
     path("fahrplan/<int:pk>/excel/", views.tour_excel, name="tour_excel"),

@@ -162,6 +162,10 @@ def stop_row(stop, start, end):
                              else (" Funk" if re.search(r"Funk|^F", building.reading_type or "", re.I) else ""))
         todo = [head]
         re_numbers = extract_re_numbers(building.order_reference, building.handwritten_note)
+    elif stop.kind == StopKind.HELP:
+        helped = stop.help_tour.people_label if stop.help_tour else "?"
+        todo = [f"🤝 Hilfe bei {helped}: " + (f"Montage {order.re_number}" if order else "Ablesung")]
+        re_numbers = {order.re_number} if order else extract_re_numbers(building.order_reference, building.handwritten_note)
     else:
         todo = [f"Montage {order.re_number}"] + [part.strip() for part in order.summary.split(",") if part.strip()]
         re_numbers = {order.re_number}
@@ -196,7 +200,7 @@ def stop_row(stop, start, end):
 
 
 def tour_sheet(tour):
-    stops = list(tour.stops.select_related("building", "installation_order").order_by("position"))
+    stops = list(tour.stops.select_related("building", "installation_order", "help_tour__employee").order_by("position"))
     work = [s.work_minutes for s in stops]
     drives = [s.drive_to_next_minutes or 0 for s in stops[:-1]]
     # Old/imported tours may have no times yet: calculate them like the plan does.

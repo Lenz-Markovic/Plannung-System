@@ -19,9 +19,10 @@ class AbsenceAdmin(SimpleHistoryAdmin):
 
 class TourStopInline(admin.TabularInline):
     model = TourStop
+    fk_name = "tour"  # the stops of THIS plan (help_tour points to another plan)
     extra = 0
-    fields = ["position", "kind", "building", "installation_order", "is_fixed", "start_time", "end_time", "work_minutes", "drive_to_next_minutes", "done_at"]
-    raw_id_fields = ["building", "installation_order"]
+    fields = ["position", "kind", "building", "installation_order", "help_tour", "is_fixed", "start_time", "end_time", "work_minutes", "drive_to_next_minutes", "done_at"]
+    raw_id_fields = ["building", "installation_order", "help_tour"]
 
 
 @admin.register(Tour)

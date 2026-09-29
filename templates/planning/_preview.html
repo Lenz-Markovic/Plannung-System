@@ -64,9 +64,9 @@
           <span class="pr-nr" data-map-pin="{{ forloop.counter }}" title="auf der Karte zeigen">{{ forloop.counter }}</span>
           <span class="pr-zeit">{{ s.start|time:"H:i" }}–{{ s.end|time:"H:i" }}</span>
           <span class="pr-adr">
-            <span class="art-tag {{ s.kind }}">{% if s.kind == "installation" %}🔧 Montage{% else %}📖 Ablesung{% endif %}</span>
+            <span class="art-tag {{ s.kind }}">{% if s.kind == "installation" %}🔧 Montage{% elif s.kind == "help" %}🤝 Hilfe bei {{ s.help_tour.people_label|default:"?" }}{% else %}📖 Ablesung{% endif %}</span>
             <b>{{ s.target.street }}</b>
-            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.full_minutes != s.work_minutes %} <span title="volle Arbeitszeit für eine Person">({{ s.full_minutes }} min ÷ {{ preview.team|length|add:1 }})</span>{% endif %}</span>
+            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.full_minutes != s.work_minutes %} <span title="volle Arbeitszeit für eine Person">({{ s.full_minutes }} min ÷ {{ s.people }})</span>{% endif %}</span>
             {% if s.order %}<br><span class="o">Montage {{ s.order.re_number }}: {{ s.order.summary }}</span>{% endif %}
           </span>
           <span class="pr-knopf">
@@ -78,6 +78,8 @@
                     hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "remove", "index": {{ s.index }}}' hx-target="#preview">✕</button>
           </span>
         </div>
+        {% for h in s.helpers %}<div class="pr-hinw help-line">🤝 Helfer: <b>{{ h.tour.employee }}</b>{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %} (eigener Plan) – die Arbeitszeit hier ist aufgeteilt</div>{% endfor %}
+        {% if s.kind == "help" and s.help_stop %}<div class="pr-hinw help-line">🤝 {% if s.help_stop.start_time %}{{ s.help_tour.people_label }} ist dort {{ s.help_stop.start_time|time:"H:i" }}–{{ s.help_stop.end_time|time:"H:i" }}{% else %}Im Plan von {{ s.help_tour.people_label }} sind noch keine Uhrzeiten gerechnet – Zeiten bitte absprechen{% endif %}</div>{% endif %}
         {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="pr-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
         {% for f in s.findings %}<div class="kf-{{ f.severity }}">{% if f.severity == "critical" %}⛔{% else %}⚠{% endif %} {{ f.message }}</div>{% endfor %}
         {% for w in s.warnings %}<div class="pr-warn">⚠ {{ w }}</div>{% endfor %}

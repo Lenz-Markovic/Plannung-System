@@ -6,13 +6,14 @@
     <span class="day-time">{{ s.start_time|time:"H:i"|default:"–" }}<small>{{ s.end_time|time:"H:i" }}</small></span>
     <div class="flex-grow-1">
       <a class="day-address" href="{{ navigation_url }}" target="_blank" rel="noopener" title="Navigation starten">
-        {% if s.kind == "installation" %}🔧 {% endif %}{{ address }} <span aria-hidden="true">🧭</span></a>
+        {% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% endif %}{{ address }} <span aria-hidden="true">🧭</span></a>
       <div class="na small">{% if b %}AZ {{ b.file_number }} · {{ b.reading_type|default:'–' }}{% endif %}{% if o %} · Montage {{ o.re_number }}{% endif %} · {{ s.work_minutes }} min</div>
     </div>
     {% if s.done_at %}<span class="day-check" title="erledigt {{ s.done_at|date:'H:i' }}">✓</span>{% endif %}
   </div>
 
   {% if b %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+  {% if s.kind == "help" %}<div class="day-hint"><b>🤝 Hilfe bei {{ s.help_tour.people_label|default:"?" }}</b> – gemeinsam an diesem Objekt</div>{% endif %}
   {% if o %}<div class="day-hint">{{ o.summary }}</div>{% endif %}
   {% if b %}
     <div class="day-devices">{% if b.hkv_count %}<span class="chip">{{ b.hkv_count }} HKV</span>{% endif %}{% if b.wmz_count %}<span class="chip heat">{{ b.wmz_count }} WMZ</span>{% endif %}{% if b.wwz_count %}<span class="chip water">{{ b.wwz_count }} WWZ</span>{% endif %}{% if b.kwz_count %}<span class="chip water">{{ b.kwz_count }} KWZ</span>{% endif %}{% if b.has_rwm %}<span class="chip safety">{% if b.rwm_count %}{{ b.rwm_count }} {% endif %}RWM</span>{% endif %}</div>

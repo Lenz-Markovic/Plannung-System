@@ -41,8 +41,9 @@ KIND_ICONS = {"reading": "📖", "installation": "🔧", "mixed": "📖🔧"}
 
 
 def tour_kind(stops):
-    """'reading', 'installation' or 'mixed' (both in one plan)."""
-    kinds = {s.kind for s in stops}
+    """'reading', 'installation' or 'mixed' (both in one plan). Help stops count as what they help with."""
+    kinds = {(StopKind.INSTALLATION if s.installation_order_id else StopKind.READING) if s.kind == StopKind.HELP else s.kind
+             for s in stops}
     if kinds == {StopKind.INSTALLATION}:
         return "installation"
     return "mixed" if StopKind.INSTALLATION in kinds else "reading"
@@ -57,7 +58,7 @@ def _tooltip(tour, stops):
         lines.append("⏱ mehr als 7,5 h" if tour.time_state == "over" else "⏱ weniger als 6 h")
     for stop in stops:
         target = stop.building or stop.installation_order
-        icon = "🔧" if stop.kind == StopKind.INSTALLATION else "📖"
+        icon = {"installation": "🔧", "help": "🤝"}.get(stop.kind, "📖")
         when = f"{stop.start_time:%H:%M} " if stop.start_time else ""
         lines.append(f"{when}{icon} {target.street}, {target.city}" if target else f"{when}{icon}")
     return "\n".join(lines)
@@ -87,8 +88,10 @@ def calendar_events(start, end, employees, editable, kind=""):
         if tour.time_state:
             badges.append("⏱")  # info: more than 7,5 h / less than 6 h
         installations = sum(1 for s in stops if s.kind == StopKind.INSTALLATION)
-        readings = len(stops) - installations
-        what = " · ".join(([f"{readings}× Ablesung"] if readings else []) + ([f"{installations}× Montage"] if installations else []))
+        helps = sum(1 for s in stops if s.kind == StopKind.HELP)
+        readings = len(stops) - installations - helps
+        what = " · ".join(([f"{readings}× Ablesung"] if readings else []) + ([f"{installations}× Montage"] if installations else [])
+                          + ([f"🤝 {helps}× Hilfe"] if helps else []))
         end_time = tour.end_time or (datetime.datetime.combine(tour.date, tour.start_time)
                                      + datetime.timedelta(minutes=tour.work_minutes + tour.drive_minutes)).time()
         events.append({

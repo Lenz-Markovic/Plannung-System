@@ -87,14 +87,24 @@ def _draft_or_none(request):
     return request.session.get(services.DRAFT_KEY)
 
 
+def _team_candidates(draft):
+    """People who can join the team: free that day (no own plan, not in another team, not absent)."""
+    date = datetime.date.fromisoformat(draft["date"])
+    busy = Tour.objects.filter(date=date).exclude(pk=draft.get("tour_id"))
+    absent = Absence.objects.filter(start_date__lte=date, end_date__gte=date).values("employee")
+    return (Employee.objects.filter(active=True).exclude(pk__in=[draft["employee"], *draft.get("team", [])])
+            .exclude(pk__in=busy.values("employee"))
+            # only real team members: "NOT IN" with an empty (NULL) value would exclude everybody
+            .exclude(pk__in=busy.filter(team__isnull=False).values("team")).exclude(pk__in=absent))
+
+
 def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     suggestions, too_long = services.draft_suggestions(draft, net_minutes=preview.day_plan.net_minutes)
     response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
                                           "suggestions": suggestions, "suggestions_too_long": too_long,
-                                          "team_candidates": Employee.objects.filter(active=True).exclude(
-                                              pk__in=[draft["employee"], *draft.get("team", [])]),
+                                          "team_candidates": _team_candidates(draft),
                                           "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
                                           "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
     response.preview = preview  # for draft_action (notification about the working time)
@@ -327,9 +337,19 @@ def tour_detail(request, pk):
     tour = get_object_or_404(Tour.objects.select_related("employee"), pk=pk)
     if not (request.user.has_perm("planning.view_tour") or tour.employee.user_id == request.user.pk):
         return HttpResponse(status=403)
-    stops = TourStop.objects.filter(tour=tour).select_related("building", "installation_order").order_by("position")
+    stops = list(TourStop.objects.filter(tour=tour).select_related("building", "installation_order", "help_tour__employee")
+                 .order_by("position"))
+    helps = list(TourStop.objects.filter(kind=StopKind.HELP, help_tour=tour).select_related("tour__employee"))
+    for stop in stops:
+        stop.helpers = [h for h in helps if h.kind == StopKind.HELP and services.same_object(
+            h, stop.building_id, stop.installation_order_id)] if stop.kind != StopKind.HELP else []
+    # who can help at one object: everybody active who is not in this plan and not fixed in a team that day
+    in_teams = Tour.objects.filter(date=tour.date, team__isnull=False).values("team")  # no NULLs in "NOT IN"
+    helper_candidates = (Employee.objects.filter(active=True).exclude(pk__in=[p.pk for p in tour.people])
+                         .exclude(pk__in=in_teams).exclude(pk__in=Absence.objects.filter(
+                             start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
-        "tour": tour, "stops": stops, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
+        "tour": tour, "stops": stops, "helper_candidates": helper_candidates, "map_data": tour_map_data(stops), "map_available": bool(current_api_key()),
         # moving to another person: readers for readings, installers for installations, both for mixed plans
         "employees": _move_candidates(stops),
     })
@@ -343,6 +363,21 @@ def _move_candidates(stops):
     if StopKind.INSTALLATION in kinds:
         people = people.filter(can_install=True)
     return people if people.exists() else Employee.objects.filter(active=True)  # nobody can do both: show all
+
+
+@require_POST
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def help_request(request, pk):
+    """🤝 "Helfer" at one stop in the side panel: opens the helper's day with a help stop."""
+    stop = get_object_or_404(TourStop.objects.select_related("tour__employee"), pk=pk)
+    helper = get_object_or_404(Employee, pk=request.POST.get("helper") or 0, active=True)
+    try:
+        request.session[services.DRAFT_KEY] = services.help_draft(stop, helper)
+    except ValueError as problem:
+        return render(request, "core/_toast.html", {"message": str(problem), "error": True})
+    response = HttpResponse("")
+    response["HX-Redirect"] = reverse("planning:draft")
+    return response
 
 
 @require_POST
@@ -472,7 +507,7 @@ def my_day(request):
         return redirect("home")
     date = datetime.date.fromisoformat(request.GET["datum"]) if request.GET.get("datum") else timezone.localdate()
     tour = dayplan.tour_of(employee, date)
-    stops = list(tour.stops.select_related("building", "installation_order", "done_by").order_by("position")) if tour else []
+    stops = list(tour.stops.select_related("building", "installation_order", "done_by", "help_tour__employee").order_by("position")) if tour else []
     return render(request, "planning/my_day.html", {
         "employee": employee, "date": date, "today": timezone.localdate(), "tour": tour,
         "stops": [_stop_context(s) for s in stops],

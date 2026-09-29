@@ -104,7 +104,18 @@ def plan_bar_context(session):
 # =============================================================================
 
 def _stop_key(stop):
-    return (stop["kind"], stop.get("building"), stop.get("order"))
+    key = (stop["kind"], stop.get("building"), stop.get("order"))
+    return key + (stop.get("help_tour"),) if stop["kind"] == StopKind.HELP else key
+
+
+def stop_dict(stop):
+    """A saved TourStop as a draft stop."""
+    if stop.kind == StopKind.READING:
+        return {"kind": StopKind.READING, "building": stop.building_id}
+    if stop.kind == StopKind.HELP:
+        return {"kind": StopKind.HELP, "building": stop.building_id, "order": stop.installation_order_id,
+                "help_tour": stop.help_tour_id}
+    return {"kind": StopKind.INSTALLATION, "order": stop.installation_order_id, "building": stop.building_id}
 
 
 def create_draft(building_ids, employee, date, start, break_minutes, strategy, order_ids=()):
@@ -115,12 +126,7 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy, o
     tour = Tour.objects.filter(employee=employee, date=date).first()
     stops = []
     if tour:
-        for stop in tour.stops.order_by("position"):
-            if stop.kind == StopKind.READING:
-                stops.append({"kind": StopKind.READING, "building": stop.building_id})
-            else:
-                stops.append({"kind": StopKind.INSTALLATION, "order": stop.installation_order_id,
-                              "building": stop.building_id})
+        stops = [stop_dict(stop) for stop in tour.stops.order_by("position")]
     existing = {_stop_key(s) for s in stops}
     for building_id in building_ids:
         new = {"kind": StopKind.READING, "building": building_id}
@@ -158,12 +164,7 @@ def draft_from_tour(tour, date=None, employee=None):
     employee = employee or tour.employee
     if (employee.pk, date) != (tour.employee_id, tour.date) and Tour.objects.filter(employee=employee, date=date).exists():
         raise ValueError(f"{employee} hat am {date:%d.%m.%Y} schon einen Fahrplan. Bitte dort ergänzen oder zuerst diesen Tag leeren.")
-    stops = []
-    for stop in tour.stops.order_by("position"):
-        if stop.kind == StopKind.READING:
-            stops.append({"kind": StopKind.READING, "building": stop.building_id})
-        else:
-            stops.append({"kind": StopKind.INSTALLATION, "order": stop.installation_order_id, "building": stop.building_id})
+    stops = [stop_dict(stop) for stop in tour.stops.order_by("position")]
     moved = (employee.pk, date) != (tour.employee_id, tour.date)
     return {
         "employee": employee.pk,
@@ -409,6 +410,10 @@ class PreviewStop:
     drive_source: str = DriveSource.NONE
     drive_reason: str = ""  # why this drive is only estimated
     full_minutes: int = 0   # work time for ONE person (before splitting on the team)
+    helpers: list = field(default_factory=list)   # help stops of other plans at this object
+    people: int = 1                                 # how many work at this stop (team + helpers)
+    help_tour: object = None                        # kind "help": the plan this person helps with
+    help_stop: object = None                        # ... and its stop at this object (times)
     points: list = field(default_factory=list)
 
 
@@ -460,6 +465,54 @@ class Preview:
         return sum(1 for s in self.stops for f in s.findings if f.severity == "critical")
 
 
+def _helpers_of(tour_id):
+    """{(building id, order id): [help TourStops]} of other plans helping in this plan."""
+    found = {}
+    if not tour_id:
+        return found
+    for stop in TourStop.objects.filter(kind=StopKind.HELP, help_tour_id=tour_id).select_related("tour__employee"):
+        key = (None if stop.installation_order_id else stop.building_id, stop.installation_order_id)
+        found.setdefault(key, []).append(stop)
+    return found
+
+
+def same_object(stop, building_id, order_id):
+    return (stop.installation_order_id == order_id) if order_id else (stop.building_id == building_id and not stop.installation_order_id)
+
+
+def _prepare_help(stop, raw, draft):
+    """A help stop: its share of the work, and whether it still fits the helped plan."""
+    helped = Tour.objects.filter(pk=raw.get("help_tour")).select_related("employee").prefetch_related("team").first()
+    stop.help_tour = helped
+    if helped is None:
+        stop.findings.append(Finding("critical", "Der Plan, bei dem geholfen wird, wurde gelöscht – diesen Stopp mit ✕ entfernen."))
+        return
+    if helped.date.isoformat() != draft["date"]:
+        stop.findings.append(Finding("critical", f"Der Plan von {helped.people_label} ist jetzt am {helped.date:%d.%m.%Y} – Hilfe passt nicht mehr."))
+    target_stop = next((s for s in helped.stops.all() if s.kind != StopKind.HELP
+                        and same_object(s, raw.get("building"), raw.get("order"))), None)
+    stop.help_stop = target_stop
+    if target_stop is None:
+        stop.findings.append(Finding("critical", f"Das Objekt ist nicht mehr im Plan von {helped.people_label}."))
+        return
+    others = TourStop.objects.filter(kind=StopKind.HELP, help_tour=helped).exclude(tour_id=draft.get("tour_id"))
+    others = [o for o in others if same_object(o, raw.get("building"), raw.get("order"))]
+    stop.people = len(helped.people) + len(others) + 1
+    stop.work_minutes = team_minutes(stop.full_minutes, stop.people)
+
+
+def _check_help_times(stops):
+    """Warning if the helper is not there while the others are (times of the helped plan)."""
+    for stop in stops:
+        target = stop.help_stop
+        if stop.kind != StopKind.HELP or target is None or not target.start_time or not stop.start:
+            continue
+        if stop.start >= (target.end_time or target.start_time) or stop.end <= target.start_time:
+            stop.findings.append(Finding("warning", (
+                f"{stop.help_tour.people_label} ist dort {target.start_time:%H:%M}–{target.end_time:%H:%M} – "
+                f"du kommst {stop.start:%H:%M}–{stop.end:%H:%M}. Beginn oder Reihenfolge anpassen.")))
+
+
 def _load_targets(stops):
     building_ids = {s["building"] for s in stops if s.get("building")}
     order_ids = {s["order"] for s in stops if s.get("order")}
@@ -467,7 +520,7 @@ def _load_targets(stops):
     orders = InstallationOrder.objects.in_bulk(order_ids)
     targets = {}
     for stop in stops:
-        if stop["kind"] == StopKind.READING:
+        if stop["kind"] == StopKind.READING or (stop["kind"] == StopKind.HELP and not stop.get("order")):
             targets[_stop_key(stop)] = buildings[stop["building"]]
         else:
             targets[_stop_key(stop)] = orders[stop["order"]]
@@ -513,20 +566,27 @@ def calculate_preview(draft):
     team = list(Employee.objects.filter(pk__in=draft.get("team", [])).order_by("short_name"))
     split = draft.get("split", True)
 
+    helpers = _helpers_of(draft.get("tour_id"))   # people from other plans helping at objects of this plan
     stops, error = [], ""
     for i, raw in enumerate(draft["stops"]):
         target = targets[_stop_key(raw)]
-        is_reading = raw["kind"] == StopKind.READING
-        building = target if is_reading else target.building
+        on_building = isinstance(target, Building)
+        building = target if on_building else target.building
+        full = target.reading_minutes if on_building else target.duration_minutes
         point, source, warnings = geocoding.position(target, client)
         if source == "tomtom" and point is None:
             source = None
-        stops.append(PreviewStop(
-            index=i, kind=raw["kind"], building=building, order=None if is_reading else target, target=target,
-            work_minutes=team_minutes(target.reading_minutes if is_reading else target.duration_minutes, 1 + len(team), split),
-            full_minutes=target.reading_minutes if is_reading else target.duration_minutes,
-            point=point, point_source=source, warnings=warnings,
-        ))
+        stop = PreviewStop(
+            index=i, kind=raw["kind"], building=building, order=None if on_building else target, target=target,
+            work_minutes=full, full_minutes=full, point=point, point_source=source, warnings=warnings,
+        )
+        if raw["kind"] == StopKind.HELP:
+            _prepare_help(stop, raw, draft)
+        else:
+            stop.helpers = helpers.get((raw.get("building") if on_building else None, raw.get("order")), [])
+            stop.people = (1 + len(team) if split else 1) + len(stop.helpers)
+            stop.work_minutes = team_minutes(full, stop.people)
+        stops.append(stop)
 
     # Driving times depend on the departure time, and the departure depends on
     # the break, which depends on the total time. So: first calculate without
@@ -551,6 +611,7 @@ def calculate_preview(draft):
                       team_problems=team_problems(draft, employee, date, team))
     preview.distance_km = sum((s.drive_km or Decimal("0")) for s in stops)
     _add_findings(preview, draft)
+    _check_help_times(preview.stops)
     preview.time_notice = time_notice(plan)  # only information: the person planning decides
     preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error) + preview.team_problems
     _add_commute(preview, client)
@@ -669,16 +730,23 @@ def save_draft(draft, user, confirm):
     tour.save()
 
     tour.team.set(preview.team)
+    helped_before = set(tour.stops.filter(kind=StopKind.HELP).values_list("help_tour_id", flat=True)) if tour.pk else set()
     tour.stops.all().delete()
     for position, stop in enumerate(preview.stops, start=1):
         TourStop.objects.create(
             tour=tour, position=position, kind=stop.kind, building=stop.building, installation_order=stop.order,
+            help_tour=stop.help_tour if stop.kind == StopKind.HELP else None,
             start_time=stop.start, end_time=stop.end, work_minutes=stop.work_minutes,
             drive_to_next_seconds=stop.drive_seconds, drive_to_next_minutes=stop.drive_minutes,
             drive_to_next_km=stop.drive_km, departure_time=stop.departure,
             drive_source=stop.drive_source if position < len(preview.stops) else DriveSource.NONE,
             route_warnings=stop.warnings,
         )
+
+    # The helped plans get less work at that object (or more, if a help was removed): recalculate them
+    helped_now = {s.help_tour.pk for s in preview.stops if s.kind == StopKind.HELP and s.help_tour}
+    _mark_helped(helped_before | helped_now, f"🤝 Hilfe von {preview.employee} geändert – bitte neu rechnen "
+                                             "(die Arbeitszeit am Objekt wird aufgeteilt)")
 
     for stop in preview.stops:
         if stop.kind == StopKind.READING and stop.building.assigned_reader_id != preview.employee.pk:
@@ -694,6 +762,36 @@ def save_draft(draft, user, confirm):
     # new dates -> check reading vs. installation again (conflicts/services.py)
     refresh_conflicts_for([s.building.pk for s in preview.stops if s.building], [s.order.pk for s in preview.stops if s.order])
     return tour
+
+
+def _mark_helped(tour_ids, reason):
+    for helped in Tour.objects.filter(pk__in=[pk for pk in tour_ids if pk]):
+        helped.needs_recalculation, helped.change_reason = True, reason
+        helped.version += 1  # counts as a change for optimistic locking
+        helped.save()
+
+
+def help_draft(stop, helper):
+    """🤝 "Helfer" in the calendar: the helper's day with a help stop at this object.
+
+    The helper keeps an own plan that day (or gets a new one). Nothing is saved
+    here - the draft opens in "Fahrplan prüfen".
+    """
+    helped = stop.tour
+    if helper in helped.people:
+        raise ValueError(f"{helper} arbeitet schon in diesem Plan mit.")
+    if Tour.objects.filter(team=helper, date=helped.date).exists():
+        raise ValueError(f"{helper} ist an diesem Tag fest in einem Team eingeplant und kann nicht woanders helfen.")
+    if stop.kind == StopKind.HELP:
+        raise ValueError("Bei einem Hilfe-Stopp kann nicht noch einmal geholfen werden.")
+    own = Tour.objects.filter(employee=helper, date=helped.date).first()
+    draft = (draft_from_tour(own) if own
+             else create_draft([], helper, helped.date, helper.default_start_time, 30, "far"))
+    new = {"kind": StopKind.HELP, "building": stop.building_id, "order": stop.installation_order_id, "help_tour": helped.pk}
+    if _stop_key(new) in {_stop_key(s) for s in draft["stops"]}:
+        raise ValueError(f"{helper} hilft dort schon.")
+    draft["stops"].append(new)
+    return draft
 
 
 def _lock_tour(draft):
@@ -740,9 +838,14 @@ def _move_buildings_out_of_other_tours(preview, draft):
 def delete_tour(tour):
     """Delete a tour; its buildings become 'unplanned' again (kept in the history)."""
     stops = list(tour.stops.all())
-    buildings = [stop.building for stop in stops if stop.building]
-    order_ids = [stop.installation_order_id for stop in stops if stop.installation_order_id]
+    buildings = [stop.building for stop in stops if stop.building and stop.kind != StopKind.HELP]
+    order_ids = [stop.installation_order_id for stop in stops if stop.installation_order_id and stop.kind != StopKind.HELP]
+    # plans helped by this one, and plans whose people helped here: recalculate them
+    helped = {stop.help_tour_id for stop in stops if stop.kind == StopKind.HELP}
+    helpers = set(tour.help_stops.values_list("tour_id", flat=True))
     tour.delete()
+    _mark_helped(helped, f"🤝 Hilfe fällt weg (Plan {tour.employee} gelöscht) – bitte neu rechnen")
+    _mark_helped(helpers, f"🤝 Der Plan {tour.employee} {tour.date:%d.%m.%Y} wurde gelöscht – Hilfe-Stopp bitte entfernen")
     for building in buildings:
         refresh_deadline(building)
     # orders without any appointment left are open again
