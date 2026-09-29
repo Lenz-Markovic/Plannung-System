@@ -26,18 +26,19 @@ from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 from core.models import Features
 from documents import notices
+from documents.notice_rules import notice_deadline
 from journal import notes
 from journal.activity import day_label, record, streets
 from journal.models import ActivityKind
-from documents.notice_rules import notice_deadline
 
-from . import dayplan, services
+from . import dayplan, services, visits
 from .calendar import calendar_events, free_day_events, tour_kind
 from .display import preview_map_data, route_sketch, tour_map_data
 from .excel import build_workbook
 from .forms import DraftSettingsForm, PlanForm
-from .models import Absence, Employee, StopKind, Tour, TourStop
+from .models import Absence, Employee, StopKind, Tour, TourStop, Visit
 from .rules.ordering import STRATEGIES
+from .rules.visits import REASONS
 from .tomtom import TomTomError, current_api_key, get_client
 
 PLAN_PERMISSION = "planning.add_tour"
@@ -108,6 +109,7 @@ def _team_candidates(draft):
 def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     notes.attach_notes(preview.stops)  # 📝 notes of the Terminierung at every stop (⛔ Storno in red)
+    visits.attach_attempts(preview.stops, preview.date)  # 🔁 2. Termin? what is still to do from last time
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     suggestions, too_long = services.draft_suggestions(draft, net_minutes=preview.day_plan.net_minutes)
     response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
@@ -193,6 +195,7 @@ def plan_confirm(request):
         return HttpResponse(status=204)
     preview = services.calculate_preview(current)
     notes.attach_notes(preview.stops)
+    visits.attach_attempts(preview.stops, preview.date)
     return render(request, "planning/_plan_confirm.html", {
         "preview": preview, "options": services.time_options(current, preview),
     })
@@ -437,6 +440,7 @@ def tour_detail(request, pk):
         stop.notice_possible = office and stop.kind != StopKind.HELP
         stop.notice = notices.state_of(stop) if office and notices.wanted(stop) else None
     notes.attach_notes(stops)  # 📝 open notes of each building / order
+    visits.attach_attempts(stops, tour.date)  # 🔁 which visit is this, and the Ergebnis
     for stop in stops:  # a note on site that went to the office as ⚠ problem is shown once, as the problem
         stop.field_is_problem = any(n.kind == "problem" and n.text == stop.field_note for n in stop.notes)
     notice_states = [s.notice.state for s in stops if s.notice]
@@ -616,8 +620,9 @@ def _stop_context(stop):
     target = stop.building or stop.installation_order
     address = f"{target.street}, {target.zip_code} {target.city}"
     notes.attach_notes([stop])  # open notes of the object: problems reported from here are shown on the card
+    visits.attach_attempts([stop], stop.tour.date)  # 2. Termin? what happened last time?
     stop.problems = [n for n in stop.notes if n.kind == "problem"]
-    return {"s": stop, "address": address, "status_choices": BuildingStatus.choices,
+    return {"s": stop, "address": address, "status_choices": BuildingStatus.choices, "reasons": REASONS, "reasons_dict": dict(REASONS),
             "navigation_url": "https://www.google.com/maps/dir/?api=1&destination=" + quote_plus(address)}
 
 
@@ -645,6 +650,34 @@ def my_day(request):
     })
 
 
+@login_required
+def object_visits(request, target, pk):
+    """🧾 Bearbeitung of one building / order: every visit with its Ergebnis, and what comes next."""
+    if not request.user.has_perm("planning.view_tour"):
+        raise PermissionDenied
+    building = get_object_or_404(Building, pk=pk) if target == "liegenschaft" else None
+    order = get_object_or_404(InstallationOrder, pk=pk) if target == "auftrag" else None
+    if building is None and order is None:
+        raise PermissionDenied
+    return render(request, "planning/_visits.html", {
+        **visits.object_history(building, order), "target": target, "pk": pk, "reasons_dict": dict(REASONS)})
+
+
+@require_POST
+@permission_required("planning.change_tour", raise_exception=True)
+def visit_close(request, pk):
+    """'✓ abschließen – kein Nachtermin nötig' (or open again)."""
+    visit = get_object_or_404(Visit, pk=pk)
+    closed = request.POST.get("closed") == "1"
+    visits.close(visit, request.user, closed)
+    target = visit.building or visit.installation_order
+    record(request.user, ActivityKind.FIELD, f"{'✓ abgeschlossen – kein Nachtermin nötig' if closed else '↺ wieder offen – Nachtermin nötig'}: "
+           f"{target.street} ({visit.attempt}. Termin {day_label(visit.date)})", building=visit.building, order=visit.installation_order)
+    response = object_visits(request, "liegenschaft" if visit.building_id else "auftrag", visit.building_id or visit.installation_order_id)
+    response["HX-Trigger"] = "buildings-changed, orders-changed"
+    return response
+
+
 def _stop_answer(request, stop, message, error=False):
     stops = list(stop.tour.stops.order_by("position"))
     response = render(request, "planning/_day_stop.html", {
@@ -659,12 +692,35 @@ def _stop_answer(request, stop, message, error=False):
 def stop_done(request, pk):
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
     done = request.POST.get("done") == "1"
-    dayplan.set_stop_done(stop, request.user, done)
+    if done:
+        visits.report(stop, request.user, visits.COMPLETE)  # ✓ fertig (100 %)
+    else:
+        visits.undo(stop, request.user)
     target = stop.building or stop.installation_order
-    record(request.user, ActivityKind.FIELD, f"{'✓ Stopp erledigt' if done else 'Stopp wieder offen'}: {target.street} "
+    record(request.user, ActivityKind.FIELD, f"{'✓ fertig (100 %)' if done else '↺ Ergebnis zurückgesetzt'}: {target.street} "
            f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
            order=stop.installation_order)
     return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
+
+
+@require_POST
+@login_required
+def stop_report(request, pk):
+    """◐ teilweise erledigt / ✗ nicht erledigt (niemand da ...): what is still to do - required."""
+    stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
+    outcome, todo, reason = request.POST.get("outcome", ""), request.POST.get("todo", ""), request.POST.get("reason", "")
+    try:
+        visit = visits.report(stop, request.user, outcome, todo, reason)
+    except ValidationError as error:
+        response = _stop_answer(request, stop, error.messages[0], error=True)
+        response["HX-Reswap"] = "none"  # keep what was typed; only the message is shown
+        return response
+    target = stop.building or stop.installation_order
+    what = visits.OUTCOME_LABELS[outcome] + (f" – {visits.REASONS[reason]}" if reason in visits.REASONS and outcome == visits.ABSENT else "")
+    number = f"{visit.attempt}. Termin · " if visit else ""
+    record(request.user, ActivityKind.FIELD, f"{what}: {target.street} ({stop.tour.employee} {day_label(stop.tour.date)}) · "
+           f"{number}noch zu tun: {todo.strip()}", tour=stop.tour, building=stop.building, order=stop.installation_order)
+    return _stop_answer(request, stop, "Ergebnis ans Büro gemeldet – Nachtermin wird geplant")
 
 
 @require_POST

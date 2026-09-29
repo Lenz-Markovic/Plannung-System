@@ -264,6 +264,28 @@ The only JavaScript is `static/js/calendar.js` (commented).
   plan it anyway.
 - A new note shows up at once in an open plan / side panel (`notes-changed`).
 
+## 🧾 After the visit: Ergebnis, Nachtermin, Bearbeitung
+
+- In **Mein Tag** every stop gets an Ergebnis (`planning/rules/visits.py`):
+  **✓ fertig (100 %)** · **◐ teilweise erledigt** (must write what is still to do, e.g.
+  "NE003 und NE007 fehlen") · **✗ niemand da / nicht möglich** (reason: niemand angetroffen,
+  kein Zugang, abgelehnt, Gerät defekt, Sonstiges + what to do next). "↺ Ergebnis ändern"
+  takes it back.
+- Every report is kept as a **Termin-Ergebnis** (`planning.Visit`): 1. Termin, 2. Termin
+  (Nachtermin), 3. Termin … with day, people, Ergebnis, what is still to do, note on site,
+  who reported it. It stays even when a plan is changed or deleted; a visited stop stays in
+  its old plan as history (planning the object again does not take it out of there).
+- **🔁 Nachtermin nötig** = last visit teilweise / nicht erledigt, not closed by the office
+  and not planned again yet: tile + filter in Liegenschaften ("Nachtermin") and Montage
+  ("Termin → Nachtermin nötig"), badge in the row; such objects are suggested again
+  (free days, "passt noch in den Tag").
+- Planning it again: Fahrplan prüfen, the calendar panel and the Excel Fahrplan show
+  **"🔁 2. Termin (Nachtermin) – zuletzt 05.10. Keller: ◐ teilweise · noch zu tun: …"**.
+- **🧾 Bearbeitung** in the detail row (▸) of every Liegenschaft and Montageauftrag: all
+  visits with their Ergebnis, the next planned appointment (which Termin it will be), and
+  "✓ abschließen – kein Nachtermin nötig" for the office (e.g. settled on the phone).
+- Mein Tag on a PC is the normal page again (no phone frame).
+
 ## 📱 Reports from "Mein Tag" (live in the office)
 
 - On the phone every stop has "Notiz vor Ort" and **⚠ Problem ans Büro melden** (the note
@@ -273,8 +295,7 @@ The only JavaScript is `static/js/calendar.js` (commented).
   30 s and reloads ONLY if something changed (nothing you type is lost otherwise).
 - Lists: badge **⚠ Problem**; Verlauf: filter **📱 vor Ort**.
 - **Mein Tag** itself is only for Ableser/Monteur, Admin and roles that get "Eigenen
-  Tagesplan sehen" in ⚙ Verwaltung → Gruppen (no longer for Disposition by default). On a
-  PC it has the same phone look (a phone frame in the middle).
+  Tagesplan sehen" in ⚙ Verwaltung → Gruppen (no longer for Disposition by default).
 
 ## 🕘 Verlauf (who changed what)
 

@@ -179,6 +179,9 @@ def stop_row(stop, start, end):
         todo.append("RWM-Prüfung")
     if stop.kind == StopKind.READING:
         todo += _devices(building)
+    last = getattr(stop, "last_visit", None)
+    if getattr(stop, "attempt", 1) > 1:  # 🔁 Nachtermin: which visit, and what is still to do from last time
+        todo.insert(0, f"🔁 {stop.attempt}. Termin" + (f" – noch zu tun: {last.todo}" if last and last.todo else ""))
 
     hints = []
     if building and building.remark:
@@ -201,6 +204,8 @@ def stop_row(stop, start, end):
 
 def tour_sheet(tour):
     stops = list(tour.stops.select_related("building", "installation_order", "help_tour__employee").order_by("position"))
+    from .visits import attach_attempts
+    attach_attempts(stops, tour.date)
     work = [s.work_minutes for s in stops]
     drives = [s.drive_to_next_minutes or 0 for s in stops[:-1]]
     # Old/imported tours may have no times yet: calculate them like the plan does.

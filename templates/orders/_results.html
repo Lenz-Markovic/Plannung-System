@@ -13,6 +13,9 @@
     <div class="lbl">noch ohne Termin</div><div class="val">{{ summary.without_date }}</div></a>
   <a class="tile t-crit {% if request.GET.konflikt == 'offen' %}on{% endif %}" href="?{% toggle_query request 'konflikt' 'offen' %}">
     <div class="lbl"><span class="ic t-crit">▲</span>mit offenem Konflikt</div><div class="val">{{ summary.conflicts }}</div></a>
+  <a class="tile t-warn {% if request.GET.termin == 'nachtermin' %}on{% endif %}" href="?{% toggle_query request 'termin' 'nachtermin' %}"
+     title="Beim letzten Termin teilweise oder nicht erledigt – und noch nicht neu geplant">
+    <div class="lbl"><span class="ic t-warn">🔁</span>Nachtermin nötig</div><div class="val">{{ summary.revisit }}</div></a>
   <div class="tile"><div class="lbl">Montagezeit</div><div class="val">{{ summary.minutes|hours }}</div></div>
 </div>
 

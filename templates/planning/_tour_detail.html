@@ -35,7 +35,9 @@
           {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
           {# 📱 from "Mein Tag": done, note on site, status proposal #}
-          {% if s.done_at %}<div class="field-line done">✓ erledigt {{ s.done_at|date:"d.m. H:i" }}{% if s.done_by %} von <b>{{ s.done_by }}</b>{% endif %}</div>{% endif %}
+          {% if s.attempt > 1 %}<div class="field-line attempt">🔁 <b>{{ s.attempt }}. Termin</b>{% if s.last_visit.todo %} · von zuletzt noch zu tun: {{ s.last_visit.todo|truncatechars:120 }}{% endif %}</div>{% endif %}
+          {% if s.done_at %}<div class="field-line done {{ s.outcome }}">{% if s.outcome == "partial" %}◐ teilweise erledigt{% elif s.outcome == "absent" %}✗ nicht erledigt{% else %}✓ fertig{% endif %} {{ s.done_at|date:"d.m. H:i" }}{% if s.done_by %} von <b>{{ s.done_by }}</b>{% endif %}
+            {% if s.visit.todo %}<br>noch zu tun: <b>{{ s.visit.todo|truncatechars:160 }}</b>{% endif %}</div>{% endif %}
           {% if s.field_note and not s.field_is_problem %}<div class="field-line">📱 vor Ort: {{ s.field_note|truncatechars:200 }}</div>{% endif %}
           {% if s.building.proposed_status %}<div class="field-line">🏷 Vorschlag{% if s.building.proposed_status_by %} von <b>{{ s.building.proposed_status_by }}</b>{% endif %}: <b>{{ s.building.get_proposed_status_display }}</b> – wartet aufs Büro (Liegenschaften-Liste: übernehmen)</div>{% endif %}
           {% for n in s.notes %}<div class="stop-note {{ n.kind }}">{{ n.icon }} <b>{{ n.get_kind_display }}</b>: {{ n.text|truncatechars:160 }} <span class="na">– {{ n.author|default:"?" }}</span></div>{% endfor %}

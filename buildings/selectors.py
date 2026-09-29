@@ -10,6 +10,7 @@ from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefet
 from django.db.models.functions import Coalesce
 
 from journal.notes import note_annotations
+from planning.visits import needs_revisit_q, visit_annotations
 from planning.models import StopKind, TourStop
 
 from .models import Building, BuildingStatus, InstallationOrder, SourceSystem
@@ -44,6 +45,7 @@ def building_list_queryset():
             status_rank=STATUS_RANK,
             **note_annotations("building"),  # 📝 / ⛔ badges in the row
         )
+        .annotate(**visit_annotations("building"))  # 🔁 visits, "Nachtermin nötig"
     )
 
 
@@ -81,6 +83,7 @@ def building_summary(buildings):
         gateways=Count("pk", filter=Q(has_gateway=True)),
     )
     numbers["with_orders"] = buildings.filter(has_orders=True).count()
+    numbers["revisit"] = buildings.filter(needs_revisit_q()).count()  # 🔁 Nachtermin nötig
     total = numbers["total"] or 1
     for key in ("released", "open", "rework"):
         numbers[f"{key}_pct"] = round(numbers[key] / total * 100)

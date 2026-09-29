@@ -100,6 +100,10 @@ class BuildingFilter(django_filters.FilterSet):
     documents_to = django_filters.DateFilter(
         label="bis", field_name="cost_documents__received_on", lookup_expr="lte", widget=date_input()
     )
+    nachtermin = django_filters.ChoiceFilter(
+        label="Nachtermin", empty_label="alle", method="filter_revisit",
+        choices=[("noetig", "🔁 Nachtermin nötig"), ("besucht", "schon besucht"), ("mehrfach", "2 × oder öfter besucht")],
+    )
     only_orders = django_filters.BooleanFilter(
         label="nur mit Auftrag (RE)", method="filter_only_orders", widget=forms.CheckboxInput
     )
@@ -175,6 +179,14 @@ class BuildingFilter(django_filters.FilterSet):
 
     def filter_documents(self, queryset, name, value):
         return queryset.filter(cost_documents__isnull=(value == "nein"))
+
+    def filter_revisit(self, queryset, name, value):
+        from planning.visits import needs_revisit_q
+        if value == "noetig":
+            return queryset.filter(needs_revisit_q())
+        if value == "mehrfach":
+            return queryset.filter(visit_count__gte=2)
+        return queryset.filter(visit_count__gte=1)
 
     def filter_only_orders(self, queryset, name, value):
         if not value:

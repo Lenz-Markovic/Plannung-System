@@ -115,7 +115,7 @@ def test_team_in_preview_calendar_and_mein_tag(demo):
 
     reader = login(roles.READER, "mate", employee=mate)
     day = reader.get(reverse("planning:my_day"), {"datum": DAY.isoformat()}).content.decode()
-    assert "Stopp erledigt" in day and f"👥 {tour.people_label}" in day
+    assert "✓ fertig (100 %)" in day and f"👥 {tour.people_label}" in day
     stop = tour.stops.first()
     assert reader.post(reverse("planning:stop_done", args=[stop.pk]), {"done": "1"}).status_code == 200
 

@@ -12,6 +12,9 @@
   <td class="mono"><b>{{ o.re_number }}</b></td>
   <td class="adr">{{ o.street }}<small>{{ o.zip_code }} {{ o.city }}{% if o.client %} · {{ o.client }}{% endif %}</small>
     {% if o.summary %}<div class="typ-tag">{{ o.summary }}</div>{% endif %}
+    {% if o.last_outcome == "partial" or o.last_outcome == "absent" %}{% if not o.last_closed %}
+      <span class="revisit-badge" title="{{ o.visit_count }}× besucht – beim letzten Mal {% if o.last_outcome == 'partial' %}teilweise{% else %}nicht{% endif %} erledigt">🔁 {% if o.revisit_planned %}Nachtermin geplant{% else %}Nachtermin nötig{% endif %} · {{ o.visit_count }}×</span>
+    {% endif %}{% elif o.visit_count %}<span class="attempt-tag" title="besucht">✓ {{ o.visit_count }}× besucht</span>{% endif %}
     {% if o.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if o.has_storno %}storno{% elif o.has_problem %}problem{% endif %}" title="Notizen ansehen / schreiben"
       hx-get="{% url 'journal:notes' 'auftrag' o.pk %}?dialog=1" hx-target="#modal">{% if o.has_storno %}⛔ Storno{% elif o.has_problem %}⚠ Problem{% else %}📝 {{ o.open_notes }}{% endif %}</button>{% endif %}</td>
   <td>{{ o.order_date|date:"d.m.Y"|default:"–" }}</td>

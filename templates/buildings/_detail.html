@@ -31,6 +31,7 @@
         <dt>Letzte Änderung</dt><dd>{{ last.history_date|date:"d.m.Y H:i" }}{% if last.history_user %} von {{ last.history_user }}{% endif %}{% if last.history_change_reason %} ({{ last.history_change_reason }}){% endif %}</dd>
       {% endif %}{% endwith %}
     </dl>
+    {% if perms.planning.view_tour %}<div class="mt-2" hx-get="{% url 'planning:visits' 'liegenschaft' b.pk %}" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
     {% if perms.journal.view_note %}<div class="mt-2" hx-get="{% url 'journal:notes' 'liegenschaft' b.pk %}" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
   </td>
 </tr>

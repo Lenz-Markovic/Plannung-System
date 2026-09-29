@@ -240,6 +240,9 @@ class TourStop(TimeStampedModel):
                                           blank=True, on_delete=models.SET_NULL, related_name="+")
     notice_for = models.CharField("Aushang für", max_length=120, blank=True,
                                   help_text="z. B. „Dienstag, 03.11.2026, zwischen 09:00 und 11:00 Uhr“")
+    # Ergebnis from "Mein Tag" (planning/rules/visits.py): complete / partial / absent, "" = not reported yet
+    outcome = models.CharField("Ergebnis", max_length=20, blank=True, choices=[
+        ("complete", "fertig (100 %)"), ("partial", "teilweise erledigt"), ("absent", "nicht erledigt")])
     done_at = models.DateTimeField("erledigt am", null=True, blank=True)
     done_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, verbose_name="erledigt von", null=True, blank=True,
@@ -271,3 +274,55 @@ class TourStop(TimeStampedModel):
     def __str__(self):
         target = self.building or self.installation_order
         return f"{self.tour} #{self.position}: {target}"
+
+
+class Visit(models.Model):
+    """What happened at one visit of a building / order (Termin-Ergebnis) - kept for good.
+
+    Written when the Ableser/Monteur reports the Ergebnis in "Mein Tag". Stays even when
+    the plan is changed or deleted later, so the office always sees: 1. Termin, 2. Termin
+    (Nachtermin) ..., who was there and what is still to do (🧾 Bearbeitung).
+    """
+
+    building = models.ForeignKey("buildings.Building", verbose_name="Liegenschaft", null=True, blank=True,
+                                 on_delete=models.CASCADE, related_name="visits")
+    installation_order = models.ForeignKey("buildings.InstallationOrder", verbose_name="Montageauftrag", null=True,
+                                           blank=True, on_delete=models.CASCADE, related_name="visits")
+    kind = models.CharField("Art", max_length=20, choices=StopKind.choices, default=StopKind.READING)
+    date = models.DateField("Tag", db_index=True)
+    tour = models.ForeignKey(Tour, null=True, blank=True, on_delete=models.SET_NULL, related_name="visits")
+    stop = models.OneToOneField(TourStop, null=True, blank=True, on_delete=models.SET_NULL, related_name="visit")
+    people = models.CharField("wer war da", max_length=120, blank=True)
+    attempt = models.PositiveSmallIntegerField("Termin Nr.", default=1)
+    outcome = models.CharField("Ergebnis", max_length=20, choices=[
+        ("complete", "fertig (100 %)"), ("partial", "teilweise erledigt"), ("absent", "nicht erledigt")])
+    reason = models.CharField("Grund", max_length=20, blank=True)
+    todo = models.TextField("Was ist noch zu tun?", blank=True)
+    note = models.TextField("Notiz vor Ort", blank=True)
+    reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="gemeldet von", null=True,
+                                    on_delete=models.SET_NULL, related_name="+")
+    reported_at = models.DateTimeField("gemeldet am", auto_now=True)
+    # the office decides that no further visit is needed ("✓ abgeschlossen")
+    closed_at = models.DateTimeField("abgeschlossen am", null=True, blank=True)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="abgeschlossen von", null=True, blank=True,
+                                  on_delete=models.SET_NULL, related_name="+")
+
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ["date", "pk"]
+        verbose_name = "Termin-Ergebnis"
+        verbose_name_plural = "Termin-Ergebnisse"
+        constraints = [
+            models.CheckConstraint(condition=Q(building__isnull=False) | Q(installation_order__isnull=False),
+                                   name="visit_has_target"),
+        ]
+
+    def __str__(self):
+        target = self.building or self.installation_order
+        return f"{target} {self.date:%d.%m.%Y}: {self.get_outcome_display()}"
+
+    @property
+    def open(self):
+        """Not complete and not closed by the office: something is still to do."""
+        return self.outcome != "complete" and self.closed_at is None

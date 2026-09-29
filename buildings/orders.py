@@ -13,6 +13,7 @@ from django.db.models import Exists, F, Min, OuterRef, Prefetch, Q
 from journal.activity import record
 from journal.models import ActivityKind
 from journal.notes import note_annotations
+from planning.visits import needs_revisit_q, visit_annotations
 from conflicts.models import Conflict, Severity
 from conflicts.services import refresh_for
 from planning.models import Employee, StopKind, TourStop
@@ -42,6 +43,7 @@ def order_list_queryset():
             has_open_conflict=Exists(Conflict.objects.filter(OPEN_CONFLICT, installation_order=OuterRef("pk"))),
             **note_annotations("installation_order"),  # 📝 / ⛔ badges in the row
         )
+        .annotate(**visit_annotations("installation_order"))  # 🔁 visits, "Nachtermin nötig"
         .prefetch_related(
             Prefetch("tour_stops", queryset=stops, to_attr="planned"),
             Prefetch("conflicts", queryset=Conflict.objects.order_by("severity"), to_attr="all_conflicts"),
@@ -67,7 +69,7 @@ class OrderFilter(django_filters.FilterSet):
     status = django_filters.ChoiceFilter(label="Status", empty_label="alle", choices=OrderStatus.choices)
     termin = django_filters.ChoiceFilter(
         label="Termin", empty_label="alle", method="filter_termin",
-        choices=[("mit", "mit Montagetermin"), ("ohne", "ohne Montagetermin")])
+        choices=[("mit", "mit Montagetermin"), ("ohne", "ohne Montagetermin"), ("nachtermin", "🔁 Nachtermin nötig")])
     konflikt = django_filters.ChoiceFilter(
         label="Konflikte", empty_label="alle", method="filter_konflikt",
         choices=[("offen", "nur mit offenem Konflikt"), ("keine", "ohne offenen Konflikt")])
@@ -112,6 +114,8 @@ class OrderFilter(django_filters.FilterSet):
         return queryset.filter(assigned_installers=value).distinct()
 
     def filter_termin(self, queryset, name, value):
+        if value == "nachtermin":
+            return queryset.filter(needs_revisit_q())
         return queryset.filter(installation_date__isnull=(value == "ohne"))
 
     def filter_konflikt(self, queryset, name, value):

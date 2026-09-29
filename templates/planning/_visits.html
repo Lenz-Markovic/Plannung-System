@@ -1,0 +1,34 @@
+{# 🧾 Bearbeitung: what happened at this object - every visit (1., 2., 3. Termin) and what comes next. #}
+{% load core_tags %}
+<div class="notes-box visits-box" id="visits-{{ target }}-{{ pk }}">
+  <div class="notes-head"><b>🧾 Bearbeitung – Termine und Ergebnisse</b>
+    <span class="na small">{{ visits|length }} Termin{{ visits|length|pluralize:"e" }} vor Ort</span></div>
+
+  {% if needs_revisit %}
+    <div class="pr-status warn">🔁 <b>Nachtermin nötig</b> ({{ next_attempt }}. Termin) – noch zu tun: <b>{{ last.todo|default:"siehe unten" }}</b></div>
+  {% endif %}
+  {% for s in planned %}
+    <div class="pr-status info">📅 geplant: <b>{{ s.tour.date|date:"D d.m.Y" }}</b> {{ s.tour.employee }}{% if s.start_time %} {{ s.start_time|time:"H:i" }}{% endif %}
+      · <span class="attempt-tag">{{ s.attempt }}. Termin</span> · {{ s.tour.get_status_display }}</div>
+  {% endfor %}
+
+  <ul class="visit-list">
+    {% for v in visits %}
+      <li class="visit {{ v.outcome }} {% if v.closed_at %}closed{% endif %}">
+        <div class="note-top"><b>{{ v.attempt }}. Termin · {{ v.date|date:"D d.m.Y" }}</b> <span>{{ v.people }}</span>
+          <b>{% if v.outcome == "complete" %}✓ fertig (100 %){% elif v.outcome == "partial" %}◐ teilweise erledigt{% else %}✗ nicht erledigt{% endif %}</b>
+          {% if v.reason %}<span>· {{ reasons_dict|get_item:v.reason }}</span>{% endif %}</div>
+        {% if v.todo %}<div>Noch zu tun: <b>{{ v.todo }}</b></div>{% endif %}
+        {% if v.note %}<div>📱 vor Ort: {{ v.note }}</div>{% endif %}
+        <div class="na small">gemeldet {{ v.reported_at|date:"d.m. H:i" }}{% if v.reported_by %} von {{ v.reported_by }}{% endif %}
+          {% if v.closed_at %} · ✓ abgeschlossen {{ v.closed_at|date:"d.m." }}{% if v.closed_by %} von {{ v.closed_by }}{% endif %}{% endif %}
+          {% if perms.planning.change_tour and v.outcome != "complete" and forloop.last %}
+            · <button class="linkish" hx-post="{% url 'planning:visit_close' v.pk %}" hx-vals='{"closed": "{% if v.closed_at %}0{% else %}1{% endif %}"}'
+                      hx-target="#visits-{{ target }}-{{ pk }}" hx-swap="outerHTML">{% if v.closed_at %}↺ doch Nachtermin nötig{% else %}✓ abschließen – kein Nachtermin nötig{% endif %}</button>
+          {% endif %}</div>
+      </li>
+    {% empty %}
+      <li class="na small">Noch kein Termin vor Ort gemeldet.</li>
+    {% endfor %}
+  </ul>
+</div>

@@ -33,6 +33,8 @@ def _summary(orders):
         "without_date": sum(1 for o in orders if o.installation_date is None and o.status != OrderStatus.DONE),
         "conflicts": sum(1 for o in orders if o.has_open_conflict),
         "minutes": sum(o.duration_minutes for o in orders),
+        "revisit": sum(1 for o in orders if o.last_outcome in ("partial", "absent") and not o.last_closed
+                       and not o.revisit_planned),
     }
 
 

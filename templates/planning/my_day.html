@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Mein Tag – {{ date|date:"d.m.Y" }}{% endblock %}
 {% block content %}
-<div class="day-phone-hint">📱 Handy-Ansicht – so sieht es der Ableser / Monteur unterwegs</div>
-<div class="day-phone">
 <div class="day">
   <header class="day-head">
     <a class="btn mini" href="?datum={{ previous_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Vortag">‹</a>
@@ -42,14 +40,13 @@
     {% endif %}
     <div class="day-stops">
       {% for item in stops %}
-        {% include "planning/_day_stop.html" with s=item.s address=item.address navigation_url=item.navigation_url status_choices=item.status_choices %}
+        {% include "planning/_day_stop.html" with s=item.s address=item.address navigation_url=item.navigation_url status_choices=item.status_choices reasons=item.reasons reasons_dict=item.reasons_dict %}
         {% if item.s.drive_to_next_minutes and not forloop.last %}<div class="day-drive">↓ {{ item.s.drive_to_next_minutes }} min Fahrt{% if item.s.drive_to_next_km %} · {{ item.s.drive_to_next_km|floatformat:1 }} km{% endif %}</div>{% endif %}
         {% if tour.break_after_position == forloop.counter %}<div class="day-drive">☕ Pause {{ tour.break_minutes }} min</div>{% endif %}
       {% endfor %}
     </div>
     <p class="na small mt-3">Tipp: Auf die Adresse tippen startet die Navigation. Telefonnummern in den Hinweisen sind anklickbar.</p>
   {% endif %}
-</div>
 </div>
 {% if map_available %}{% include "planning/_map_scripts.html" %}{% endif %}
 {% endblock %}

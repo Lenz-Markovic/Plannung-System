@@ -16,6 +16,9 @@
     {% if b.access_apartment or b.access_room %}{% with z=b.access %}
       <span class="zg-badge {% if z.important %}stark{% endif %}" title="{{ z.text }}">{% if z.apartment %}🔑 Wohnung{% if z.units %} {{ z.units|join:", " }}{% endif %}{% else %}🚪 Heizraum{% endif %}</span>
     {% endwith %}{% endif %}
+    {% if b.last_outcome == "partial" or b.last_outcome == "absent" %}{% if not b.last_closed %}
+      <span class="revisit-badge" title="{{ b.visit_count }}× besucht – beim letzten Mal {% if b.last_outcome == 'partial' %}teilweise{% else %}nicht{% endif %} erledigt">🔁 {% if b.revisit_planned %}Nachtermin geplant{% else %}Nachtermin nötig{% endif %} · {{ b.visit_count }}×</span>
+    {% endif %}{% elif b.visit_count %}<span class="attempt-tag" title="besucht">✓ {{ b.visit_count }}× besucht</span>{% endif %}
     {% if b.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if b.has_storno %}storno{% elif b.has_problem %}problem{% endif %}" title="Notizen ansehen / schreiben"
       hx-get="{% url 'journal:notes' 'liegenschaft' b.pk %}?dialog=1" hx-target="#modal">{% if b.has_storno %}⛔ Storno{% elif b.has_problem %}⚠ Problem{% else %}📝 {{ b.open_notes }}{% endif %}</button>{% endif %}
   </td>

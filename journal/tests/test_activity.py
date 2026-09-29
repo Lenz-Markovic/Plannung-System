@@ -160,7 +160,7 @@ def test_field_note_problem_and_done_are_live_in_the_office(demo):
     assert changed.status_code == 200  # something new: the panel reloads
     assert "Problem vor Ort</b>: Zähler in Whg 3 defekt" in html and f"von <b>{reader}</b>" in html  # shown once, as problem
     field = Activity.objects.filter(kind=ActivityKind.FIELD)
-    assert field.filter(text__startswith="⚠ Problem vor Ort").exists() and field.filter(text__startswith="✓ Stopp erledigt").exists()
+    assert field.filter(text__startswith="⚠ Problem vor Ort").exists() and field.filter(text__startswith="✓ fertig (100 %)").exists()
     row = office.get(reverse("buildings:list"), {"q": stop.building.file_number}).content.decode()
     assert "⚠ Problem" in row
 

@@ -31,7 +31,7 @@ from conflicts.services import refresh_for as refresh_conflicts_for
 from documents.services import refresh_deadline
 
 from . import geocoding
-from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop
+from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop, Visit
 from .rules import autoplan as autoplan_rules
 from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
@@ -252,6 +252,12 @@ class Suggestion:
 SUGGESTION_DRIVE_MINUTES = 15  # rough extra drive per suggested stop
 
 
+def visit_revisit_ids():
+    """(building ids, order ids) that need a 🔁 Nachtermin (planning/visits.py)."""
+    from .visits import revisit_ids
+    return revisit_ids()
+
+
 def _storno():
     """(building ids, order ids) with an open ⛔ Storno note: never suggested automatically."""
     from journal.notes import open_storno
@@ -431,8 +437,10 @@ def free_day_suggestions(employee, date, kind=""):
     storno_buildings, storno_orders = _storno()
     found = []
     if employee.can_install and kind != "reading":
-        open_orders = (InstallationOrder.objects.exclude(status=OrderStatus.DONE).filter(tour_stops__isnull=True)
-                       .exclude(pk__in=storno_orders))
+        _, revisit_orders = visit_revisit_ids()
+        open_orders = (InstallationOrder.objects.exclude(status=OrderStatus.DONE)
+                       .filter(Q(tour_stops__isnull=True) | Q(pk__in=revisit_orders))
+                       .exclude(pk__in=storno_orders).distinct())
         assigned = list(open_orders.filter(assigned_installers=employee).order_by("re_number"))
         rest = open_orders.exclude(pk__in=[o.pk for o in assigned]).order_by("zip_code", "re_number")
         # first the usual region, then the others (many orders have no building, so no region)
@@ -444,7 +452,9 @@ def free_day_suggestions(employee, date, kind=""):
             found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
                                     f"{why} · {order.duration_minutes} min", order.duration_minutes))
     if employee.can_read and kind != "installation":
-        unplanned = Building.objects.filter(tour_stops__isnull=True).exclude(pk__in=storno_buildings)
+        revisit_buildings, _ = visit_revisit_ids()  # 🔁 Nachtermin: plannable again
+        unplanned = (Building.objects.filter(Q(tour_stops__isnull=True) | Q(pk__in=revisit_buildings))
+                     .exclude(pk__in=storno_buildings).distinct())
         assigned = list(unplanned.filter(assigned_reader=employee).order_by("zip_code", "file_number"))
         rest = unplanned.exclude(pk__in=[b.pk for b in assigned]).order_by("zip_code", "file_number")
         nearby = list(rest.filter(region=region)[:30]) if region else []
@@ -521,13 +531,17 @@ def nearby_unplanned(draft, preview, room, limit=6):
     points = [s.point for s in preview.stops if s.point]
     employee = preview.employee
     storno_buildings, storno_orders = _storno()
+    revisit_buildings, revisit_orders = visit_revisit_ids()  # 🔁 Nachtermin: plannable again
     objects = []
     if employee.can_read:
-        objects += [(StopKind.READING, b) for b in Building.objects.exclude(tour_stops__kind=StopKind.READING)
-                    .exclude(pk__in=storno_buildings) if (StopKind.READING, b.pk, None) not in in_plan]
+        unplanned = Building.objects.exclude(tour_stops__kind=StopKind.READING) | Building.objects.filter(pk__in=revisit_buildings)
+        objects += [(StopKind.READING, b) for b in unplanned.exclude(pk__in=storno_buildings).distinct()
+                    if (StopKind.READING, b.pk, None) not in in_plan]
     if employee.can_install:
-        objects += [(StopKind.INSTALLATION, o) for o in InstallationOrder.objects.exclude(status=OrderStatus.DONE)
-                    .exclude(tour_stops__kind=StopKind.INSTALLATION).exclude(pk__in=storno_orders)
+        unplanned = (InstallationOrder.objects.exclude(tour_stops__kind=StopKind.INSTALLATION)
+                     | InstallationOrder.objects.filter(pk__in=revisit_orders))
+        objects += [(StopKind.INSTALLATION, o) for o in unplanned.exclude(status=OrderStatus.DONE).distinct()
+                    .exclude(pk__in=storno_orders)
                     if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
     found = []
     for kind, obj in objects:
@@ -849,8 +863,8 @@ def _calculate_legs(client, stops, date, start, work, break_after, break_minutes
 def _stops_in_other_tours(preview, draft, buildings):
     """Reading stops of these buildings in OTHER tours (not the day being planned,
     and not the tour that is being moved)."""
-    stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings)
-             .exclude(tour__employee=preview.employee, tour__date=preview.date))
+    stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings, done_at__isnull=True, outcome="")
+             .exclude(tour__employee=preview.employee, tour__date=preview.date))  # a visited stop stays as history
     if draft.get("tour_id"):
         stops = stops.exclude(tour_id=draft["tour_id"])
     return stops.select_related("tour__employee")
@@ -950,6 +964,10 @@ def save_draft(draft, user, confirm):
     helped_before = set(tour.stops.filter(kind=StopKind.HELP).values_list("help_tour_id", flat=True)) if tour.pk else set()
     # printed tenant notices stay with their object (they show "veraltet" if day or time changed)
     # (and so does the choice "Aushang ja")
+    # ... and what was reported from "Mein Tag" (Ergebnis, done, note on site, the Visit)
+    reported = {(st.kind, st.building_id, st.installation_order_id): st
+                for st in tour.stops.filter(Q(done_at__isnull=False) | ~Q(field_note="") | ~Q(outcome=""))} if tour.pk else {}
+    visit_of = dict(Visit.objects.filter(stop__in=list(reported.values())).values_list("stop_id", "pk"))
     notices = {(st.kind, st.building_id, st.installation_order_id):
                (st.notice_printed_at, st.notice_for, st.notice_wanted, st.notice_printed_by_id)
                for st in tour.stops.filter(Q(notice_wanted=True) | Q(notice_printed_at__isnull=False))} if tour.pk else {}
@@ -958,7 +976,10 @@ def save_draft(draft, user, confirm):
         printed_at, printed_for, wanted, printed_by = notices.get(
             (stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None),
             (None, "", False, None))
-        TourStop.objects.create(
+        done = reported.get((stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None))
+        new_stop = TourStop.objects.create(
+            outcome=done.outcome if done else "", done_at=done.done_at if done else None,
+            done_by_id=done.done_by_id if done else None, field_note=done.field_note if done else "",
             notice_printed_at=printed_at, notice_for=printed_for, notice_wanted=wanted, notice_printed_by_id=printed_by,
             tour=tour, position=position, kind=stop.kind, building=stop.building, installation_order=stop.order,
             help_tour=stop.help_tour if stop.kind == StopKind.HELP else None,
@@ -968,6 +989,8 @@ def save_draft(draft, user, confirm):
             drive_source=stop.drive_source if position < len(preview.stops) else DriveSource.NONE,
             route_warnings=stop.warnings,
         )
+        if done and done.pk in visit_of:
+            Visit.objects.filter(pk=visit_of[done.pk]).update(stop=new_stop)  # the Ergebnis stays with the stop
 
     _record_saved(user, tour, before, preview)
 

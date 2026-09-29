@@ -127,10 +127,10 @@ def test_day_check_reloads_only_when_the_tour_changed(day):
     assert client.get(url, {"version": tour.version})["HX-Refresh"] == "true"
 
 
-def test_admin_can_look_at_any_day_in_the_phone_look(day):
+def test_admin_can_look_at_any_day(day):
     admin = login(user_with("adm", roles.ADMIN))
     html = admin.get(reverse("planning:my_day") + f"?person={day['tour'].employee.pk}").content.decode()
-    assert "Mörikeweg 1" in html and "Stopp erledigt" in html and 'class="day-phone"' in html
+    assert "Mörikeweg 1" in html and "✓ fertig (100 %)" in html and "day-phone" not in html  # normal page on the PC
 
 
 def test_mein_tag_only_for_readers_admin_and_granted_roles(day):
