@@ -13,6 +13,7 @@ urlpatterns = [
     path("entwurf/aktion/", views.draft_action, name="draft_action"),
     path("entwurf/suche/", views.draft_search, name="draft_search"),
     path("entwurf/sicher/", views.plan_confirm, name="plan_confirm"),
+    path("entwurf/sicher/suche/", views.confirm_search, name="confirm_search"),
     path("entwurf/speichern/", views.draft_save, name="draft_save"),
     path("entwurf/verwerfen/", views.draft_discard, name="draft_discard"),
     path("kalender/", views.calendar_page, name="calendar"),

@@ -187,6 +187,10 @@ The only JavaScript is `static/js/calendar.js` (commented).
     time (the stop whose removal is enough, smallest first), or **✕ nur herausnehmen**;
   - too short: unplanned stops nearby (readings and installations the person can do)
     that still fit, **＋ dazu**.
+- **Selbst eingeben** (in the same question): type an RE number, AZ, street or town.
+  Every result shows its minutes, the drive from the nearest stop, whether it still
+  fits into the day (✓ / ⚠) and whether it is already planned elsewhere; buttons
+  **＋ dazu** and, for a day that is too long, **⇄ statt …** where swapping makes it fit.
 - Automatic choices of the system keep to 7,5 h strictly (`fits_in_day`).
 - CSS/JS links carry `?v=<version>` (`core/context_processors.py`), so browsers load the
   new files after an update instead of old copies from their cache.

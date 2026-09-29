@@ -160,3 +160,39 @@ def test_slightly_long_day_offers_swaps_that_fit(planner):
                                                     "kind": swap.kind, "pk": swap.pk, "close_modal": "1"})
     after = services.calculate_preview(planner.session[services.DRAFT_KEY])
     assert after.day_plan.net_minutes < preview.day_plan.net_minutes
+
+
+# --- "Selbst eingeben" in the question ---------------------------------------------------
+
+def test_type_in_an_re_number_yourself_and_add_it(planner):
+    from buildings.models import InstallationOrder, OrderStatus
+
+    start_plan(planner, unplanned()[:1])
+    order = InstallationOrder.objects.exclude(status=OrderStatus.DONE).order_by("re_number").first()
+    question = planner.get(reverse("planning:plan_confirm")).content.decode()
+    assert "Selbst eingeben" in question and reverse("planning:confirm_search") in question
+    found = planner.get(reverse("planning:confirm_search"), {"q": order.re_number}).content.decode()
+    assert f"Montage {order.re_number}" in found and "＋ dazu" in found
+    assert "passt noch in den Tag" in found or "über 7,5 h" in found
+    planner.post(reverse("planning:draft_action"), {"action": "add", "kind": "installation", "pk": order.pk, "close_modal": "1"})
+    assert any(s.get("order") == order.pk for s in planner.session[services.DRAFT_KEY]["stops"])
+
+
+def test_search_shows_already_planned_and_swaps_for_a_long_day(planner):
+    first, second = unplanned()[:2]
+    for building in (first, second):
+        building.reading_minutes_manual = 240
+        building.save()
+    start_plan(planner, [first, second])
+    planned = Building.objects.filter(tour_stops__kind=StopKind.READING).select_related().first()
+    found = planner.get(reverse("planning:confirm_search"), {"q": planned.file_number}).content.decode()
+    assert "schon geplant:" in found
+    small = unplanned()[3]
+    found = planner.get(reverse("planning:confirm_search"), {"q": small.file_number}).content.decode()
+    assert "⇄ statt" in found  # swapping it in for one of the long stops makes the day fit
+
+
+def test_search_needs_two_characters_and_says_when_nothing_is_found(planner):
+    start_plan(planner, unplanned()[:1])
+    assert planner.get(reverse("planning:confirm_search"), {"q": "x"}).content == b""
+    assert "Nichts gefunden" in planner.get(reverse("planning:confirm_search"), {"q": "RE99999999"}).content.decode()

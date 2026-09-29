@@ -1,0 +1,17 @@
+{# Results of "Selbst eingeben" in the question "Bist du sicher?" (planning/views.py: confirm_search). #}
+{% for r in results %}
+  <div class="tq-row">
+    <div><b>{{ r.title }}</b> <span class="na small">· {{ r.reason }} · ca. {{ r.drive }} min Fahrt{% if r.km is not None %}, {{ r.km|floatformat:1 }} km vom nächsten Stopp{% endif %}</span>
+      {% if r.fits %}<span class="t-good small">✓ passt noch in den Tag</span>{% else %}<span class="t-warn small">⚠ als zusätzlicher Stopp über 7,5 h</span>{% endif %}</div>
+    <div class="tq-actions">
+      {% for index, street in r.swaps %}
+        <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                hx-vals='{"action": "swap", "index": {{ index }}, "kind": "{{ r.kind }}", "pk": {{ r.pk }}, "close_modal": "1"}'>⇄ statt {{ street }} (passt)</button>
+      {% endfor %}
+      <button class="btn mini {% if r.fits %}primary{% endif %}" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+              hx-vals='{"action": "add", "kind": "{{ r.kind }}", "pk": {{ r.pk }}, "close_modal": "1"}'>＋ dazu</button>
+    </div>
+  </div>
+{% empty %}
+  <div class="na small">Nichts gefunden für „{{ query }}“ (erledigte Aufträge und Stopps, die schon im Plan sind, werden nicht angezeigt).</div>
+{% endfor %}

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F, Q
+from django.db.models import F, Prefetch, Q
 from django.utils import timezone
 
 from buildings.models import Building, InstallationOrder, OrderStatus
@@ -306,11 +306,21 @@ def search_targets(query, draft, limit=6):
                                      | Q(zip_code__startswith=word))
         orders = orders.filter(Q(re_number__icontains=word) | Q(building_file_number__icontains=word)
                                | Q(street__icontains=word) | Q(city__icontains=word) | Q(zip_code__startswith=word))
+    def planned(stops):
+        """' · schon geplant: Keller 03.12.2026' - saving moves a reading here; an order would get a 2nd date."""
+        stop = min(stops, key=lambda st: st.tour.date, default=None)
+        return f" · schon geplant: {stop.tour.employee} {stop.tour.date:%d.%m.%Y}" if stop else ""
+
+    reading_stops = TourStop.objects.filter(kind=StopKind.READING).select_related("tour__employee")
+    install_stops = TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour__employee")
+    buildings = buildings.prefetch_related(Prefetch("tour_stops", queryset=reading_stops, to_attr="planned"))
+    orders = orders.prefetch_related(Prefetch("tour_stops", queryset=install_stops, to_attr="planned"))
     results = [Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.zip_code} {b.city}",
-                          f"{b.reading_minutes} min")
+                          f"{b.reading_minutes} min{planned(b.planned)}", b.reading_minutes)
                for b in buildings.order_by("file_number")[:limit] if (StopKind.READING, b.pk, None) not in in_plan]
     results += [Suggestion(StopKind.INSTALLATION, o.pk, f"🔧 Montage {o.re_number} · {o.street}, {o.zip_code} {o.city}",
-                           f"{o.duration_minutes} min{' · ' + o.summary if o.summary else ''}")
+                           f"{o.duration_minutes} min{' · ' + o.summary if o.summary else ''}{planned(o.planned)}",
+                           o.duration_minutes)
                 for o in orders.order_by("re_number")[:limit]
                 if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
     return results
@@ -456,6 +466,36 @@ class Candidate:
         return self.minutes + self.drive
 
 
+def drive_to_plan(obj, points):
+    """(estimated drive minutes, km) from the nearest stop of the plan to this building / order."""
+    point = geocoding.position(obj, None)[0]
+    nearest = min(points, key=lambda p: distance_km(p, point)) if point and points else None
+    if nearest is None:
+        return SUGGESTION_DRIVE_MINUTES, None
+    return estimate_drive_minutes(nearest, point), distance_km(nearest, point)
+
+
+def rate_search_results(results, draft, preview):
+    """For the search in "Bist du sicher?": does each result fit into the day, and instead of which stop?
+
+    Adds to every result: drive, km, fits (as an extra stop) and swaps [(index, street)].
+    """
+    options = time_options(draft, preview)
+    net = preview.day_plan.net_minutes
+    points = [s.point for s in preview.stops if s.point]
+    buildings = Building.objects.in_bulk([r.pk for r in results if r.kind == StopKind.READING])
+    orders = InstallationOrder.objects.in_bulk([r.pk for r in results if r.kind == StopKind.INSTALLATION])
+    for result in results:
+        obj = buildings.get(result.pk) if result.kind == StopKind.READING else orders.get(result.pk)
+        result.drive, km = drive_to_plan(obj, points)
+        result.km = round(km, 1) if km is not None else None
+        need = result.minutes + result.drive
+        result.fits = fits_in_day(net, need)
+        result.swaps = [(t.index, t.stop.target.street) for t in options["trim"]
+                        if need <= MAX_NET_MINUTES - (net - t.saves)]
+    return results
+
+
 def nearby_unplanned(draft, preview, room, limit=6):
     """Everything not planned yet (readings AND installations the person can do) that
     fits into `room` minutes, nearest to the plan first."""
@@ -472,10 +512,7 @@ def nearby_unplanned(draft, preview, room, limit=6):
                     if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
     found = []
     for kind, obj in objects:
-        point = geocoding.position(obj, None)[0]
-        nearest = min(points, key=lambda p: distance_km(p, point)) if point and points else None
-        km = distance_km(nearest, point) if nearest else None
-        drive = estimate_drive_minutes(nearest, point) if nearest else SUGGESTION_DRIVE_MINUTES
+        drive, km = drive_to_plan(obj, points)
         minutes = obj.reading_minutes if kind == StopKind.READING else obj.duration_minutes
         if minutes and minutes + drive <= room:
             label = (f"📖 Ablesung {obj.file_number} · {obj.street}, {obj.city}" if kind == StopKind.READING

@@ -190,6 +190,19 @@ def plan_confirm(request):
 
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
+def confirm_search(request):
+    """Search field in "Bist du sicher?": type an RE number, AZ or address yourself."""
+    current = _draft_or_none(request)
+    query = request.GET.get("q", "").strip()
+    if not current or len(query) < 2:
+        return HttpResponse("")
+    preview = services.calculate_preview(current)
+    results = services.rate_search_results(services.search_targets(query, current), current, preview)
+    return render(request, "planning/_confirm_search.html", {"results": results, "query": query,
+                                                             "too_long": bool(preview.time_notice and preview.time_notice.kind == "over")})
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
 def draft_search(request):
     """Search box in the preview: buildings and orders to add to the plan."""
     current = _draft_or_none(request)

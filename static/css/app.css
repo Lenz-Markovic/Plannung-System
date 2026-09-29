@@ -557,3 +557,5 @@ button.cal-pill:hover { border-color: var(--axis); }
 .pc-sum { background: var(--surface-2); border-radius: 8px; padding: 8px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 2px; margin: 6px 0 10px; }
 .pc-btns { flex-wrap: wrap; }
 .pc-btns form { margin: 0; }
+.pc-search { width: 100%; border: 1px solid var(--grid); border-radius: 6px; padding: 6px 9px; font-size: 13.5px; margin-bottom: 4px; }
+.time-dlg { max-height: 92vh; overflow-y: auto; }
