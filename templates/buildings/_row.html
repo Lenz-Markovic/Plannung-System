@@ -16,6 +16,8 @@
     {% if b.access_apartment or b.access_room %}{% with z=b.access %}
       <span class="zg-badge {% if z.important %}stark{% endif %}" title="{{ z.text }}">{% if z.apartment %}🔑 Wohnung{% if z.units %} {{ z.units|join:", " }}{% endif %}{% else %}🚪 Heizraum{% endif %}</span>
     {% endwith %}{% endif %}
+    {% if b.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if b.has_storno %}storno{% endif %}" title="Notizen ansehen / schreiben"
+      hx-get="{% url 'journal:notes' 'liegenschaft' b.pk %}?dialog=1" hx-target="#modal">{% if b.has_storno %}⛔ Storno{% else %}📝 {{ b.open_notes }}{% endif %}</button>{% endif %}
   </td>
   <td>
     <div class="tec-art" title="{{ b.reading_type }}">{{ b.reading_type|reading_type_code|default:"–" }}</div>

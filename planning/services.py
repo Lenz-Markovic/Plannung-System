@@ -252,6 +252,12 @@ class Suggestion:
 SUGGESTION_DRIVE_MINUTES = 15  # rough extra drive per suggested stop
 
 
+def _storno():
+    """(building ids, order ids) with an open ⛔ Storno note: never suggested automatically."""
+    from journal.notes import open_storno
+    return open_storno()
+
+
 def draft_suggestions(draft, limit=6, net_minutes=None):
     """Readings and installations that belong together (prototype: "Zusammen mit der HA").
 
@@ -268,14 +274,16 @@ def draft_suggestions(draft, limit=6, net_minutes=None):
     order_ids = {s["order"] for s in draft["stops"] if s["kind"] == StopKind.INSTALLATION}
     buildings = Building.objects.filter(pk__in=building_ids)
     cores = {b.file_number_core for b in buildings}
-    open_orders = InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(pk__in=order_ids)
+    storno_buildings, storno_orders = _storno()
+    open_orders = InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(pk__in=order_ids | storno_orders)
     found = []
     for order in open_orders.filter(Q(building__in=building_ids) | Q(building_file_number_core__in=cores)).order_by("re_number"):
         found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
                                 f"offen für eine Liegenschaft dieses Plans · {order.duration_minutes} min", order.duration_minutes))
     for order in InstallationOrder.objects.filter(pk__in=order_ids, building__isnull=False).select_related("building"):
         key = (StopKind.READING, order.building_id, None)
-        if key not in in_plan and not order.building.tour_stops.filter(kind=StopKind.READING).exists():
+        if (key not in in_plan and order.building_id not in storno_buildings
+                and not order.building.tour_stops.filter(kind=StopKind.READING).exists()):
             b = order.building
             found.append(Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.city}",
                                     f"gleiche Liegenschaft wie {order.re_number}, noch kein Ablesetermin · {b.reading_minutes} min", b.reading_minutes))
@@ -320,10 +328,13 @@ def search_targets(query, draft, limit=6):
     install_stops = TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour__employee")
     buildings = buildings.prefetch_related(Prefetch("tour_stops", queryset=reading_stops, to_attr="planned"))
     orders = orders.prefetch_related(Prefetch("tour_stops", queryset=install_stops, to_attr="planned"))
+    storno_buildings, storno_orders = _storno()  # found anyway (a person decides), but clearly marked
     results = [Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.zip_code} {b.city}",
-                          f"{b.reading_minutes} min{planned(b.planned)}", b.reading_minutes)
+                          f"{'⛔ Storno gemeldet · ' if b.pk in storno_buildings else ''}{b.reading_minutes} min{planned(b.planned)}",
+                          b.reading_minutes)
                for b in buildings.order_by("file_number")[:limit] if (StopKind.READING, b.pk, None) not in in_plan]
     results += [Suggestion(StopKind.INSTALLATION, o.pk, f"🔧 Montage {o.re_number} · {o.street}, {o.zip_code} {o.city}",
+                           f"{'⛔ Storno gemeldet · ' if o.pk in storno_orders else ''}"
                            f"{o.duration_minutes} min{' · ' + o.summary if o.summary else ''}{planned(o.planned)}",
                            o.duration_minutes)
                 for o in orders.order_by("re_number")[:limit]
@@ -417,9 +428,11 @@ def free_day_suggestions(employee, date, kind=""):
     Returns (suggestions, ids pre-ticked because they fit into the day).
     """
     region = _usual_region(employee)
+    storno_buildings, storno_orders = _storno()
     found = []
     if employee.can_install and kind != "reading":
-        open_orders = InstallationOrder.objects.exclude(status=OrderStatus.DONE).filter(tour_stops__isnull=True)
+        open_orders = (InstallationOrder.objects.exclude(status=OrderStatus.DONE).filter(tour_stops__isnull=True)
+                       .exclude(pk__in=storno_orders))
         assigned = list(open_orders.filter(assigned_installers=employee).order_by("re_number"))
         rest = open_orders.exclude(pk__in=[o.pk for o in assigned]).order_by("zip_code", "re_number")
         # first the usual region, then the others (many orders have no building, so no region)
@@ -431,7 +444,7 @@ def free_day_suggestions(employee, date, kind=""):
             found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
                                     f"{why} · {order.duration_minutes} min", order.duration_minutes))
     if employee.can_read and kind != "installation":
-        unplanned = Building.objects.filter(tour_stops__isnull=True)
+        unplanned = Building.objects.filter(tour_stops__isnull=True).exclude(pk__in=storno_buildings)
         assigned = list(unplanned.filter(assigned_reader=employee).order_by("zip_code", "file_number"))
         rest = unplanned.exclude(pk__in=[b.pk for b in assigned]).order_by("zip_code", "file_number")
         nearby = list(rest.filter(region=region)[:30]) if region else []
@@ -507,13 +520,14 @@ def nearby_unplanned(draft, preview, room, limit=6):
     in_plan = {_stop_key(s) for s in draft["stops"]}
     points = [s.point for s in preview.stops if s.point]
     employee = preview.employee
+    storno_buildings, storno_orders = _storno()
     objects = []
     if employee.can_read:
         objects += [(StopKind.READING, b) for b in Building.objects.exclude(tour_stops__kind=StopKind.READING)
-                    if (StopKind.READING, b.pk, None) not in in_plan]
+                    .exclude(pk__in=storno_buildings) if (StopKind.READING, b.pk, None) not in in_plan]
     if employee.can_install:
         objects += [(StopKind.INSTALLATION, o) for o in InstallationOrder.objects.exclude(status=OrderStatus.DONE)
-                    .exclude(tour_stops__kind=StopKind.INSTALLATION)
+                    .exclude(tour_stops__kind=StopKind.INSTALLATION).exclude(pk__in=storno_orders)
                     if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
     found = []
     for kind, obj in objects:
@@ -909,6 +923,7 @@ def save_draft(draft, user, confirm):
         raise ValueError(" ".join(preview.problems))
 
     tour = _lock_tour(draft)
+    before = (tour.employee, tour.date, tour.status) if tour is not None else None  # for the Verlauf
     if tour is None:
         tour = Tour(employee=preview.employee, date=preview.date, created_by=user)
 
@@ -951,6 +966,8 @@ def save_draft(draft, user, confirm):
             drive_source=stop.drive_source if position < len(preview.stops) else DriveSource.NONE,
             route_warnings=stop.warnings,
         )
+
+    _record_saved(user, tour, before, preview)
 
     # The helped plans get less work at that object (or more, if a help was removed): recalculate them
     helped_now = {s.help_tour.pk for s in preview.stops if s.kind == StopKind.HELP and s.help_tour}
@@ -1001,6 +1018,25 @@ def help_draft(stop, helper):
         raise ValueError(f"{helper} hilft dort schon.")
     draft["stops"].append(new)
     return draft
+
+
+def _record_saved(user, tour, before, preview):
+    """🕘 Verlauf: created / moved / confirmed / changed."""
+    from journal.activity import day_label, record, streets
+    from journal.models import ActivityKind
+
+    people = " + ".join([str(preview.employee), *[str(e) for e in preview.team]])
+    what = f"{len(preview.stops)} Stopps: {streets(preview.stops)}"
+    state = "bestätigt" if tour.status == TourStatus.CONFIRMED else "vorläufig"
+    if before is None:
+        text = f"Fahrplan erstellt ({state}): {people} {day_label(tour.date)} · {what}"
+    elif (before[0], before[1]) != (tour.employee, tour.date):
+        text = f"Termin verschoben: {before[0]} {day_label(before[1])} → {people} {day_label(tour.date)} · {what}"
+    elif tour.status == TourStatus.CONFIRMED and before[2] != TourStatus.CONFIRMED:
+        text = f"Fahrplan bestätigt: {people} {day_label(tour.date)} · {what}"
+    else:
+        text = f"Fahrplan geändert ({state}): {people} {day_label(tour.date)} · {what}"
+    record(user, ActivityKind.PLAN, text, tour=tour)
 
 
 def _lock_tour(draft):
@@ -1107,7 +1143,8 @@ def autoplan_jobs(kind):
             if core:
                 installs[core] = max(installs.get(core, stop.tour.date), stop.tour.date)
         # not planned, and not "freigegeben" (released = already done)
-        for b in Building.objects.exclude(tour_stops__kind=StopKind.READING).exclude(status=BuildingStatus.RELEASED):
+        for b in (Building.objects.exclude(tour_stops__kind=StopKind.READING).exclude(status=BuildingStatus.RELEASED)
+                  .exclude(pk__in=_storno()[0])):
             jobs.append(autoplan_rules.Job(
                 key=(StopKind.READING, b.pk), kind="reading", minutes=b.reading_minutes,
                 point=geocoding.position(b, None)[0], region=b.region, person=b.assigned_reader_id,
@@ -1119,6 +1156,7 @@ def autoplan_jobs(kind):
             core = stop.building.file_number_core
             readings[core] = min(readings.get(core, stop.tour.date), stop.tour.date)
         for o in (InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(tour_stops__kind=StopKind.INSTALLATION)
+                  .exclude(pk__in=_storno()[1])
                   .select_related("building").prefetch_related("assigned_installers")):
             installers = sorted(o.assigned_installers.all(), key=lambda e: e.short_name)
             core = o.building.file_number_core if o.building else o.building_file_number_core

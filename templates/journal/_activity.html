@@ -1,0 +1,36 @@
+{# 🕘 Verlauf: side drawer (loaded into #drawer). Who changed what, newest first. #}
+<div class="drawer-back" hx-get="{% url 'empty' %}" hx-target="#drawer" hx-trigger="click target:.drawer-back"></div>
+<aside class="drawer" role="dialog" aria-label="Verlauf">
+  <div class="drawer-head">
+    <h3>🕘 Verlauf{% if scope.tour %} dieses Fahrplans{% elif scope.liegenschaft %} der Liegenschaft{% elif scope.auftrag %} des Auftrags{% endif %}</h3>
+    <button class="dlg-x position-static" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#drawer">✕</button>
+  </div>
+  <form id="activity-filter" class="drawer-filter" hx-get="{% url 'journal:activity' %}" hx-target="#activity-list" hx-trigger="change">
+    {% for key, value in scope.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <div class="chips">
+      {% for value, label in areas %}
+        <label class="chip {% if area == value %}on{% endif %}"><input type="radio" name="bereich" value="{{ value }}" {% if area == value %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+    <div class="drawer-row">
+      <label><input type="checkbox" name="wer" value="ich" {% if mine %}checked{% endif %}> nur meine</label>
+      <select name="tage" aria-label="Zeitraum">
+        <option value="" {% if not days %}selected{% endif %}>alles</option>
+        <option value="1" {% if days == "1" %}selected{% endif %}>letzte 24 h</option>
+        <option value="7" {% if days == "7" %}selected{% endif %}>letzte 7 Tage</option>
+        <option value="30" {% if days == "30" %}selected{% endif %}>letzte 30 Tage</option>
+      </select>
+    </div>
+  </form>
+  <div id="activity-list" hx-get="{% url 'journal:activity' %}" hx-include="#activity-filter" hx-target="this"
+       hx-trigger="every 30s, notes-changed from:body, calendar-changed from:body, orders-changed from:body">
+    {% include "journal/_activity_list.html" %}
+  </div>
+</aside>
+<script>
+  document.querySelectorAll("#activity-filter .chip").forEach(function (chip) {
+    chip.addEventListener("change", function () {
+      document.querySelectorAll("#activity-filter .chip").forEach(function (c) { c.classList.toggle("on", c.querySelector("input").checked); });
+    });
+  });
+</script>

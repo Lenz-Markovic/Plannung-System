@@ -26,6 +26,9 @@ from buildings.models import Building
 from buildings.services import change_status
 from planning.models import StopKind, TourStop
 
+from journal.activity import day_label, record, streets
+from journal.models import ActivityKind
+
 from . import notices
 from .aushang_docx import DOCX_TYPE, build_docx
 from .aushang_fields import BOX_LABELS, WEEKDAYS
@@ -208,8 +211,12 @@ def notice_toggle(request):
     stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
     if not stops:
         return HttpResponseBadRequest("Kein Stopp gewählt.")
+    on = request.POST.get("on") == "1"
     for stop in stops:
-        notices.set_wanted(stop, request.POST.get("on") == "1")
+        notices.set_wanted(stop, on)
+    tour = stops[0].tour
+    record(request.user, ActivityKind.NOTICE, f"Aushang {'ja' if on else 'nein'} ({len(stops)}): {streets(stops)} · "
+           f"Plan {tour.employee} {day_label(tour.date)}", tour=tour)
     from planning.views import tour_detail  # the side panel of the plan, shown again
     return tour_detail(request, stops[0].tour_id)
 
@@ -220,6 +227,11 @@ def notice_print(request):
     """📄 Aushänge drucken / als Word: mark the chosen stops as printed, then the page or the .docx."""
     stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
     notices.mark_printed(stops)
+    for tour in {s.tour for s in stops}:  # one line per plan
+        mine = [s for s in stops if s.tour == tour]
+        record(request.user, ActivityKind.NOTICE,
+               f"Aushang {'als Word geladen' if request.POST.get('format') == 'docx' else 'gedruckt'} ({len(mine)}): "
+               f"{streets(mine)} · Plan {tour.employee} {day_label(tour.date)}", tour=tour)
     if request.POST.get("format") == "docx":
         return _docx_response(stops)
     return redirect(f"{reverse('documents:notice_page')}?{'&'.join(f'stop={s.pk}' for s in stops)}")

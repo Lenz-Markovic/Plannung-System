@@ -11,6 +11,8 @@
 <div id="preview">
   {% include "planning/_preview.html" %}
 </div>
+{# a new note (📝, e.g. ⛔ Storno) shows up in the plan at once #}
+<div hidden hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "refresh"}' hx-trigger="notes-changed from:body" hx-target="#preview"></div>
 {% if preview.time_notice %}
   {# The plan is too long / too short: the question with suggestions pops up at once #}
   <div hx-get="{% url 'planning:plan_confirm' %}" hx-trigger="load" hx-target="#modal" hidden></div>

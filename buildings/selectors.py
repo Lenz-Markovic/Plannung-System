@@ -9,6 +9,7 @@ e.g. later for the Excel export.
 from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefetch, Q, Subquery, Sum, Value, When
 from django.db.models.functions import Coalesce
 
+from journal.notes import note_annotations
 from planning.models import StopKind, TourStop
 
 from .models import Building, BuildingStatus, InstallationOrder, SourceSystem
@@ -41,6 +42,7 @@ def building_list_queryset():
             has_orders=Exists(InstallationOrder.objects.filter(building=OuterRef("pk"))),
             effective_minutes=Coalesce("reading_minutes_manual", "reading_minutes_calculated"),
             status_rank=STATUS_RANK,
+            **note_annotations("building"),  # 📝 / ⛔ badges in the row
         )
     )
 

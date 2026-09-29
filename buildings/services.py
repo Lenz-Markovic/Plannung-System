@@ -10,6 +10,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
 from documents.services import refresh_deadline
+from journal.activity import record
+from journal.models import ActivityKind
 
 from .models import BuildingStatus, PropertyManager
 from .rules.access import detect_access
@@ -35,12 +37,15 @@ def change_status(building, new_status, user):
         raise PermissionDenied("Diesen Status darf deine Rolle nicht setzen.")
     if building.status == new_status:
         return building
+    old = building.get_status_display()
     building.status = new_status
     building.status_changed_at = timezone.now()
     # A decision was made, so an open proposal from a reader is done.
     building.proposed_status, building.proposed_status_by, building.proposed_status_at = "", None, None
     building.save()
     refresh_deadline(building)
+    record(user, ActivityKind.STATUS, f"AZ {building.file_number} {building.street}: Status {old} → "
+           f"{building.get_status_display()}", building=building)
     return building
 
 
@@ -81,6 +86,8 @@ def propose_status(building, new_status, user):
         building.proposed_status, building.proposed_status_by, building.proposed_status_at = "", None, None
     else:
         building.proposed_status, building.proposed_status_by, building.proposed_status_at = new_status, user, timezone.now()
+        record(user, ActivityKind.STATUS, f"AZ {building.file_number} {building.street}: Vorschlag "
+               f"{BuildingStatus(new_status).label}", building=building)
     building.save()
     return building
 

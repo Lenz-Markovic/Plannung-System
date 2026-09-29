@@ -248,6 +248,38 @@ The only JavaScript is `static/js/calendar.js` (commented).
   **Alle … vorläufig erstellen** (after "Bist du sicher?") saves all days as provisional
   plans - confirm them one by one in the calendar as usual.
 
+## 📝 Notizen (Terminierung ↔ Planung)
+
+- Notes on a **Liegenschaft** or a **Montageauftrag**, kinds: 📝 Hinweis, ⛔ **Storno**,
+  📅 Terminwunsch, 🔑 Zugang / Schlüssel. Written by the Terminierung (role
+  Sachbearbeitung) and the Disposition; Leitung and Admin can read them (Admin all).
+- Where: in the detail row of the Liegenschaften and Montage lists (▸), as a badge
+  in the row (📝 n / ⛔ Storno - click opens them), at every stop in **Fahrplan prüfen**
+  and in the **calendar side panel** ("📝 Notizen · ＋ neue" opens a pop-up).
+- **Add more on top**: every note keeps its author and time; new ones come on top.
+  "✓ erledigt" ticks a note off (it stays, greyed), "↺ wieder offen" reopens it.
+- An **open ⛔ Storno** keeps the object out of every suggestion (plan suggestions,
+  free days, "passt noch in den Tag", automatic planning). The search still finds it,
+  marked "⛔ Storno gemeldet", and "Bist du sicher?" asks: "✕ aus dem Plan nehmen" or
+  plan it anyway.
+- A new note shows up at once in an open plan / side panel (`notes-changed`).
+
+## 🕘 Verlauf (who changed what)
+
+- **🕘 Verlauf** in the navigation opens a side drawer: newest first, grouped by day,
+  with who and when. Filters: Fahrpläne, Aushänge, Aufträge, Status, Notizen,
+  Unterlagen; "nur meine"; last 24 h / 7 / 30 days. Refreshes itself every 30 s.
+- Recorded (`journal/activity.py`): plan created / changed / **confirmed** / **Termin
+  verschoben** (old → new person and day) / deleted, stop done (Mein Tag), **Aushang
+  gedruckt / als Word geladen / ja-nein**, order priority / status / Montagezeit /
+  Monteure, building status and status proposals, Unterlagen-Eingang, notes.
+- Per object: "🕘 Verlauf dieses Plans" in the calendar side panel, "🕘 Verlauf" in
+  every notes box (Liegenschaft / Auftrag).
+- **Who may see it**: permission `journal.view_activity` - Admin, Disposition,
+  Sachbearbeitung, Leitung by default; not Ableser/Monteur. Change it per role in
+  ⚙ Verwaltung → Gruppen. The Verlauf itself cannot be edited or deleted (admin read only).
+- After the update: `python manage.py migrate` and `python manage.py setup_roles`.
+
 ## 💶 Material & Kosten (Montage, Admin only)
 
 - **🔧 Montage → 💶 Material & Kosten** (permission `buildings.view_costs`, only the
@@ -317,6 +349,7 @@ The only JavaScript is `static/js/calendar.js` (commented).
 | `planning/` | employees, absences, tours and stops (+ TomTom client, working-time rules later) |
 | `conflicts/` | stored conflict results (+ rules later) |
 | `documents/` | cover sheets, received cost documents / 14-day deadline |
+| `journal/` | 📝 notes (Storno …) on buildings and orders, 🕘 Verlauf (who changed what) |
 | `templates/` | HTML templates (German UI) |
 
 Business rules are pure Python functions in `<app>/rules/` with tests in

@@ -9,6 +9,8 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 
 from buildings.models import BuildingStatus
+from journal.activity import record
+from journal.models import ActivityKind
 from planning.models import StopKind, TourStop
 
 from .models import CostDocumentReceipt
@@ -53,6 +55,8 @@ def set_received_on(building, received_on, user):
     if received_on is None:
         if receipt:
             receipt.delete()  # kept in the change history
+            record(user, ActivityKind.DOCUMENTS, f"AZ {building.file_number} {building.street}: Unterlagen-Eingang entfernt",
+                   building=building)
         return None
     if receipt and receipt.received_on == received_on:
         return receipt
@@ -64,6 +68,8 @@ def set_received_on(building, received_on, user):
     receipt.last_seen_planned_date = planned_reading_date(building)
     receipt.entered_by = user
     receipt.save()
+    record(user, ActivityKind.DOCUMENTS, f"AZ {building.file_number} {building.street}: Unterlagen erhalten am "
+           f"{received_on:%d.%m.%Y}", building=building)
     return receipt
 
 

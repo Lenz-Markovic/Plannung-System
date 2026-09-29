@@ -11,6 +11,7 @@ urlpatterns = [
     path("konflikte/", include("conflicts.urls")),
     path("montage/", include("buildings.order_urls")),
     path("planung/", include("planning.urls")),
+    path("journal/", include("journal.urls")),
     path("leer/", core_views.empty, name="empty"),
     path("konto/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),

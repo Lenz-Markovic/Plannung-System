@@ -1,0 +1,37 @@
+{# 📝 Notes of one building / order: add on top, then the list (open first). #}
+{# Used in the detail rows of the lists and (in_modal) in the pop-up from a plan. #}
+<div class="notes-box" id="notes-{{ target }}-{{ pk }}">
+  <div class="notes-head"><b>📝 Notizen</b>
+    <span class="na small">{{ notes|length }} insgesamt</span>
+    {% if perms.journal.view_activity %}<span class="spacer"></span><button type="button" class="linkish small" hx-get="{% url 'journal:activity' %}?{% if is_building %}liegenschaft{% else %}auftrag{% endif %}={{ pk }}" hx-target="#drawer">🕘 Verlauf</button>{% endif %}</div>
+  {% if perms.journal.add_note %}
+    <form class="note-form" hx-post="{% url 'journal:note_add' target pk %}"
+          {% if in_modal %}hx-target="#modal"{% else %}hx-target="#notes-{{ target }}-{{ pk }}" hx-swap="outerHTML"{% endif %}>
+      {% if in_modal %}<input type="hidden" name="dialog" value="1">{% endif %}
+      <select name="kind" aria-label="Art der Notiz">{% for value, label in kinds %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+      <textarea name="text" rows="2" maxlength="2000" required placeholder="z. B. Storno – Mieter hat abgesagt, neuer Termin ab November"></textarea>
+      <button class="btn mini primary">＋ Notiz</button>
+    </form>
+  {% endif %}
+  <ul class="note-list">
+    {% for n in notes %}
+      <li class="note {{ n.kind }} {% if not n.is_open %}done{% endif %}">
+        <div class="note-top"><span class="note-kind">{{ n.icon }} {{ n.get_kind_display }}</span>
+          <span class="na small">{{ n.author|default:"–" }} · {{ n.created_at|date:"d.m.Y H:i" }}</span>
+          {% if perms.journal.change_note %}
+            <form class="d-inline" hx-post="{% url 'journal:note_resolve' n.pk %}"
+                  {% if in_modal %}hx-target="#modal"{% else %}hx-target="#notes-{{ target }}-{{ pk }}" hx-swap="outerHTML"{% endif %}>
+              {% if in_modal %}<input type="hidden" name="dialog" value="1">{% endif %}
+              {% if n.is_open %}<input type="hidden" name="done" value="1"><button class="linkish" title="Als erledigt abhaken">✓ erledigt</button>
+              {% else %}<input type="hidden" name="done" value="0"><button class="linkish" title="Wieder öffnen">↺ wieder offen</button>{% endif %}
+            </form>
+          {% endif %}
+        </div>
+        <div class="note-text">{{ n.text|linebreaksbr }}</div>
+        {% if not n.is_open %}<div class="na small">✓ erledigt {{ n.resolved_at|date:"d.m. H:i" }}{% if n.resolved_by %} von {{ n.resolved_by }}{% endif %}</div>{% endif %}
+      </li>
+    {% empty %}
+      <li class="na small">Noch keine Notizen.</li>
+    {% endfor %}
+  </ul>
+</div>

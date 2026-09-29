@@ -1,6 +1,7 @@
 {% load core_tags %}
 {# Side panel of one tour in the calendar (cal-side in the prototype). #}
 <div class="card-lite">
+  <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}" hx-trigger="notes-changed from:body" hx-target="#cal-side"></div>
   <div class="d-flex justify-content-between align-items-start">
     <div>
       <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {% if tour.team.all %}👥 {% endif %}{{ tour.people_label }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
@@ -31,6 +32,8 @@
           {% if s.building %}<b>{{ s.building.street }}</b> <span class="o">{{ s.building.city }}</span>
           {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+          {% for n in s.notes %}<div class="stop-note {{ n.kind }}">{{ n.icon }} <b>{{ n.get_kind_display }}</b>: {{ n.text|truncatechars:160 }} <span class="na">– {{ n.author|default:"?" }}</span></div>{% endfor %}
+          {% if perms.journal.view_note and s.kind != "help" %}<button type="button" class="linkish small" hx-get="{% if s.installation_order %}{% url 'journal:notes' 'auftrag' s.installation_order.pk %}{% else %}{% url 'journal:notes' 'liegenschaft' s.building.pk %}{% endif %}?dialog=1" hx-target="#modal">📝 Notizen{% if s.notes %} ({{ s.notes|length }}){% endif %} · ＋ neue</button>{% endif %}
           {% if s.kind == "help" %}<div class="g help-line">🤝 Hilfe bei {{ s.help_tour.people_label|default:"(Plan gelöscht)" }}</div>
           {% elif s.installation_order.summary %}<div class="g">Montage {{ s.installation_order.re_number }}: {{ s.installation_order.summary }}</div>{% endif %}
           {% if s.notice %}
@@ -99,6 +102,13 @@
         </div>
       {% endif %}
     </div>
+  {% endif %}
+  {% if perms.journal.view_activity %}
+    <details class="side-history" {% if activities %}open{% endif %}><summary>🕘 Verlauf dieses Plans</summary>
+      {% for a in activities %}<div class="act-mini">{{ a.icon }} {{ a.text|truncatechars:110 }} <span class="na">– {{ a.user|default:"System" }}, {{ a.created_at|date:"d.m. H:i" }}</span></div>
+      {% empty %}<div class="na">Noch keine Einträge.</div>{% endfor %}
+      <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}?tour={{ tour.pk }}" hx-target="#drawer">alles anzeigen →</button>
+    </details>
   {% endif %}
   {% if perms.planning.change_tour %}
   <div class="side-actions">

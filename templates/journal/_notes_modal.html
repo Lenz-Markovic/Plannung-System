@@ -1,0 +1,9 @@
+{# Pop-up with the notes of one stop's object (opened from "Fahrplan prüfen" or the calendar). #}
+<div class="dlg-back">
+  <div class="dlg notes-dlg">
+    <button class="dlg-x" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#modal">✕</button>
+    <h3>{% if is_building %}🏢 AZ {{ obj.file_number }}{% else %}🔧 {{ obj.re_number }}{% endif %} · {{ obj.street }}</h3>
+    <p class="dlg-sub">{{ obj.zip_code }} {{ obj.city }} – Notizen der Terminierung und der Planung. Neue Notizen kommen oben dazu.</p>
+    {% include "journal/_notes.html" %}
+  </div>
+</div>

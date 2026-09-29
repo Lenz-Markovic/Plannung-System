@@ -10,6 +10,9 @@ from django import forms
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Exists, F, Min, OuterRef, Prefetch, Q
 
+from journal.activity import record
+from journal.models import ActivityKind
+from journal.notes import note_annotations
 from conflicts.models import Conflict, Severity
 from conflicts.services import refresh_for
 from planning.models import Employee, StopKind, TourStop
@@ -37,6 +40,7 @@ def order_list_queryset():
         .annotate(
             installation_date=Min("tour_stops__tour__date", filter=Q(tour_stops__kind=StopKind.INSTALLATION)),
             has_open_conflict=Exists(Conflict.objects.filter(OPEN_CONFLICT, installation_order=OuterRef("pk"))),
+            **note_annotations("installation_order"),  # 📝 / ⛔ badges in the row
         )
         .prefetch_related(
             Prefetch("tour_stops", queryset=stops, to_attr="planned"),
@@ -147,9 +151,14 @@ def update_order(order, data, user):
         order.save()
         order.assigned_installers.set(Employee.objects.filter(pk__in=ids, can_install=True))
         refresh_for(order_ids=[order.pk])
+        names = ", ".join(e.short_name for e in order.assigned_installers.all()) or "keine"
+        record(user, ActivityKind.ORDER, f"{order.re_number} {order.street}: Monteure → {names}", order=order)
         return "Monteure"
     else:
         raise ValidationError("Kein Feld angegeben.")
     order.save()
     refresh_for(order_ids=[order.pk])  # e.g. "Erledigt" -> the conflict is solved
+    value = {"Priorität": order.get_priority_display() or "keine", "Status": order.get_status_display(),
+             "Montagezeit": f"{order.duration_minutes} min"}[field]
+    record(user, ActivityKind.ORDER, f"{order.re_number} {order.street}: {field} → {value}", order=order)
     return field

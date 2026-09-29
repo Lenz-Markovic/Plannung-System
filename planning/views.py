@@ -25,6 +25,9 @@ from buildings.models import Building, BuildingStatus, InstallationOrder
 from buildings.services import propose_status
 from core.models import Features
 from documents import notices
+from journal import notes
+from journal.activity import day_label, record, streets
+from journal.models import ActivityKind
 from documents.notice_rules import notice_deadline
 
 from . import dayplan, services
@@ -103,6 +106,7 @@ def _team_candidates(draft):
 
 def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
+    notes.attach_notes(preview.stops)  # 📝 notes of the Terminierung at every stop (⛔ Storno in red)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     suggestions, too_long = services.draft_suggestions(draft, net_minutes=preview.day_plan.net_minutes)
     response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
@@ -169,7 +173,7 @@ def draft_action(request):
             message, error = str(problem), True
     request.session[services.DRAFT_KEY] = current
     response = _render_preview(request, current)
-    if not message and response.preview.time_notice:
+    if not message and response.preview.time_notice and action != "refresh":
         # information after each change while the day is longer than 7,5 h / shorter than 6 h
         message, info = f"ℹ ⏱ {response.preview.time_notice.text}", True
     if message:
@@ -187,6 +191,7 @@ def plan_confirm(request):
     if not current:
         return HttpResponse(status=204)
     preview = services.calculate_preview(current)
+    notes.attach_notes(preview.stops)
     return render(request, "planning/_plan_confirm.html", {
         "preview": preview, "options": services.time_options(current, preview),
     })
@@ -425,6 +430,7 @@ def tour_detail(request, pk):
         # tenant notice (Aushang), optional per stop: missing / late / printed / outdated
         stop.notice_possible = stop.kind != StopKind.HELP
         stop.notice = notices.state_of(stop) if notices.wanted(stop) else None
+    notes.attach_notes(stops)  # 📝 open notes of each building / order
     notice_states = [s.notice.state for s in stops if s.notice]
     # who can help at one object: everybody active who is not in this plan and not fixed in a team that day
     in_teams = Tour.objects.filter(date=tour.date, team__isnull=False).values("team")  # no NULLs in "NOT IN"
@@ -433,6 +439,7 @@ def tour_detail(request, pk):
                              start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
         "tour": tour, "stops": stops, "helper_candidates": helper_candidates,
+        "activities": list(tour.activities.select_related("user")[:5]) if request.user.has_perm("journal.view_activity") else [],
         "notice_stops": [s for s in stops if s.notice], "notice_deadline": notice_deadline(tour.date),
         "notice_possible": [s for s in stops if s.notice_possible],
         "notice_off": [s for s in stops if s.notice_possible and not s.notice],
@@ -516,6 +523,8 @@ def tour_recalculate(request, pk):
 def tour_delete(request, pk):
     tour = get_object_or_404(Tour, pk=pk)
     label = f"{tour.employee} am {tour.date:%d.%m.%Y}"
+    record(request.user, ActivityKind.PLAN, f"Fahrplan gelöscht: {tour.people_label} {day_label(tour.date)} · "
+           f"{tour.stops.count()} Stopps: {streets(tour.stops.select_related('building', 'installation_order'))}")
     services.delete_tour(tour)
     response = render(request, "core/_toast.html", {"message": f"Fahrplan {label} gelöscht"})
     response["HX-Trigger"] = "calendar-changed"  # the calendar reloads its events
@@ -623,6 +632,10 @@ def stop_done(request, pk):
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
     done = request.POST.get("done") == "1"
     dayplan.set_stop_done(stop, request.user, done)
+    target = stop.building or stop.installation_order
+    record(request.user, ActivityKind.PLAN, f"{'✓ Stopp erledigt' if done else 'Stopp wieder offen'}: {target.street} "
+           f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
+           order=stop.installation_order)
     return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
 
 

@@ -37,6 +37,18 @@ VIEW_DATA = [
     "conflicts.view_conflict",
     "documents.view_coversheet",
     "documents.view_costdocumentreceipt",
+    "journal.view_note",
+]
+
+# "📝 Notizen schreiben" (e.g. Storno from the Terminierung) and mark them erledigt
+WRITE_NOTES = [
+    "journal.add_note",
+    "journal.change_note",
+]
+
+# "🕘 Verlauf sehen": who changed what (plans, appointments, printed notices, status)
+VIEW_ACTIVITY = [
+    "journal.view_activity",
 ]
 
 # "Fahrpläne erstellen, verschieben, löschen"
@@ -86,6 +98,8 @@ ROLE_PERMISSIONS = {
         *EDIT_PROPERTY_MANAGER_AND_NOTES,
         *OWN_DAY_PLAN,
         "planning.view_reports",
+        *WRITE_NOTES,
+        *VIEW_ACTIVITY,
     ],
     PROCESSING: [
         *VIEW_DATA,
@@ -94,6 +108,8 @@ ROLE_PERMISSIONS = {
         "buildings.release_building",
         *EDIT_PROPERTY_MANAGER_AND_NOTES,
         "planning.view_reports",
+        *WRITE_NOTES,
+        *VIEW_ACTIVITY,
     ],
     READER: [
         # "nur eigene Termine": no view_building; the views show them only
@@ -105,5 +121,6 @@ ROLE_PERMISSIONS = {
     MANAGEMENT: [
         *VIEW_DATA,
         "planning.view_reports",
+        *VIEW_ACTIVITY,
     ],
 }

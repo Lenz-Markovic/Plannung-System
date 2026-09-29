@@ -17,6 +17,19 @@
         {% if preview.critical_count %} · <span class="t-crit">⛔ {{ preview.critical_count }} Konflikt{{ preview.critical_count|pluralize:"e" }} (siehe Plan)</span>{% endif %}</div>
     </div>
 
+    {# ⛔ Storno from the Terminierung: really plan it? #}
+    {% for s in preview.stops %}{% if s.storno %}
+      <div class="tq-row storno-row">
+        <div>⛔ <b>Storno gemeldet:</b> {{ s.target.street }}, {{ s.target.city }}
+          {% for n in s.notes %}{% if n.kind == "storno" %}<div class="small">„{{ n.text|truncatechars:160 }}“ – {{ n.author|default:"?" }}, {{ n.created_at|date:"d.m." }}</div>{% endif %}{% endfor %}</div>
+        <div class="tq-actions">
+          <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                  hx-vals='{"action": "remove", "index": {{ s.index }}, "close_modal": "1"}' {% if preview.stops|length == 1 %}disabled{% endif %}>✕ aus dem Plan nehmen</button>
+          <span class="na small">oder trotzdem planen</span>
+        </div>
+      </div>
+    {% endif %}{% endfor %}
+
     {% if o.kind == "over" %}
       <h4 class="pp-h">{% if o.enough %}Vorschlag: einen Stopp tauschen oder herausnehmen – dann passt der Tag{% else %}Die größten Stopps (einer allein reicht nicht){% endif %}</h4>
       {% for t in o.trim %}

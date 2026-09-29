@@ -1,0 +1,16 @@
+{% regroup entries by created_at.date as days_list %}
+{% for day in days_list %}
+  <div class="act-day">{% if day.grouper == today %}Heute{% else %}{{ day.grouper|date:"l, d.m.Y" }}{% endif %}</div>
+  <ul class="act-list">
+    {% for a in day.list %}
+      <li class="act act-{{ a.kind }}">
+        <span class="act-ic" title="{{ a.get_kind_display }}">{{ a.icon }}</span>
+        <div><div class="act-text">{{ a.text }}</div>
+          <div class="na small">{{ a.created_at|time:"H:i" }} · <b>{{ a.user|default:"System" }}</b>
+            {% if a.tour %} · <a href="{% url 'planning:calendar' %}?datum={{ a.tour.date|date:'Y-m-d' }}">im Kalender</a>{% endif %}</div></div>
+      </li>
+    {% endfor %}
+  </ul>
+{% empty %}
+  <p class="na small p-2">Noch keine Einträge.</p>
+{% endfor %}

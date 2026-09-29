@@ -11,7 +11,9 @@
   <td class="mono">{% if o.building %}<a href="{% url 'buildings:list' %}?q={{ o.building.file_number }}" title="Liegenschaft zeigen">{{ o.building_file_number|default:o.building.file_number }}</a>{% else %}{{ o.building_file_number|default:"–" }}{% endif %}</td>
   <td class="mono"><b>{{ o.re_number }}</b></td>
   <td class="adr">{{ o.street }}<small>{{ o.zip_code }} {{ o.city }}{% if o.client %} · {{ o.client }}{% endif %}</small>
-    {% if o.summary %}<div class="typ-tag">{{ o.summary }}</div>{% endif %}</td>
+    {% if o.summary %}<div class="typ-tag">{{ o.summary }}</div>{% endif %}
+    {% if o.open_notes and perms.journal.view_note %}<button type="button" class="note-badge {% if o.has_storno %}storno{% endif %}" title="Notizen ansehen / schreiben"
+      hx-get="{% url 'journal:notes' 'auftrag' o.pk %}?dialog=1" hx-target="#modal">{% if o.has_storno %}⛔ Storno{% else %}📝 {{ o.open_notes }}{% endif %}</button>{% endif %}</td>
   <td>{{ o.order_date|date:"d.m.Y"|default:"–" }}</td>
   <td>
     {% if stop %}

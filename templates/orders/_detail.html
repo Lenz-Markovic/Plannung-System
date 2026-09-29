@@ -25,6 +25,7 @@
       {% if o.building %}<div class="mt-2">Liegenschaft: <a href="{% url 'buildings:list' %}?q={{ o.building.file_number }}">{{ o.building.file_number }} {{ o.building.street }}, {{ o.building.city }}</a></div>{% endif %}
       <div class="na small mt-1">Vorgang {{ o.process_number|default:"–" }}{% if o.client %} · Auftraggeber {{ o.client }}{% endif %}</div>
 
+      {% if perms.journal.view_note %}<div class="mt-3" hx-get="{% url 'journal:notes' 'auftrag' o.pk %}" hx-trigger="load" hx-swap="outerHTML"></div>{% endif %}
       <h3 class="h6 mt-3">Meldungen</h3>
       {% for c in o.all_conflicts %}
         <div class="odet-msg"><span class="cf-sev {{ c.severity }}">{% if c.severity == "critical" %}Konflikt{% elif c.severity == "warning" %}prüfen{% else %}Hinweis{% endif %}</span>
