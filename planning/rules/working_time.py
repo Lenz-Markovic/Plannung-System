@@ -153,3 +153,20 @@ def team_minutes(minutes, people, split=True):
     if not split or people <= 1 or not minutes:
         return minutes
     return max(5, math.ceil(minutes / people / 5) * 5)
+
+
+def trim_choices(savings, net_minutes, limit=3):
+    """Which stop to take out of a day that is too long?
+
+    savings: minutes saved per stop (its work + its drive), index = stop.
+    Returns (indices, enough): the stops that ALONE bring the day to 7,5 h -
+    the smallest first (lose as little work as possible). If no single stop is
+    enough, the biggest ones and enough=False.
+    """
+    over = net_minutes - MAX_NET_MINUTES
+    if over <= 0:
+        return [], True
+    enough = sorted((i for i, saved in enumerate(savings) if saved >= over), key=lambda i: savings[i])
+    if enough:
+        return enough[:limit], True
+    return sorted(range(len(savings)), key=lambda i: -savings[i])[:limit], False

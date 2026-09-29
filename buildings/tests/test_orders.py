@@ -126,7 +126,7 @@ def test_plan_an_order_on_the_reading_day_shows_the_conflict_and_saves_it(dispo)
     assert "Montage und Ablesung am selben Tag" in preview and "kf-critical" in preview
     assert f"Montagezeit {order.duration_minutes} min" in preview and "Ablesezeit" not in preview
 
-    dispo.post(reverse("planning:draft_save"), {"confirm": "0"})
+    dispo.post(reverse("planning:draft_save"), {"confirm": "0", "time_ok": "1"})  # "Ja" to the working-time question
     order.refresh_from_db()
     tour = Tour.objects.get(employee=installer, date=reading_day)
     assert order.status == OrderStatus.PLANNED and tour.stops.get().installation_order == order

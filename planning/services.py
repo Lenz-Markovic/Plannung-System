@@ -34,7 +34,8 @@ from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tou
 from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
-from .rules.working_time import confirmation_problems, fits_in_day, schedule_day, team_minutes, time_notice
+from .rules.working_time import (MAX_NET_MINUTES, confirmation_problems, fits_in_day, schedule_day, team_minutes,
+                                 time_notice, trim_choices)
 from .tomtom import TomTomError, get_client, local_datetime
 
 SELECTION_KEY = "plan_selection"
@@ -433,6 +434,95 @@ def free_day_suggestions(employee, date, kind=""):
             ticked.add((suggestion.kind, suggestion.pk))
             used += extra
     return found, ticked
+
+
+# =============================================================================
+# Question before saving a day that is too long / too short: options
+# =============================================================================
+
+@dataclass
+class Candidate:
+    """An unplanned stop near the plan (reading or installation)."""
+
+    kind: str
+    pk: int
+    title: str
+    minutes: int      # work
+    drive: int        # estimated drive from the nearest stop of the plan
+    km: float | None
+
+    @property
+    def need(self):
+        return self.minutes + self.drive
+
+
+def nearby_unplanned(draft, preview, room, limit=6):
+    """Everything not planned yet (readings AND installations the person can do) that
+    fits into `room` minutes, nearest to the plan first."""
+    in_plan = {_stop_key(s) for s in draft["stops"]}
+    points = [s.point for s in preview.stops if s.point]
+    employee = preview.employee
+    objects = []
+    if employee.can_read:
+        objects += [(StopKind.READING, b) for b in Building.objects.exclude(tour_stops__kind=StopKind.READING)
+                    if (StopKind.READING, b.pk, None) not in in_plan]
+    if employee.can_install:
+        objects += [(StopKind.INSTALLATION, o) for o in InstallationOrder.objects.exclude(status=OrderStatus.DONE)
+                    .exclude(tour_stops__kind=StopKind.INSTALLATION)
+                    if (StopKind.INSTALLATION, o.building_id, o.pk) not in in_plan]
+    found = []
+    for kind, obj in objects:
+        point = geocoding.position(obj, None)[0]
+        nearest = min(points, key=lambda p: distance_km(p, point)) if point and points else None
+        km = distance_km(nearest, point) if nearest else None
+        drive = estimate_drive_minutes(nearest, point) if nearest else SUGGESTION_DRIVE_MINUTES
+        minutes = obj.reading_minutes if kind == StopKind.READING else obj.duration_minutes
+        if minutes and minutes + drive <= room:
+            label = (f"📖 Ablesung {obj.file_number} · {obj.street}, {obj.city}" if kind == StopKind.READING
+                     else f"🔧 Montage {obj.re_number} · {obj.street}, {obj.city}")
+            found.append(Candidate(kind, obj.pk, label, minutes, drive, round(km, 1) if km is not None else None))
+    found.sort(key=lambda c: (c.km is None, c.km or 0, -c.minutes))
+    return found[:limit]
+
+
+@dataclass
+class TrimOption:
+    index: int              # stop in the draft
+    stop: object            # PreviewStop
+    saves: int              # minutes saved when it is taken out
+    swaps: list             # Candidates that fit instead
+
+
+def time_options(draft, preview):
+    """Options for the question dialog: what to take out / swap (too long) or add (too short)."""
+    plan = preview.day_plan
+    notice = preview.time_notice
+    if notice is None:
+        return {"kind": "", "trim": [], "enough": True, "fill": []}
+    if notice.kind == "over":
+        savings = [s.work_minutes + (s.drive_minutes or 0) for s in preview.stops]
+        indices, enough = trim_choices(savings, plan.net_minutes)
+        trim = []
+        for i in indices:
+            room = MAX_NET_MINUTES - (plan.net_minutes - savings[i])
+            trim.append(TrimOption(i, preview.stops[i], savings[i], nearby_unplanned(draft, preview, room, limit=3) if room > 0 else []))
+        return {"kind": "over", "trim": trim, "enough": enough, "fill": []}
+    room = MAX_NET_MINUTES - plan.net_minutes
+    return {"kind": "under", "trim": [], "enough": True, "fill": nearby_unplanned(draft, preview, room)}
+
+
+def swap_stop(draft, index, kind, pk):
+    """⇄: replace the stop at `index` with another one (same position)."""
+    if not 0 <= index < len(draft["stops"]):
+        raise ValueError("Stopp nicht gefunden.")
+    old = draft["stops"].pop(index)
+    try:
+        message = add_stop(draft, kind, pk)
+    except ValueError:
+        draft["stops"].insert(index, old)
+        raise
+    draft["stops"].insert(index, draft["stops"].pop())  # the new stop takes the old place
+    return message.replace("hinzugefügt", "statt des alten Stopps eingeplant")
 
 
 def first_free_days(employees, start):

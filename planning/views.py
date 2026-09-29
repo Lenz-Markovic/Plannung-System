@@ -143,7 +143,13 @@ def draft_action(request):
             current["start"] = form.cleaned_data["start"].strftime("%H:%M")
             current["break"] = form.cleaned_data["break_minutes"]
     message, error, info = "", False, False
-    if action in ("team_add", "team_remove", "team_split"):
+    if action == "swap":
+        # ⇄ in the working-time question: another stop instead of this one
+        try:
+            message = services.swap_stop(current, index, request.POST.get("kind"), int(request.POST.get("pk", 0)))
+        except ValueError as problem:
+            message, error = str(problem), True
+    elif action in ("team_add", "team_remove", "team_split"):
         # 👥 Team for big objects (planning/services.py: set_team)
         try:
             message = services.set_team(
@@ -165,7 +171,22 @@ def draft_action(request):
         message, info = f"ℹ ⏱ {response.preview.time_notice.text}", True
     if message:
         response.content += render(request, "core/_toast.html", {"message": message, "error": error, "info": info}).content
+    if request.POST.get("close_modal"):
+        response.content += b'<div id="modal" hx-swap-oob="true"></div>'  # the question dialog closes
     return response
+
+
+@permission_required(PLAN_PERMISSION, raise_exception=True)
+def time_question(request):
+    """Dialog before saving a day over 7,5 h / under 6 h: really? - with options to fix it."""
+    current = _draft_or_none(request)
+    if not current:
+        return HttpResponse(status=204)
+    preview = services.calculate_preview(current)
+    return render(request, "planning/_time_question.html", {
+        "preview": preview, "options": services.time_options(current, preview),
+        "confirm": request.GET.get("confirm") == "1",
+    })
 
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
@@ -185,6 +206,10 @@ def draft_save(request):
     confirm = request.POST.get("confirm") == "1"
     if confirm and not request.user.has_perm("planning.confirm_tour"):
         messages.error(request, "Deine Rolle darf Fahrpläne nicht bestätigen.")
+        return redirect("planning:draft")
+    # Over 7,5 h / under 6 h: only after the question "wirklich so übernehmen?" was answered with yes
+    if request.POST.get("time_ok") != "1" and services.calculate_preview(current).time_notice:
+        messages.warning(request, "Die Arbeitszeit liegt außerhalb von 6–7,5 h – bitte zuerst die Frage beantworten.")
         return redirect("planning:draft")
     try:
         tour = services.save_draft(current, request.user, confirm=confirm)

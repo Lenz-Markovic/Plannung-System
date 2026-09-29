@@ -64,7 +64,7 @@ def test_drag_and_drop_makes_a_draft_and_only_confirm_moves_the_tour(client, dem
     assert tour.date == old_date  # nothing changed yet
     page = client.get(reverse("planning:draft")).content.decode()
     assert "Verschiebung: bisher" in page
-    response = client.post(reverse("planning:draft_save"), {"confirm": "1"})
+    response = client.post(reverse("planning:draft_save"), {"confirm": "1", "time_ok": "1"})  # "Ja" to the working-time question
     tour.refresh_from_db()
     # back to the calendar on the new day, and the Excel file of the tour is downloaded
     assert response["Location"] == f"{reverse('planning:calendar')}?datum={FREE_DAY.isoformat()}&excel={tour.pk}"

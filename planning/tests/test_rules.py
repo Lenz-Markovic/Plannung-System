@@ -110,3 +110,11 @@ def test_first_free_day_skips_weekends_plans_and_absences():
     holiday = [(datetime.date(2026, 10, 7), datetime.date(2026, 10, 16))]
     assert first_free_day(monday, busy, holiday) == datetime.date(2026, 10, 19)
     assert first_free_day(monday, busy, [(monday, datetime.date(2027, 12, 31))], horizon=30) is None
+
+
+def test_trim_choices_smallest_stop_that_is_enough():
+    from planning.rules.working_time import trim_choices
+
+    assert trim_choices([100, 40, 60, 200], 500) == ([2, 0, 3], True)   # 50 min over: 60 is the smallest enough
+    assert trim_choices([20, 30], 600) == ([1, 0], False)             # 150 over: nothing alone is enough
+    assert trim_choices([100], 400) == ([], True)                     # not too long

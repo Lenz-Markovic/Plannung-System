@@ -106,7 +106,7 @@ def test_team_in_preview_calendar_and_mein_tag(demo):
                                             "break_minutes": 30, "strategy": "far"})
     html = dispo.post(reverse("planning:draft_action"), {"action": "team_add", "pk": mate.pk}).content.decode()
     assert "ist jetzt im Team" in html and "÷ 2" in html
-    dispo.post(reverse("planning:draft_save"), {"confirm": "0"})
+    dispo.post(reverse("planning:draft_save"), {"confirm": "0", "time_ok": "1"})  # "Ja" to the working-time question
     tour = Tour.objects.get(employee=lead, date=DAY)
 
     feed = json.loads(dispo.get(reverse("planning:calendar_feed"), {"start": "2026-11-09", "end": "2026-11-12", "person": mate.pk}).content)

@@ -14,8 +14,8 @@
 {% if preview.time_notice %}
   <div class="pr-status info time-notice" id="time-notice">
     ℹ ⏱ <b>{{ preview.time_notice.text }}.</b>
-    {% if preview.time_notice.kind == "over" %}Zur Info – du kannst den Plan trotzdem so übernehmen (oder Stopps mit ✕ herausnehmen).
-    {% else %}Zur Info – du kannst den Plan trotzdem so übernehmen (oder mit „＋ Stopp hinzufügen“ ergänzen).{% endif %}
+    Beim Speichern fragt das System nach und schlägt vor, {% if preview.time_notice.kind == "over" %}welcher Stopp heraus kann oder was statt dessen passt{% else %}welche ungeplanten Stopps in der Nähe noch passen{% endif %}.
+    <button class="btn mini" hx-get="{% url 'planning:time_question' %}?confirm=0" hx-target="#modal">Vorschläge ansehen</button>
   </div>
 {% endif %}
 
@@ -133,11 +133,20 @@
 
 <div class="dlg-btns">
   <form method="post" action="{% url 'planning:draft_discard' %}">{% csrf_token %}<button class="btn">Verwerfen</button></form>
-  <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="0">
-    <button class="btn" title="Speichern ohne Bestätigung – z. B. ohne echte Fahrzeiten">Vorläufig speichern</button></form>
-  {% if perms.planning.confirm_tour %}
-  <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="1">
-    <button class="btn primary" {% if not preview.can_confirm %}disabled title="{{ preview.problems|join:' ' }}"{% endif %}>✓ Fahrplan übernehmen</button></form>
+  {% if preview.time_notice %}
+    {# Over 7,5 h / under 6 h: first the question "wirklich so?" with options to fix it #}
+    <button class="btn" hx-get="{% url 'planning:time_question' %}?confirm=0" hx-target="#modal">Vorläufig speichern …</button>
+    {% if perms.planning.confirm_tour %}
+      <button class="btn primary" {% if not preview.can_confirm %}disabled title="{{ preview.problems|join:' ' }}"{% endif %}
+              hx-get="{% url 'planning:time_question' %}?confirm=1" hx-target="#modal">✓ Fahrplan übernehmen …</button>
+    {% endif %}
+  {% else %}
+    <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="0">
+      <button class="btn" title="Speichern ohne Bestätigung – z. B. ohne echte Fahrzeiten">Vorläufig speichern</button></form>
+    {% if perms.planning.confirm_tour %}
+    <form method="post" action="{% url 'planning:draft_save' %}">{% csrf_token %}<input type="hidden" name="confirm" value="1">
+      <button class="btn primary" {% if not preview.can_confirm %}disabled title="{{ preview.problems|join:' ' }}"{% endif %}>✓ Fahrplan übernehmen</button></form>
+    {% endif %}
   {% endif %}
 </div>
 {% endwith %}

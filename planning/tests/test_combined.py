@@ -68,7 +68,7 @@ def test_both_selections_go_into_one_dialog_and_plan(dispo):
                                             "break_minutes": 30, "strategy": "far"})
     preview = dispo.get(reverse("planning:draft")).content.decode()
     assert preview.count("art-tag reading") == 1 and preview.count("art-tag installation") == 1
-    dispo.post(reverse("planning:draft_save"), {"confirm": "0"})
+    dispo.post(reverse("planning:draft_save"), {"confirm": "0", "time_ok": "1"})  # "Ja" to the working-time question
     tour = Tour.objects.get(employee=person, date=DAY)
     assert {s.kind for s in tour.stops.all()} == {StopKind.READING, StopKind.INSTALLATION}
     assert tour_kind(list(tour.stops.all())) == "mixed"

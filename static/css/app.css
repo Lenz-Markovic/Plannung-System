@@ -508,7 +508,7 @@ button.cal-pill:hover { border-color: var(--axis); }
   background-size: 50% 100%; background-position: right; background-repeat: no-repeat; }
 .leg-bar { display: inline-block; width: 26px; height: 12px; border-radius: 3px; background-color: #5b8fd0; vertical-align: -2px; }
 /* person overview in the side panel */
-.person-panel .pp-h { font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
+.pp-h { font-size: 12.5px; font-weight: 700; margin: 12px 0 4px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .03em; }
 .pp-weeks { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
 .pp-week { display: grid; grid-template-columns: 82px 1fr auto; gap: 8px; align-items: center; }
 .pp-bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
@@ -548,3 +548,9 @@ button.cal-pill:hover { border-color: var(--axis); }
 .fc-event.free-day .fc-event-title { color: #1f5130; text-shadow: none; }
 .free-sugg { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed var(--grid); font-size: 13px; cursor: pointer; }
 .free-sugg input { margin-top: 3px; }
+
+/* ---- Working-time question ------------------------------------------------------ */
+.time-dlg { max-width: 760px; }
+.tq-row { border-bottom: 1px dashed var(--grid); padding: 7px 0; font-size: 13px; }
+.tq-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.tq-actions .btn { text-align: left; white-space: normal; }

@@ -176,13 +176,17 @@ The only JavaScript is `static/js/calendar.js` (commented).
 
 ## Working time over 7,5 h or under 6 h
 
-- **A person plans:** over 7,5 h or under 6 h net is only information ("ℹ ⏱ …" in the
-  preview, a short message after every change, ⏱ in the calendar). The plan can be
-  confirmed as it is - the person planning decides.
+- **A person plans:** over 7,5 h or under 6 h net is shown in the preview ("ℹ ⏱ …",
+  a short message after every change, ⏱ in the calendar). Saving asks first:
+  **"⏱ Wirklich so speichern / übernehmen?"** – with options that make sense:
+  - too long: the stop to take out (the smallest one that is enough first) with
+    **✕ herausnehmen**, and **⇄ tauschen** against an unplanned stop nearby that fits
+    into the time instead;
+  - too short: unplanned stops nearby (readings and installations the person can do)
+    that still fit into the day, with **＋ dazu**.
+  **"Ja, trotzdem so"** saves as it is; the server refuses to save without the answer.
 - **The system chooses:** automatic choices keep to 7,5 h strictly (`fits_in_day` in
-  `planning/rules/working_time.py`): the "Passt dazu" suggestions only offer stops that
-  still fit, `demo_day` takes only as many buildings as fit. A future automatic
-  planning uses the same rule.
+  `planning/rules/working_time.py`): "Passt dazu", the free-day suggestions, `demo_day`.
 
 ## Teams, first free day, weekly hours
 

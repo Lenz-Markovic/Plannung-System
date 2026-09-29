@@ -1,0 +1,50 @@
+{# Question before saving a day over 7,5 h / under 6 h (planning/views.py: time_question). #}
+{% load core_tags %}
+{% with n=preview.time_notice o=options %}
+<div class="dlg-back">
+  <div class="dlg time-dlg">
+    <button class="dlg-x" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#modal">✕</button>
+    <h3>⏱ Wirklich so {% if confirm %}übernehmen{% else %}speichern{% endif %}?</h3>
+    <p class="dlg-sub"><b>{{ n.text }}.</b> {{ preview.employee }} am {{ preview.date|date:"l, d.m.Y" }} · {{ preview.stops|length }} Stopps</p>
+
+    {% if o.kind == "over" %}
+      <h4 class="pp-h">{% if o.enough %}Ein Stopp weniger – dann passt der Tag{% else %}Die größten Stopps (einer allein reicht nicht){% endif %}</h4>
+      {% for t in o.trim %}
+        <div class="tq-row">
+          <div><span class="art-tag {{ t.stop.kind }}">{% if t.stop.kind == "installation" %}🔧{% elif t.stop.kind == "help" %}🤝{% else %}📖{% endif %}</span>
+            <b>{{ t.stop.target.street }}</b>, {{ t.stop.target.city }} <span class="na small">· spart ca. {{ t.saves }} min</span></div>
+          <div class="tq-actions">
+            <button class="btn mini" hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "remove", "index": {{ t.index }}, "close_modal": "1"}'
+                    hx-target="#preview">✕ herausnehmen</button>
+            {% for c in t.swaps %}
+              <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                      hx-vals='{"action": "swap", "index": {{ t.index }}, "kind": "{{ c.kind }}", "pk": {{ c.pk }}, "close_modal": "1"}'
+                      title="Statt diesem Stopp – passt in die 7,5 h">⇄ {{ c.title }} <span class="na">({{ c.minutes }} min{% if c.km is not None %}, {{ c.km|floatformat:1 }} km{% endif %})</span></button>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+      {% if o.trim and not o.trim.0.swaps %}<div class="na small">Kein ungeplanter Stopp in der Nähe passt statt dessen in die Zeit.</div>{% endif %}
+    {% elif o.kind == "under" %}
+      <h4 class="pp-h">Noch nicht geplant, in der Nähe – passt in den Tag</h4>
+      {% for c in o.fill %}
+        <div class="tq-row">
+          <div><b>{{ c.title }}</b> <span class="na small">· {{ c.minutes }} min Arbeit + ca. {{ c.drive }} min Fahrt{% if c.km is not None %} · {{ c.km|floatformat:1 }} km vom nächsten Stopp{% endif %}</span></div>
+          <div class="tq-actions">
+            <button class="btn mini primary" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview"
+                    hx-vals='{"action": "add", "kind": "{{ c.kind }}", "pk": {{ c.pk }}, "close_modal": "1"}'>＋ dazu</button>
+          </div>
+        </div>
+      {% empty %}<div class="na small">Kein ungeplanter Stopp in der Nähe passt noch in den Tag.</div>{% endfor %}
+    {% endif %}
+
+    <form method="post" action="{% url 'planning:draft_save' %}" class="dlg-btns">
+      {% csrf_token %}
+      <input type="hidden" name="confirm" value="{% if confirm %}1{% else %}0{% endif %}">
+      <input type="hidden" name="time_ok" value="1">
+      <button class="btn" type="button" hx-get="{% url 'empty' %}" hx-target="#modal">← Zurück und ändern</button>
+      <button class="btn primary">Ja, trotzdem so {% if confirm %}übernehmen{% else %}speichern{% endif %}</button>
+    </form>
+  </div>
+</div>
+{% endwith %}
