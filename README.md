@@ -176,15 +176,13 @@ The only JavaScript is `static/js/calendar.js` (commented).
 
 ## Working time over 7,5 h or under 6 h
 
-- The preview shows a notice (and a short message after every change) when the net
-  working time is over 7,5 h or under 6 h (`MAX_NET_MINUTES` / `MIN_NET_MINUTES` in
-  `planning/rules/working_time.py`).
-- The planner either changes the plan, or clicks **✓ Arbeitszeit so übernehmen**
-  (reason optional). Then the plan can be confirmed as it is. Who approved it, when and
-  why is stored with the plan and shown in the calendar side panel, the tooltip and
-  the Excel file. Plans outside the range that nobody approved get ⏱ in the calendar.
-- The approval belongs to that working time: if stops are added or removed later, it
-  is void and the notice comes back.
+- **A person plans:** over 7,5 h or under 6 h net is only information ("ℹ ⏱ …" in the
+  preview, a short message after every change, ⏱ in the calendar). The plan can be
+  confirmed as it is - the person planning decides.
+- **The system chooses:** automatic choices keep to 7,5 h strictly (`fits_in_day` in
+  `planning/rules/working_time.py`): the "Passt dazu" suggestions only offer stops that
+  still fit, `demo_day` takes only as many buildings as fit. A future automatic
+  planning uses the same rule.
 
 ## Teams, first free day, weekly hours
 

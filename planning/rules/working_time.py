@@ -105,7 +105,7 @@ def _h(minutes):
 
 @dataclass(frozen=True)
 class TimeNotice:
-    """Working time outside the normal range: the planner must approve it knowingly."""
+    """Working time outside the normal range: shown as information to the planner."""
 
     kind: str   # "over" or "under"
     text: str
@@ -123,24 +123,25 @@ def time_notice(day_plan):
     return None
 
 
-def confirmation_problems(day_plan, all_drives_from_tomtom, time_approved=False):
+def confirmation_problems(day_plan, all_drives_from_tomtom):
     """Reasons why a plan cannot be confirmed (empty list = may be confirmed).
 
-    time_approved: the planner clicked "Arbeitszeit so übernehmen" - then a day
-    over 7,5 h or under 6 h may be confirmed as it is.
+    The working time is NOT a reason: when a person plans, over 7,5 h / under
+    6 h is only a notice (time_notice). Automatic choices by the system keep to
+    the limit strictly (fits_in_day).
     """
     problems = []
     if not all_drives_from_tomtom:
         problems.append("Ohne echte TomTom-Fahrzeiten kann der Plan nicht bestätigt werden.")
-    notice = time_notice(day_plan)
-    if notice and not time_approved:
-        if notice.kind == "over":
-            problems.append(f"Netto-Arbeitszeit {_h(day_plan.over_limit_minutes)} h über 7,5 h – "
-                            "Stopps herausnehmen oder die Arbeitszeit bewusst so übernehmen.")
-        else:
-            problems.append(f"Netto-Arbeitszeit nur {_h(day_plan.net_minutes)} h – Stopps ergänzen "
-                            "oder die Arbeitszeit bewusst so übernehmen.")
     return problems
+
+
+def fits_in_day(net_minutes, extra_minutes):
+    """For AUTOMATIC choices (suggestions, demo plans): may the system add this much work?
+
+    Strict: the day must stay within 7,5 h net.
+    """
+    return net_minutes + extra_minutes <= MAX_NET_MINUTES
 
 
 def team_minutes(minutes, people, split=True):

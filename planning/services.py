@@ -34,7 +34,7 @@ from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tou
 from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
-from .rules.working_time import confirmation_problems, schedule_day, team_minutes, time_notice
+from .rules.working_time import confirmation_problems, fits_in_day, schedule_day, team_minutes, time_notice
 from .tomtom import TomTomError, get_client, local_datetime
 
 SELECTION_KEY = "plan_selection"
@@ -177,9 +177,6 @@ def draft_from_tour(tour, date=None, employee=None):
         "stops": stops,
         "team": [e.pk for e in tour.team.all() if e.pk != employee.pk],
         "split": tour.split_work,
-        # an approved working time stays approved as long as the net time does not change
-        "time_approval": {"net": tour.net_minutes, "by": str(tour.time_approved_by or "?"), "user_id": tour.time_approved_by_id,
-                          "note": tour.time_approval_note} if tour.time_approved_at else None,
     }
 
 
@@ -245,10 +242,18 @@ class Suggestion:
     pk: int
     title: str
     reason: str
+    minutes: int = 0  # work time of this stop
 
 
-def draft_suggestions(draft, limit=6):
+SUGGESTION_DRIVE_MINUTES = 15  # rough extra drive per suggested stop
+
+
+def draft_suggestions(draft, limit=6, net_minutes=None):
     """Readings and installations that belong together (prototype: "Zusammen mit der HA").
+
+    This is an AUTOMATIC choice of the system, so it keeps to 7,5 h strictly:
+    with net_minutes (the plan so far) only stops that still fit are suggested.
+    Returns (suggestions, number left out because the day would be too long).
 
     - an open order for a building that is read in this plan
     - the reading of a building that gets an installation in this plan, if not planned yet
@@ -263,20 +268,28 @@ def draft_suggestions(draft, limit=6):
     found = []
     for order in open_orders.filter(Q(building__in=building_ids) | Q(building_file_number_core__in=cores)).order_by("re_number"):
         found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
-                                f"offen für eine Liegenschaft dieses Plans · {order.duration_minutes} min"))
+                                f"offen für eine Liegenschaft dieses Plans · {order.duration_minutes} min", order.duration_minutes))
     for order in InstallationOrder.objects.filter(pk__in=order_ids, building__isnull=False).select_related("building"):
         key = (StopKind.READING, order.building_id, None)
         if key not in in_plan and not order.building.tour_stops.filter(kind=StopKind.READING).exists():
             b = order.building
             found.append(Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.city}",
-                                    f"gleiche Liegenschaft wie {order.re_number}, noch kein Ablesetermin · {b.reading_minutes} min"))
+                                    f"gleiche Liegenschaft wie {order.re_number}, noch kein Ablesetermin · {b.reading_minutes} min", b.reading_minutes))
     employee = Employee.objects.filter(pk=draft["employee"]).first()
     if employee and employee.can_install:
         for order in (open_orders.filter(assigned_installers=employee, tour_stops__isnull=True)
                       .exclude(pk__in=[f.pk for f in found if f.kind == StopKind.INSTALLATION]).order_by("re_number")[:limit]):
             found.append(Suggestion(StopKind.INSTALLATION, order.pk, f"🔧 Montage {order.re_number} · {order.street}, {order.city}",
-                                    f"{employee} zugewiesen, noch ohne Termin · {order.duration_minutes} min"))
-    return found[:limit]
+                                    f"{employee} zugewiesen, noch ohne Termin · {order.duration_minutes} min", order.duration_minutes))
+    if net_minutes is None:
+        return found[:limit], 0
+    fitting, used = [], net_minutes
+    for suggestion in found:
+        extra = suggestion.minutes + SUGGESTION_DRIVE_MINUTES
+        if fits_in_day(used, extra):
+            fitting.append(suggestion)
+            used += extra
+    return fitting[:limit], len(found) - len(fitting)
 
 
 def search_targets(query, draft, limit=6):
@@ -363,20 +376,6 @@ def first_free_days(employees, start):
     return {e: first_free_day(start, busy.get(e.pk, set()), away.get(e.pk, [])) for e in employees}
 
 
-def approve_time(draft, user, note=""):
-    """ "Arbeitszeit so übernehmen": remembered in the draft together with the
-    net minutes it was given for - if the plan changes, the approval is void."""
-    plan = calculate_preview(draft).day_plan
-    draft["time_approval"] = {"net": plan.net_minutes, "by": user.get_username(), "user_id": user.pk,
-                              "note": note.strip()[:300]}
-    return draft
-
-
-def valid_time_approval(draft, plan):
-    approval = draft.get("time_approval")
-    return approval if approval and approval.get("net") == plan.net_minutes else None
-
-
 def remove_stop(draft, index):
     if 0 <= index < len(draft["stops"]) and len(draft["stops"]) > 1:
         del draft["stops"][index]
@@ -429,8 +428,7 @@ class Preview:
     team: list = field(default_factory=list)          # Employees besides the lead
     split: bool = True                                 # work time divided by the team size
     team_problems: list = field(default_factory=list)
-    time_notice: object = None     # rules.working_time.TimeNotice: over 7,5 h / under 6 h
-    time_approval: dict | None = None  # {"by": ..., "note": ...} when the planner approved it
+    time_notice: object = None     # rules.working_time.TimeNotice: over 7,5 h / under 6 h (info only)
 
     @property
     def all_from_tomtom(self):
@@ -553,10 +551,8 @@ def calculate_preview(draft):
                       team_problems=team_problems(draft, employee, date, team))
     preview.distance_km = sum((s.drive_km or Decimal("0")) for s in stops)
     _add_findings(preview, draft)
-    preview.time_notice = time_notice(plan)
-    preview.time_approval = valid_time_approval(draft, plan) if preview.time_notice else None
-    preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error,
-                                             time_approved=preview.time_approval is not None) + preview.team_problems
+    preview.time_notice = time_notice(plan)  # only information: the person planning decides
+    preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error) + preview.team_problems
     _add_commute(preview, client)
     return preview
 
@@ -669,10 +665,6 @@ def save_draft(draft, user, confirm):
     tour.end_time, tour.distance_km = plan.end, preview.distance_km
     tour.commute_to_minutes, tour.commute_to_km = preview.commute_minutes, preview.commute_km
     tour.confirmed_by, tour.confirmed_at = (user, timezone.now()) if confirm else (None, None)
-    approval = preview.time_approval
-    tour.time_approved_by_id = approval["user_id"] if approval else None
-    tour.time_approved_at = timezone.now() if approval else None
-    tour.time_approval_note = approval["note"] if approval else ""
     tour.split_work = preview.split
     tour.save()
 

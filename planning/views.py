@@ -90,8 +90,9 @@ def _draft_or_none(request):
 def _render_preview(request, draft, template="planning/_preview.html"):
     preview = services.calculate_preview(draft)
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
+    suggestions, too_long = services.draft_suggestions(draft, net_minutes=preview.day_plan.net_minutes)
     response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
-                                          "suggestions": services.draft_suggestions(draft),
+                                          "suggestions": suggestions, "suggestions_too_long": too_long,
                                           "team_candidates": Employee.objects.filter(active=True).exclude(
                                               pk__in=[draft["employee"], *draft.get("team", [])]),
                                           "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
@@ -131,14 +132,8 @@ def draft_action(request):
         if form.is_valid():
             current["start"] = form.cleaned_data["start"].strftime("%H:%M")
             current["break"] = form.cleaned_data["break_minutes"]
-    message, error = "", False
-    if action == "approve_time":
-        services.approve_time(current, request.user, request.POST.get("note", ""))
-        message = "Arbeitszeit bewusst übernommen – der Plan kann so bestätigt werden"
-    elif action == "revoke_time":
-        current["time_approval"] = None
-        message = "Freigabe der Arbeitszeit zurückgenommen"
-    elif action in ("team_add", "team_remove", "team_split"):
+    message, error, info = "", False, False
+    if action in ("team_add", "team_remove", "team_split"):
         # 👥 Team for big objects (planning/services.py: set_team)
         try:
             message = services.set_team(
@@ -155,11 +150,11 @@ def draft_action(request):
             message, error = str(problem), True
     request.session[services.DRAFT_KEY] = current
     response = _render_preview(request, current)
-    if not message and response.preview.time_notice and not response.preview.time_approval:
-        # notification after each change while the day is too long / too short
-        message, error = f"⏱ {response.preview.time_notice.text}", True
+    if not message and response.preview.time_notice:
+        # information after each change while the day is longer than 7,5 h / shorter than 6 h
+        message, info = f"ℹ ⏱ {response.preview.time_notice.text}", True
     if message:
-        response.content += render(request, "core/_toast.html", {"message": message, "error": error}).content
+        response.content += render(request, "core/_toast.html", {"message": message, "error": error, "info": info}).content
     return response
 
 

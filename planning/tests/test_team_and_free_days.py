@@ -65,7 +65,7 @@ def test_team_splits_the_work_time_and_is_saved(demo):
     services.set_team(draft, split=False)
     assert services.calculate_preview(draft).stops[0].work_minutes == building.reading_minutes
 
-    tour = services.save_draft(services.approve_time(team_draft(lead, [mate], building), User(username="d")), None, confirm=False)
+    tour = services.save_draft(team_draft(lead, [mate], building), None, confirm=False)
     assert tour.people == [lead, mate] and tour.people_label == f"{lead} + {mate}" and tour.split_work
     ws = build_workbook([tour])[0].active
     assert ws["G1"].value == f"{lead} + {mate}"
@@ -84,7 +84,7 @@ def test_team_member_who_is_busy_or_absent_is_refused(demo):
 
 def test_a_team_member_cannot_get_a_second_plan_that_day(demo):
     lead, mate = free_people(2)
-    services.save_draft(services.approve_time(team_draft(lead, [mate]), User(username="d")), None, confirm=False)
+    services.save_draft(team_draft(lead, [mate]), None, confirm=False)
     own = services.create_draft([Building.objects.filter(tour_stops__isnull=True).first().pk], mate, DAY, datetime.time(8), 30, "far")
     assert any("schon im Plan von" in p for p in services.calculate_preview(own).team_problems)
 
@@ -106,7 +106,6 @@ def test_team_in_preview_calendar_and_mein_tag(demo):
                                             "break_minutes": 30, "strategy": "far"})
     html = dispo.post(reverse("planning:draft_action"), {"action": "team_add", "pk": mate.pk}).content.decode()
     assert "ist jetzt im Team" in html and "÷ 2" in html
-    dispo.post(reverse("planning:draft_action"), {"action": "approve_time"})
     dispo.post(reverse("planning:draft_save"), {"confirm": "0"})
     tour = Tour.objects.get(employee=lead, date=DAY)
 
@@ -123,7 +122,7 @@ def test_team_in_preview_calendar_and_mein_tag(demo):
 
 def test_moving_a_team_plan_keeps_the_team(demo):
     lead, mate = free_people(2)
-    tour = services.save_draft(services.approve_time(team_draft(lead, [mate]), User(username="d")), None, confirm=False)
+    tour = services.save_draft(team_draft(lead, [mate]), None, confirm=False)
     assert services.draft_from_tour(tour, date=DAY + datetime.timedelta(days=1))["team"] == [mate.pk]
 
 

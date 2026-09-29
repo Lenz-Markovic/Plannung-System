@@ -5,8 +5,9 @@ can be tried out on the phone:
     python manage.py demo_day            # today
     python manage.py demo_day --datum 2026-10-05
 
-Takes 5 buildings that are not planned yet and saves them as a PROVISIONAL tour
-(the same way the office plans it). ONLY for local testing.
+Takes up to 5 buildings that are not planned yet - only as many as fit into
+7,5 h - and saves them as a PROVISIONAL tour (the same way the office plans it).
+ONLY for local testing.
 """
 
 import datetime
@@ -17,6 +18,7 @@ from django.utils import timezone
 from buildings.models import Building
 from planning import services
 from planning.models import Employee, Tour
+from planning.rules.working_time import fits_in_day
 
 
 class Command(BaseCommand):
@@ -39,7 +41,13 @@ class Command(BaseCommand):
         if first is None:
             raise CommandError("Keine ungeplanten Liegenschaften – zuerst python manage.py import_prototype ausführen.")
         buildings = Building.objects.filter(tour_stops__isnull=True, region=first.region).order_by("zip_code", "file_number")
-        ids = list(buildings.values_list("pk", flat=True)[: options["anzahl"]])
+        # The system chooses the stops itself here, so it keeps to 7,5 h net strictly
+        ids, minutes = [], 0
+        for building in buildings[: options["anzahl"] * 3]:
+            extra = building.reading_minutes + 15  # + rough drive
+            if len(ids) < options["anzahl"] and fits_in_day(minutes, extra):
+                ids.append(building.pk)
+                minutes += extra
         draft = services.create_draft(ids, employee, date, employee.default_start_time, 30, "far")
         tour = services.save_draft(draft, None, confirm=False)
         self.stdout.write(self.style.SUCCESS(

@@ -10,26 +10,13 @@
 {% else %}<div class="pr-status warn">⚠ TomTom ist verbunden, aber <b>{{ preview.estimated_count }} Fahrt{{ preview.estimated_count|pluralize:"en" }}</b> konnte{{ preview.estimated_count|pluralize:"n" }} nicht berechnet werden – der Grund steht unten bei der jeweiligen Fahrt („geschätzt: …“). Betroffene Stopps korrigieren oder mit ✕ herausnehmen.</div>
 {% endif %}
 
-{# Working time over 7,5 h or under 6 h: the planner decides - fix it, or approve it knowingly. #}
+{# Working time over 7,5 h or under 6 h: only information - the person planning decides. #}
 {% if preview.time_notice %}
-  {% with n=preview.time_notice a=preview.time_approval %}
-  <div class="pr-status {% if a %}ok{% else %}warn{% endif %} time-notice" id="time-notice">
-    {% if a %}
-      ✓ ⏱ {{ n.text }} – <b>bewusst so übernommen</b> von {{ a.by }}{% if a.note %}: „{{ a.note }}“{% endif %}.
-      Der Plan kann so bestätigt werden.
-      <button class="btn mini" hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "revoke_time"}' hx-target="#preview">zurücknehmen</button>
-    {% else %}
-      ⏱ <b>{{ n.text }}.</b>
-      {% if n.kind == "over" %}Stopps mit ✕ herausnehmen – oder, wenn es so gewollt ist (z. B. Überstunden abgesprochen):
-      {% else %}Stopps mit „＋ Stopp hinzufügen“ ergänzen – oder, wenn es so gewollt ist (z. B. halber Tag):{% endif %}
-      <form class="time-approve" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview">
-        <input type="hidden" name="action" value="approve_time">
-        <input name="note" maxlength="300" placeholder="Grund (freiwillig)" aria-label="Grund">
-        <button class="btn mini primary">✓ Arbeitszeit so übernehmen</button>
-      </form>
-    {% endif %}
+  <div class="pr-status info time-notice" id="time-notice">
+    ℹ ⏱ <b>{{ preview.time_notice.text }}.</b>
+    {% if preview.time_notice.kind == "over" %}Zur Info – du kannst den Plan trotzdem so übernehmen (oder Stopps mit ✕ herausnehmen).
+    {% else %}Zur Info – du kannst den Plan trotzdem so übernehmen (oder mit „＋ Stopp hinzufügen“ ergänzen).{% endif %}
   </div>
-  {% endwith %}
 {% endif %}
 
 {# 👥 Team: more people work this plan together (big objects). The work time can be split. #}
@@ -55,7 +42,7 @@
 
 <div class="pr-kopfzeile">
   <span>{{ preview.stops|length }} Stopps · {{ preview.start|time:"H:i" }}–{{ plan.end|time:"H:i" }} ·
-    {% if preview.ends_next_day %}<b class="t-crit">(endet nach Mitternacht!)</b> · {% endif %}Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="{% if preview.time_approval %}t-good{% else %}t-crit{% endif %}">– {{ plan.over_limit_minutes|hours }} über 7,5 h{% if preview.time_approval %} ✓ übernommen{% endif %}</b>{% endif %}</span>
+    {% if preview.ends_next_day %}<b class="t-crit">(endet nach Mitternacht!)</b> · {% endif %}Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="t-warn">– {{ plan.over_limit_minutes|hours }} über 7,5 h</b>{% endif %}</span>
   <span class="spacer"></span>
   {# change start / break / order: recalculates the preview #}
   <form class="pr-settings" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview" hx-trigger="change">
@@ -112,9 +99,10 @@
              hx-get="{% url 'planning:draft_search' %}" hx-trigger="input changed delay:300ms, search" hx-target="#pr-add-results">
       <div id="pr-add-results"></div>
       {% if suggestions %}
-        <div class="na small mt-2">Passt dazu:</div>
+        <div class="na small mt-2">Passt dazu (und noch in die 7,5 h):</div>
         {% for f in suggestions %}{% include "planning/_add_row.html" %}{% endfor %}
       {% endif %}
+      {% if suggestions_too_long %}<div class="na small mt-1">{{ suggestions_too_long }} weitere{% if suggestions_too_long == 1 %}r{% endif %} Vorschl{{ suggestions_too_long|pluralize:"ag,äge" }} passt nicht mehr in den Tag – über die Suche kannst du trotzdem alles hinzufügen.</div>{% endif %}
     </div>
   </div>
 

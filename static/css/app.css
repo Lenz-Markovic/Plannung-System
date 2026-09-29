@@ -532,3 +532,5 @@ button.cal-pill:hover { border-color: var(--axis); }
 .team-tag { font-weight: 700; }
 .free-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .cal-free-btn { margin-left: auto; }
+.pr-status.info { background: var(--accent-wash); color: var(--ink); }
+.toast-msg.info { background: #1f3a5f; }

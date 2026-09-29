@@ -103,7 +103,7 @@ def test_add_a_stop_by_search_and_refuse_duplicates(dispo):
 def test_suggestion_open_order_of_a_building_in_the_plan(demo):
     order = InstallationOrder.objects.filter(building__isnull=False, tour_stops__isnull=True).exclude(status=OrderStatus.DONE).first()
     draft = services.create_draft([order.building.pk], all_rounder(), DAY, datetime.time(8), 30, "far")
-    suggestions = services.draft_suggestions(draft)
+    suggestions, _ = services.draft_suggestions(draft)
     assert any(s.kind == StopKind.INSTALLATION and s.pk == order.pk for s in suggestions)
 
 
@@ -111,7 +111,7 @@ def test_suggestion_reading_for_an_installation_building(demo):
     order = next(o for o in InstallationOrder.objects.filter(building__isnull=False).exclude(status=OrderStatus.DONE)
                  if not o.building.tour_stops.filter(kind=StopKind.READING).exists())
     draft = services.create_draft([], all_rounder(), DAY, datetime.time(8), 30, "far", order_ids=[order.pk])
-    assert any(s.kind == StopKind.READING and s.pk == order.building_id for s in services.draft_suggestions(draft))
+    assert any(s.kind == StopKind.READING and s.pk == order.building_id for s in services.draft_suggestions(draft)[0])
 
 
 # --- calendar --------------------------------------------------------------------------
@@ -186,3 +186,12 @@ def test_day_panel_shows_planned_and_free_people_and_prefills_the_dialog(dispo):
 def test_day_panel_is_for_the_office_only(demo):
     reader = login(roles.READER, "abl2")
     assert reader.get(reverse("planning:day"), {"datum": DAY.isoformat()}).status_code == 403
+
+
+def test_suggestions_keep_to_7_5_hours_because_the_system_chooses_them(demo):
+    order = InstallationOrder.objects.filter(building__isnull=False, tour_stops__isnull=True).exclude(status=OrderStatus.DONE).first()
+    draft = services.create_draft([order.building.pk], all_rounder(), DAY, datetime.time(8), 30, "far")
+    fitting, left_out = services.draft_suggestions(draft, net_minutes=0)
+    assert any(s.pk == order.pk for s in fitting) and left_out == 0
+    fitting, left_out = services.draft_suggestions(draft, net_minutes=445)  # the day is (almost) full
+    assert fitting == [] and left_out >= 1

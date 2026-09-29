@@ -136,14 +136,6 @@ class Tour(TimeStampedModel):
     )
     confirmed_at = models.DateTimeField("bestätigt am", null=True, blank=True)
 
-    # Working time over 7,5 h or under 6 h, approved knowingly by the planner
-    time_approved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, verbose_name="Arbeitszeit übernommen von", null=True, blank=True,
-        on_delete=models.SET_NULL, related_name="+",
-    )
-    time_approved_at = models.DateTimeField("Arbeitszeit übernommen am", null=True, blank=True)
-    time_approval_note = models.CharField("Begründung Arbeitszeit", max_length=300, blank=True)
-
     # Big objects: more people work the same plan together (drive together, same stops)
     team = models.ManyToManyField(Employee, verbose_name="im Team mit", blank=True, related_name="team_tours")
     split_work = models.BooleanField("Arbeitszeit auf das Team aufteilen", default=True)
@@ -189,10 +181,6 @@ class Tour(TimeStampedModel):
             return "over"
         return "under" if 0 < self.net_minutes < MIN_NET_MINUTES else ""
 
-    @property
-    def time_open(self):
-        """Working time outside the range and nobody approved it yet."""
-        return bool(self.time_state) and not self.time_approved_at
 
 
 class StopKind(models.TextChoices):

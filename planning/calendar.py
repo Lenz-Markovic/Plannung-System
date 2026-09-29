@@ -53,9 +53,7 @@ def _tooltip(tour, stops):
     lines = [f"{tour.people_label} · {tour.date:%d.%m.%Y} · {tour.get_status_display()} · netto {_hours(tour.net_minutes)} h"]
     if len(tour.people) > 1:
         lines.append(f"👥 Team: {tour.people_label}" + (" – Arbeitszeit aufgeteilt" if tour.split_work else ""))
-    if tour.time_state and tour.time_approved_at:
-        lines.append(f"⏱ Arbeitszeit bewusst übernommen von {tour.time_approved_by or '?'}")
-    elif tour.time_state:
+    if tour.time_state:
         lines.append("⏱ mehr als 7,5 h" if tour.time_state == "over" else "⏱ weniger als 6 h")
     for stop in stops:
         target = stop.building or stop.installation_order
@@ -70,7 +68,7 @@ def calendar_events(start, end, employees, editable, kind=""):
     tours = list(
         # plans led by these people, and plans where they are in the team
         Tour.objects.filter(Q(employee__in=employees) | Q(team__in=employees), date__gte=start, date__lt=end).distinct()
-        .select_related("employee", "time_approved_by").prefetch_related("stops__building", "stops__installation_order", "team")
+        .select_related("employee").prefetch_related("stops__building", "stops__installation_order", "team")
     )
     clashing = installation_conflicts(tours)
     events = []
@@ -86,8 +84,8 @@ def calendar_events(start, end, employees, editable, kind=""):
             badges.append("⟳")
         if tour.pk in clashing:
             badges.append("⚠")
-        if tour.time_open:
-            badges.append("⏱")  # more than 7,5 h / less than 6 h, not approved
+        if tour.time_state:
+            badges.append("⏱")  # info: more than 7,5 h / less than 6 h
         installations = sum(1 for s in stops if s.kind == StopKind.INSTALLATION)
         readings = len(stops) - installations
         what = " · ".join(([f"{readings}× Ablesung"] if readings else []) + ([f"{installations}× Montage"] if installations else []))
