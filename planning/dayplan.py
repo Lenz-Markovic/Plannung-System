@@ -6,14 +6,16 @@ office roles with planning.view_tour may look at everybody's day.
 """
 
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Tour, TourStatus
 
 
 def may_work_on(user, tour):
-    """Own tour, or an office role that may change tours."""
-    return tour.employee.user_id == user.pk or user.has_perm("planning.change_tour")
+    """Own tour (as lead or in the team), or an office role that may change tours."""
+    return (tour.employee.user_id == user.pk or tour.team.filter(user=user).exists()
+            or user.has_perm("planning.change_tour"))
 
 
 def set_stop_done(stop, user, done):
@@ -49,4 +51,6 @@ def progress(stops):
 
 
 def tour_of(employee, date):
-    return Tour.objects.filter(employee=employee, date=date).select_related("employee").first()
+    """The plan of this person on that day - their own, or one they work in as team member."""
+    return (Tour.objects.filter(Q(employee=employee) | Q(team=employee), date=date)
+            .select_related("employee").first())

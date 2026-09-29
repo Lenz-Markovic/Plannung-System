@@ -6,7 +6,7 @@
     <a class="btn mini" href="?datum={{ previous_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Vortag">‹</a>
     <div class="day-title">
       <h1>{% if date == today %}Heute{% else %}{{ date|date:"l" }}{% endif %}, {{ date|date:"d.m.Y" }}</h1>
-      <span class="sub">{{ employee }}{% if tour %} · {{ tour.start_time|time:"H:i" }}–{{ tour.end_time|time:"H:i"|default:"?" }} · {{ tour.get_status_display }}{% endif %}</span>
+      <span class="sub">{% if tour and tour.team.all %}👥 {{ tour.people_label }}{% else %}{{ employee }}{% endif %}{% if tour %} · {{ tour.start_time|time:"H:i" }}–{{ tour.end_time|time:"H:i"|default:"?" }} · {{ tour.get_status_display }}{% endif %}</span>
     </div>
     <a class="btn mini" href="?datum={{ next_day|date:'Y-m-d' }}{% if request.GET.person %}&person={{ request.GET.person }}{% endif %}" aria-label="Folgetag">›</a>
   </header>

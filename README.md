@@ -186,6 +186,21 @@ The only JavaScript is `static/js/calendar.js` (commented).
 - The approval belongs to that working time: if stops are added or removed later, it
   is void and the notice comes back.
 
+## Teams, first free day, weekly hours
+
+- **👥 Team** (big objects): in "Fahrplan prüfen" add up to 3 more people to a plan.
+  Their day counts as planned, the work time per stop is split on the team (rounded
+  up to 5 min, can be switched off), team members see the plan in "Mein Tag" and may
+  tick stops. Calendar, side panel and Excel show "Keller + Kaiser". A team member who
+  is absent or already planned that day is refused (also for "vorläufig").
+- **🗓 Erster freier Tag** (calendar): every reader / installer with the first working
+  day (Mon–Fri) without a plan (also not in a team) and without absence; filter
+  Ableser / Monteure; click = that day with "planen". Also in the person overview.
+- **Weekly hours** in the person overview only with the permission "Wochenstunden je
+  Mitarbeiter sehen" (only Admin by default, changeable in the admin). After updating
+  run `python manage.py setup_roles` once so the Admin role gets it. Daily hours stay
+  visible for everybody.
+
 ## Project layout
 
 | Folder | Contents |

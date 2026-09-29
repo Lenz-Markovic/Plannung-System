@@ -50,7 +50,9 @@ def tour_kind(stops):
 
 def _tooltip(tour, stops):
     """Text shown when the mouse is over a tour: one line per stop."""
-    lines = [f"{tour.employee} · {tour.date:%d.%m.%Y} · {tour.get_status_display()} · netto {_hours(tour.net_minutes)} h"]
+    lines = [f"{tour.people_label} · {tour.date:%d.%m.%Y} · {tour.get_status_display()} · netto {_hours(tour.net_minutes)} h"]
+    if len(tour.people) > 1:
+        lines.append(f"👥 Team: {tour.people_label}" + (" – Arbeitszeit aufgeteilt" if tour.split_work else ""))
     if tour.time_state and tour.time_approved_at:
         lines.append(f"⏱ Arbeitszeit bewusst übernommen von {tour.time_approved_by or '?'}")
     elif tour.time_state:
@@ -66,8 +68,9 @@ def _tooltip(tour, stops):
 def calendar_events(start, end, employees, editable, kind=""):
     """kind: '' = all plans, or only 'reading' / 'installation' / 'mixed' plans."""
     tours = list(
-        Tour.objects.filter(date__gte=start, date__lt=end, employee__in=employees)
-        .select_related("employee", "time_approved_by").prefetch_related("stops__building", "stops__installation_order")
+        # plans led by these people, and plans where they are in the team
+        Tour.objects.filter(Q(employee__in=employees) | Q(team__in=employees), date__gte=start, date__lt=end).distinct()
+        .select_related("employee", "time_approved_by").prefetch_related("stops__building", "stops__installation_order", "team")
     )
     clashing = installation_conflicts(tours)
     events = []
@@ -92,7 +95,7 @@ def calendar_events(start, end, employees, editable, kind=""):
                                      + datetime.timedelta(minutes=tour.work_minutes + tour.drive_minutes)).time()
         events.append({
             "id": tour.pk,
-            "title": " ".join(badges + [f"{KIND_ICONS[plan_kind]} {tour.employee} · {what} · {_hours(tour.work_minutes + tour.drive_minutes)} h"]),
+            "title": " ".join(badges + [f"{KIND_ICONS[plan_kind]} {'👥 ' if len(tour.people) > 1 else ''}{tour.people_label} · {what} · {_hours(tour.work_minutes + tour.drive_minutes)} h"]),
             "start": datetime.datetime.combine(tour.date, tour.start_time).isoformat(),
             "end": datetime.datetime.combine(tour.date, end_time).isoformat(),
             "backgroundColor": tour.employee.calendar_color,

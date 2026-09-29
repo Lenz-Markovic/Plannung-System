@@ -92,6 +92,8 @@ def _render_preview(request, draft, template="planning/_preview.html"):
     settings_form = DraftSettingsForm(initial={"start": draft["start"], "break_minutes": draft["break"]})
     response = render(request, template, {"preview": preview, "draft": draft, "settings_form": settings_form,
                                           "suggestions": services.draft_suggestions(draft),
+                                          "team_candidates": Employee.objects.filter(active=True).exclude(
+                                              pk__in=[draft["employee"], *draft.get("team", [])]),
                                           "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
                                           "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
     response.preview = preview  # for draft_action (notification about the working time)
@@ -136,6 +138,15 @@ def draft_action(request):
     elif action == "revoke_time":
         current["time_approval"] = None
         message = "Freigabe der Arbeitszeit zurückgenommen"
+    elif action in ("team_add", "team_remove", "team_split"):
+        # 👥 Team for big objects (planning/services.py: set_team)
+        try:
+            message = services.set_team(
+                current, add=int(request.POST.get("pk") or 0) if action == "team_add" else None,
+                remove=int(request.POST.get("pk") or 0) if action == "team_remove" else None,
+                split=(request.POST.get("split") == "1") if action == "team_split" else None)
+        except ValueError as problem:
+            message, error = str(problem), True
     if action == "add":
         # "+ Stopp hinzufügen": a reading or an installation joins the same plan
         try:
@@ -250,11 +261,11 @@ def day_overview(request):
         date = datetime.date.fromisoformat(request.GET.get("datum", ""))
     except ValueError:
         return HttpResponse(status=400)
-    tours = list(Tour.objects.filter(date=date).select_related("employee").prefetch_related("stops"))
+    tours = list(Tour.objects.filter(date=date).select_related("employee").prefetch_related("stops", "team"))
     for tour in tours:
         tour.kind = tour_kind(list(tour.stops.all()))
     absent = {a.employee_id: a for a in Absence.objects.filter(start_date__lte=date, end_date__gte=date).select_related("employee")}
-    planned = {t.employee_id for t in tours}
+    planned = {person.pk for t in tours for person in t.people}
     free = [e for e in Employee.objects.filter(active=True) if e.pk not in planned and e.pk not in absent]
     selection = services.plan_bar_context(request.session)
     # "planen" only for people who can do what is ticked (readings -> reader, orders -> installer)
@@ -268,12 +279,29 @@ def day_overview(request):
 
 
 @login_required
+def free_days(request):
+    """Side panel "🗓 Erster freier Tag": for every reader / installer the first day without a plan."""
+    if not request.user.has_perm("planning.view_tour"):
+        return HttpResponse(status=403)
+    today = timezone.localdate()
+    people = Employee.objects.filter(active=True)
+    kind = request.GET.get("art", "")
+    if kind == "reading":
+        people = people.filter(can_read=True)
+    elif kind == "installation":
+        people = people.filter(can_install=True)
+    days = services.first_free_days(people, today)
+    rows = sorted(days.items(), key=lambda item: (item[1] or datetime.date.max, item[0].short_name))
+    return render(request, "planning/_free_days.html", {"rows": rows, "today": today, "kind": kind})
+
+
+@login_required
 def person_overview(request, pk):
     """Side panel after a click on a person in the calendar: their plans at a glance."""
     employee = get_object_or_404(_calendar_employees(request.user), pk=pk)
     today = timezone.localdate()
     monday = today - datetime.timedelta(days=today.weekday())
-    tours = list(Tour.objects.filter(employee=employee, date__gte=today).order_by("date")
+    tours = list(Tour.objects.filter(services.tours_with(employee), date__gte=today).distinct().order_by("date")
                  .prefetch_related("stops")[:12])
     for tour in tours:
         tour.kind = tour_kind(list(tour.stops.all()))
@@ -281,9 +309,11 @@ def person_overview(request, pk):
         tour.end_shown = tour.end_time or (datetime.datetime.combine(tour.date, tour.start_time)
                                            + datetime.timedelta(minutes=tour.net_minutes)).time()
     weeks = []
-    for offset in range(3):
+    # Weekly hours: only for roles with "Wochenstunden sehen" (Admin by default)
+    for offset in range(3 if request.user.has_perm("planning.view_week_hours") else 0):
         start = monday + datetime.timedelta(weeks=offset)
-        week_tours = Tour.objects.filter(employee=employee, date__gte=start, date__lt=start + datetime.timedelta(days=7))
+        week_tours = Tour.objects.filter(services.tours_with(employee), date__gte=start,
+                                         date__lt=start + datetime.timedelta(days=7)).distinct()
         minutes = sum(t.work_minutes + t.drive_minutes for t in week_tours)
         weeks.append({"start": start, "minutes": minutes, "days": week_tours.count(),
                       "percent": min(100, round(minutes / (5 * 450) * 100))})  # 5 days × 7.5 h
@@ -291,6 +321,7 @@ def person_overview(request, pk):
                    .exclude(status="done").order_by("re_number"))
     return render(request, "planning/_person.html", {
         "employee": employee, "tours": tours, "weeks": weeks, "open_orders": open_orders,
+        "first_free": services.first_free_days([employee], today)[employee],
         "absences": Absence.objects.filter(employee=employee, end_date__gte=today).order_by("start_date")[:5],
     })
 
@@ -453,7 +484,7 @@ def my_day(request):
         "map_data": tour_map_data(stops), "map_available": bool(stops) and bool(current_api_key()),
         "progress": dayplan.progress(stops),
         "previous_day": date - datetime.timedelta(days=1), "next_day": date + datetime.timedelta(days=1),
-        "next_tour": Tour.objects.filter(employee=employee, date__gt=date).order_by("date").first(),
+        "next_tour": Tour.objects.filter(services.tours_with(employee), date__gt=date).order_by("date").first(),
         "employees": Employee.objects.filter(active=True) if request.user.has_perm("planning.view_tour") else [],
         "can_work": tour is not None and dayplan.may_work_on(request.user, tour),
     })

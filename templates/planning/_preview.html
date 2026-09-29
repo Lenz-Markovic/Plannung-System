@@ -32,6 +32,27 @@
   {% endwith %}
 {% endif %}
 
+{# 👥 Team: more people work this plan together (big objects). The work time can be split. #}
+<div class="pr-team">
+  <b>👥 Team:</b> <span class="chip">{{ preview.employee }}</span>
+  {% for e in preview.team %}
+    <span class="chip">{{ e }} <button class="chip-x" hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "team_remove", "pk": {{ e.pk }}}'
+          hx-target="#preview" aria-label="{{ e }} aus dem Team nehmen">✕</button></span>
+  {% endfor %}
+  {% if preview.team|length < 3 %}
+    <select name="pk" hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "team_add"}' hx-trigger="change" hx-target="#preview" aria-label="Person zum Team hinzufügen">
+      <option value="">＋ Person dazu (große Objekte) …</option>
+      {% for e in team_candidates %}<option value="{{ e.pk }}">{{ e }} {% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</option>{% endfor %}
+    </select>
+  {% endif %}
+  {% if preview.team %}
+    <label class="chk ms-2"><input type="checkbox" {% if preview.split %}checked{% endif %}
+           hx-post="{% url 'planning:draft_action' %}" hx-vals='js:{action: "team_split", split: event.target.checked ? "1" : "0"}' hx-target="#preview">
+      Arbeitszeit aufteilen ({{ preview.team|length|add:1 }} Personen)</label>
+  {% endif %}
+</div>
+{% for problem in preview.team_problems %}<div class="pr-status fehler">⛔ {{ problem }} Bitte eine andere Person wählen.</div>{% endfor %}
+
 <div class="pr-kopfzeile">
   <span>{{ preview.stops|length }} Stopps · {{ preview.start|time:"H:i" }}–{{ plan.end|time:"H:i" }} ·
     {% if preview.ends_next_day %}<b class="t-crit">(endet nach Mitternacht!)</b> · {% endif %}Netto <b>{{ plan.net_minutes|hours }}</b>{% if plan.over_limit_minutes %} <b class="{% if preview.time_approval %}t-good{% else %}t-crit{% endif %}">– {{ plan.over_limit_minutes|hours }} über 7,5 h{% if preview.time_approval %} ✓ übernommen{% endif %}</b>{% endif %}</span>
@@ -58,7 +79,7 @@
           <span class="pr-adr">
             <span class="art-tag {{ s.kind }}">{% if s.kind == "installation" %}🔧 Montage{% else %}📖 Ablesung{% endif %}</span>
             <b>{{ s.target.street }}</b>
-            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min</span>
+            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.full_minutes != s.work_minutes %} <span title="volle Arbeitszeit für eine Person">({{ s.full_minutes }} min ÷ {{ preview.team|length|add:1 }})</span>{% endif %}</span>
             {% if s.order %}<br><span class="o">Montage {{ s.order.re_number }}: {{ s.order.summary }}</span>{% endif %}
           </span>
           <span class="pr-knopf">

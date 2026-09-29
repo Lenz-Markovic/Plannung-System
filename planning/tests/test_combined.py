@@ -152,8 +152,11 @@ def test_accepted_conflict_no_longer_marks_the_calendar(demo):
 def test_person_overview(dispo):
     kaiser = Employee.objects.get(short_name="Kaiser")
     html = dispo.get(reverse("planning:person", args=[kaiser.pk])).content.decode()
-    assert "Kaiser" in html and "🔧 Monteur" in html and "Nächste Fahrpläne" in html and "KW" in html
-    assert html.count('class="pp-tour"') == min(12, Tour.objects.filter(employee=kaiser, date__gte=datetime.date(2026, 9, 28)).count())
+    assert "Kaiser" in html and "🔧 Monteur" in html and "Nächste Fahrpläne" in html
+    assert "Erster freier Tag" in html
+    assert "KW" not in html  # weekly hours: only Admin (test_team_and_free_days.py)
+    plans = Tour.objects.filter(employee=kaiser, date__gte=datetime.date(2026, 9, 28)).count()
+    assert html.count('hx-get="/planung/fahrplan/') == min(12, plans)
 
 
 def test_reader_sees_only_their_own_overview(demo):

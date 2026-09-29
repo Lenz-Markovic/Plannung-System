@@ -84,3 +84,27 @@ def test_order_nearest_neighbour():
     stops = ["A", "B", "C", "X"]
     assert order_stops(stops, SHORT, coords.get) == ["A", "C", "B", "X"]  # no coordinates -> last
     assert order_stops(stops, FAR, coords.get)[0] == "B"  # farthest from the centre first
+
+
+def test_team_minutes_split_and_round_up_to_5():
+    from planning.rules.working_time import team_minutes
+
+    assert team_minutes(240, 2) == 120
+    assert team_minutes(50, 3) == 20          # 16,7 -> 20
+    assert team_minutes(7, 4) == 5            # never less than 5 min
+    assert team_minutes(240, 1) == 240
+    assert team_minutes(240, 2, split=False) == 240
+    assert team_minutes(0, 2) == 0
+
+
+def test_first_free_day_skips_weekends_plans_and_absences():
+    from planning.rules.availability import first_free_day
+
+    monday = datetime.date(2026, 10, 5)
+    assert first_free_day(monday, set()) == monday
+    assert first_free_day(datetime.date(2026, 10, 3), set()) == monday  # Saturday -> Monday
+    busy = {monday, monday + datetime.timedelta(days=1)}
+    assert first_free_day(monday, busy) == datetime.date(2026, 10, 7)  # Wednesday
+    holiday = [(datetime.date(2026, 10, 7), datetime.date(2026, 10, 16))]
+    assert first_free_day(monday, busy, holiday) == datetime.date(2026, 10, 19)
+    assert first_free_day(monday, busy, [(monday, datetime.date(2027, 12, 31))], horizon=30) is None

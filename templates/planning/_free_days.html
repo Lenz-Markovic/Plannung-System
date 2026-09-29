@@ -1,0 +1,27 @@
+{# Side panel "🗓 Erster freier Tag" (planning/views.py: free_days). Click = that day in the calendar. #}
+<div class="card-lite person-panel">
+  <div class="d-flex justify-content-between align-items-start">
+    <h3 class="h6 mb-1">🗓 Erster freier Tag</h3>
+    <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen">✕</button>
+  </div>
+  <div class="na small">Erster Werktag ab heute ohne Fahrplan (auch nicht im Team) und ohne Abwesenheit</div>
+  <div class="cal-kinds mt-2">
+    <button class="ul-f {% if not kind %}an{% endif %}" hx-get="{% url 'planning:free_days' %}" hx-target="#cal-side">alle</button>
+    <button class="ul-f {% if kind == 'reading' %}an{% endif %}" hx-get="{% url 'planning:free_days' %}?art=reading" hx-target="#cal-side">📖 Ableser</button>
+    <button class="ul-f {% if kind == 'installation' %}an{% endif %}" hx-get="{% url 'planning:free_days' %}?art=installation" hx-target="#cal-side">🔧 Monteure</button>
+  </div>
+  <div class="mt-2">
+    {% for e, day in rows %}
+      {% if day %}
+        <button class="pp-tour free-row" hx-get="{% url 'planning:day' %}?datum={{ day|date:'Y-m-d' }}" hx-target="#cal-side" data-goto="{{ day|date:'Y-m-d' }}"
+                title="Diesen Tag im Kalender zeigen – mit „planen“">
+          <span><span class="dot" style="background:{{ e.calendar_color }}"></span> <b>{{ e }}</b>
+            <span class="pill-role">{% if e.can_read %}📖{% endif %}{% if e.can_install %}🔧{% endif %}</span></span>
+          <span><b>{{ day|date:"D d.m.Y" }}</b> <span class="na small">{% if day == today %}heute{% else %}in {{ day|timeuntil:today }}{% endif %}</span></span>
+        </button>
+      {% else %}
+        <div class="pp-tour free-row na"><span>{{ e }}</span><span class="small">nichts frei in den nächsten 6 Monaten</span></div>
+      {% endif %}
+    {% empty %}<div class="na small">Keine Personen.</div>{% endfor %}
+  </div>
+</div>

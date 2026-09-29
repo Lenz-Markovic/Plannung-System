@@ -31,9 +31,10 @@ from documents.services import refresh_deadline
 
 from . import geocoding
 from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop
+from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import estimate_drive_minutes, planned_drive_minutes
 from .rules.ordering import order_stops
-from .rules.working_time import confirmation_problems, schedule_day, time_notice
+from .rules.working_time import confirmation_problems, schedule_day, team_minutes, time_notice
 from .tomtom import TomTomError, get_client, local_datetime
 
 SELECTION_KEY = "plan_selection"
@@ -141,6 +142,8 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy, o
         "tour_id": tour.pk if tour else None,
         "tour_version": tour.version if tour else None,
         "stops": stops,
+        "team": [e.pk for e in tour.team.all()] if tour else [],
+        "split": tour.split_work if tour else True,
     }
     return sort_draft(draft)
 
@@ -172,6 +175,8 @@ def draft_from_tour(tour, date=None, employee=None):
         "tour_version": tour.version,
         "moved_from": f"{tour.employee} am {tour.date:%d.%m.%Y}" if moved else "",
         "stops": stops,
+        "team": [e.pk for e in tour.team.all() if e.pk != employee.pk],
+        "split": tour.split_work,
         # an approved working time stays approved as long as the net time does not change
         "time_approval": {"net": tour.net_minutes, "by": str(tour.time_approved_by or "?"), "user_id": tour.time_approved_by_id,
                           "note": tour.time_approval_note} if tour.time_approved_at else None,
@@ -296,6 +301,68 @@ def search_targets(query, draft, limit=6):
     return results
 
 
+# =============================================================================
+# Team: more people on one plan (big objects)
+# =============================================================================
+
+MAX_TEAM = 3  # up to 3 more people besides the lead
+
+
+def tours_with(employee):
+    """Q for all tours this person works on: as lead or in the team."""
+    return Q(employee=employee) | Q(team=employee)
+
+
+def set_team(draft, add=None, remove=None, split=None):
+    """Change the team of the draft; returns a short message."""
+    team = [pk for pk in draft.get("team", []) if pk != remove]
+    message = ""
+    if add:
+        person = Employee.objects.filter(pk=add, active=True).first()
+        if person is None or person.pk == draft["employee"] or person.pk in team:
+            raise ValueError("Diese Person ist schon im Plan.")
+        if len(team) >= MAX_TEAM:
+            raise ValueError(f"Höchstens {MAX_TEAM + 1} Personen in einem Team.")
+        team.append(person.pk)
+        message = f"{person} ist jetzt im Team"
+    elif remove:
+        message = "aus dem Team genommen"
+    if split is not None:
+        draft["split"] = split
+        message = "Arbeitszeit wird auf das Team aufgeteilt" if split else "Jeder Stopp behält die volle Arbeitszeit"
+    draft["team"] = team
+    return message
+
+
+def team_problems(draft, lead, date, team):
+    """Why the team cannot work this plan: absent, or already in another plan that day."""
+    problems = []
+    others = Tour.objects.filter(date=date)
+    if draft.get("tour_id"):
+        others = others.exclude(pk=draft["tour_id"])
+    for person in [lead, *team]:
+        if person != lead and Absence.objects.filter(employee=person, start_date__lte=date, end_date__gte=date).exists():
+            problems.append(f"{person} ist an diesem Tag abwesend.")
+        clash = others.filter(tours_with(person)).exclude(employee=lead).select_related("employee").first()
+        if clash and clash.employee == person:
+            problems.append(f"{person} hat an diesem Tag schon einen eigenen Fahrplan.")
+        elif clash:
+            problems.append(f"{person} ist an diesem Tag schon im Plan von {clash.employee}.")
+    return problems
+
+
+def first_free_days(employees, start):
+    """{employee: first free working day} - plans as lead or in a team count as busy."""
+    end = start + datetime.timedelta(days=HORIZON_DAYS)
+    busy, away = {}, {}
+    for tour in Tour.objects.filter(date__gte=start, date__lte=end).prefetch_related("team"):
+        for person in [tour.employee_id, *[e.pk for e in tour.team.all()]]:
+            busy.setdefault(person, set()).add(tour.date)
+    for absence in Absence.objects.filter(end_date__gte=start, start_date__lte=end):
+        away.setdefault(absence.employee_id, []).append((absence.start_date, absence.end_date))
+    return {e: first_free_day(start, busy.get(e.pk, set()), away.get(e.pk, [])) for e in employees}
+
+
 def approve_time(draft, user, note=""):
     """ "Arbeitszeit so übernehmen": remembered in the draft together with the
     net minutes it was given for - if the plan changes, the approval is void."""
@@ -342,6 +409,7 @@ class PreviewStop:
     drive_km: Decimal | None = None
     drive_source: str = DriveSource.NONE
     drive_reason: str = ""  # why this drive is only estimated
+    full_minutes: int = 0   # work time for ONE person (before splitting on the team)
     points: list = field(default_factory=list)
 
 
@@ -358,6 +426,9 @@ class Preview:
     commute_minutes: int | None = None
     commute_km: Decimal | None = None
     has_tomtom: bool = False
+    team: list = field(default_factory=list)          # Employees besides the lead
+    split: bool = True                                 # work time divided by the team size
+    team_problems: list = field(default_factory=list)
     time_notice: object = None     # rules.working_time.TimeNotice: over 7,5 h / under 6 h
     time_approval: dict | None = None  # {"by": ..., "note": ...} when the planner approved it
 
@@ -441,6 +512,8 @@ def calculate_preview(draft):
     start = datetime.time.fromisoformat(draft["start"])
     client = get_client()
     targets = _load_targets(draft["stops"])
+    team = list(Employee.objects.filter(pk__in=draft.get("team", [])).order_by("short_name"))
+    split = draft.get("split", True)
 
     stops, error = [], ""
     for i, raw in enumerate(draft["stops"]):
@@ -452,7 +525,8 @@ def calculate_preview(draft):
             source = None
         stops.append(PreviewStop(
             index=i, kind=raw["kind"], building=building, order=None if is_reading else target, target=target,
-            work_minutes=target.reading_minutes if is_reading else target.duration_minutes,
+            work_minutes=team_minutes(target.reading_minutes if is_reading else target.duration_minutes, 1 + len(team), split),
+            full_minutes=target.reading_minutes if is_reading else target.duration_minutes,
             point=point, point_source=source, warnings=warnings,
         ))
 
@@ -475,13 +549,14 @@ def calculate_preview(draft):
         stop.start, stop.end, stop.departure, stop.break_after = times.start, times.end, times.departure, times.break_after
 
     preview = Preview(employee=employee, date=date, start=start, stops=stops, day_plan=plan, problems=[],
-                      error=error, has_tomtom=client is not None)
+                      error=error, has_tomtom=client is not None, team=team, split=split,
+                      team_problems=team_problems(draft, employee, date, team))
     preview.distance_km = sum((s.drive_km or Decimal("0")) for s in stops)
     _add_findings(preview, draft)
     preview.time_notice = time_notice(plan)
     preview.time_approval = valid_time_approval(draft, plan) if preview.time_notice else None
     preview.problems = confirmation_problems(plan, preview.all_from_tomtom and not error,
-                                             time_approved=preview.time_approval is not None)
+                                             time_approved=preview.time_approval is not None) + preview.team_problems
     _add_commute(preview, client)
     return preview
 
@@ -569,6 +644,8 @@ def _add_commute(preview, client):
 def save_draft(draft, user, confirm):
     """Save the draft as a tour. confirm=False saves it as 'vorläufig'."""
     preview = calculate_preview(draft)
+    if preview.team_problems:
+        raise ValueError(" ".join(preview.team_problems))  # also for "vorläufig": nobody may be booked twice
     if confirm and not preview.can_confirm:
         raise ValueError(" ".join(preview.problems))
 
@@ -596,8 +673,10 @@ def save_draft(draft, user, confirm):
     tour.time_approved_by_id = approval["user_id"] if approval else None
     tour.time_approved_at = timezone.now() if approval else None
     tour.time_approval_note = approval["note"] if approval else ""
+    tour.split_work = preview.split
     tour.save()
 
+    tour.team.set(preview.team)
     tour.stops.all().delete()
     for position, stop in enumerate(preview.stops, start=1):
         TourStop.objects.create(

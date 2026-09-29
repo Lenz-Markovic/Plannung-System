@@ -19,6 +19,7 @@ urlpatterns = [
     path("fahrplan/<int:pk>/", views.tour_detail, name="tour_detail"),
     path("person/<int:pk>/", views.person_overview, name="person"),
     path("tag/", views.day_overview, name="day"),
+    path("frei/", views.free_days, name="free_days"),
     path("fahrplan/<int:pk>/verschieben/", views.tour_move, name="tour_move"),
     path("fahrplan/<int:pk>/neu-rechnen/", views.tour_recalculate, name="tour_recalculate"),
     path("fahrplan/<int:pk>/loeschen/", views.tour_delete, name="tour_delete"),

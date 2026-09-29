@@ -144,6 +144,10 @@ class Tour(TimeStampedModel):
     time_approved_at = models.DateTimeField("Arbeitszeit übernommen am", null=True, blank=True)
     time_approval_note = models.CharField("Begründung Arbeitszeit", max_length=300, blank=True)
 
+    # Big objects: more people work the same plan together (drive together, same stops)
+    team = models.ManyToManyField(Employee, verbose_name="im Team mit", blank=True, related_name="team_tours")
+    split_work = models.BooleanField("Arbeitszeit auf das Team aufteilen", default=True)
+
     history = HistoricalRecords()
 
     class Meta:
@@ -157,6 +161,7 @@ class Tour(TimeStampedModel):
             ("confirm_tour", "Fahrplan bestätigen"),
             ("view_own_tours", "Eigenen Tagesplan sehen"),
             ("view_reports", "Auswertungen und Zeiten je Ableser sehen"),
+            ("view_week_hours", "Wochenstunden je Mitarbeiter sehen"),  # only Admin by default
         ]
 
     def __str__(self):
@@ -166,6 +171,16 @@ class Tour(TimeStampedModel):
     def net_minutes(self):
         """Net working time = reading/installation + driving between stops."""
         return self.work_minutes + self.drive_minutes
+
+    @property
+    def people(self):
+        """Lead + team, e.g. [Keller, Kaiser] (the team is prefetched where it is used a lot)."""
+        return [self.employee, *sorted(self.team.all(), key=lambda e: e.short_name)]
+
+    @property
+    def people_label(self):
+        """'Keller' or 'Keller + Kaiser'."""
+        return " + ".join(e.short_name for e in self.people)
 
     @property
     def time_state(self):

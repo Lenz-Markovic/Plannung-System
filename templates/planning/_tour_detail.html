@@ -3,7 +3,7 @@
 <div class="card-lite">
   <div class="d-flex justify-content-between align-items-start">
     <div>
-      <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {{ tour.employee }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
+      <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {% if tour.team.all %}👥 {% endif %}{{ tour.people_label }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
       <div class="na small">{{ tour.start_time|time:"H:i" }}–{{ tour.end_time|time:"H:i"|default:"?" }} · {{ stops|length }} Stopps ·
         Netto {{ tour.net_minutes }} min{% if tour.break_minutes %} · Pause {{ tour.break_minutes }} min{% endif %}</div>
     </div>
@@ -14,6 +14,7 @@
     <span class="st {% if tour.status == 'confirmed' %}released{% elif tour.status == 'provisional' %}open{% else %}released{% endif %}">{{ tour.get_status_display }}</span>
     <span class="tag">{{ tour.get_routing_source_display }}</span>
   </div>
+  {% if tour.team.all %}<div class="small mt-1">👥 Team für große Objekte{% if tour.split_work %} · Arbeitszeit je Stopp auf {{ tour.people|length }} Personen aufgeteilt{% endif %}</div>{% endif %}
   {% if tour.time_state %}
     <div class="pr-status {% if tour.time_approved_at %}ok{% else %}warn{% endif %} cal-time">⏱ Netto {{ tour.net_minutes|hours }}
       {% if tour.time_state == "over" %}– mehr als 7,5 h{% else %}– weniger als 6 h{% endif %}

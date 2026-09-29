@@ -9,7 +9,7 @@
   <h4 class="pp-h">Geplant ({{ tours|length }})</h4>
   {% for t in tours %}
     <button class="pp-tour" hx-get="{% url 'planning:tour_detail' t.pk %}" hx-target="#cal-side">
-      <span class="dot" style="background:{{ t.employee.calendar_color }}"></span> <b>{{ t.employee }}</b>
+      <span class="dot" style="background:{{ t.employee.calendar_color }}"></span> <b>{% if t.team.all %}👥 {% endif %}{{ t.people_label }}</b>
       <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% else %}📖 Ablesung{% endif %}</span>
       <span class="na small">{{ t.stops.all|length }} Stopp{{ t.stops.all|length|pluralize:"s" }} · {{ t.start_time|time:"H:i" }}{% if t.status == "provisional" %} · ⏳{% endif %}</span>
     </button>

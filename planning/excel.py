@@ -205,7 +205,7 @@ def tour_sheet(tour):
     # Old/imported tours may have no times yet: calculate them like the plan does.
     plan = schedule_day(tour.start_time, work, drives, tour.break_minutes or 30)
     sheet = TourSheet(
-        date=tour.date, person=str(tour.employee), work=sum(work), drive=sum(drives),
+        date=tour.date, person=tour.people_label, work=sum(work), drive=sum(drives),
         installation_work=sum(s.work_minutes for s in stops if s.kind == StopKind.INSTALLATION),
         provisional=tour.status == TourStatus.PROVISIONAL or tour.needs_recalculation or tour.routing_source != RoutingSource.TOMTOM,
         source=tour.routing_note, commute=tour.commute_to_minutes,

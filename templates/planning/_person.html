@@ -9,7 +9,8 @@
     <button class="dlg-x position-static" hx-get="{% url 'empty' %}" hx-target="#cal-side" aria-label="Schließen" data-person-close>✕</button>
   </div>
 
-  {# Workload of this and the next two weeks (5 days × 7,5 h = 100 %) #}
+  {# Workload of this and the next two weeks (5 days × 7,5 h = 100 %) - only with "Wochenstunden sehen" (Admin) #}
+  {% if weeks %}
   <div class="pp-weeks">
     {% for w in weeks %}
       <div class="pp-week" title="{{ w.days }} Tag{{ w.days|pluralize:'e' }} geplant · {{ w.minutes|hours }} von 37,5 Std">
@@ -19,13 +20,20 @@
       </div>
     {% endfor %}
   </div>
+  {% endif %}
+
+  {% if first_free and perms.planning.view_tour %}
+    <button class="pp-tour mt-2" hx-get="{% url 'planning:day' %}?datum={{ first_free|date:'Y-m-d' }}" hx-target="#cal-side" data-goto="{{ first_free|date:'Y-m-d' }}">
+      🗓 Erster freier Tag: <b>{{ first_free|date:"l, d.m.Y" }}</b></button>
+  {% elif first_free %}<div class="small mt-2">🗓 Erster freier Tag: <b>{{ first_free|date:"l, d.m.Y" }}</b></div>
+  {% endif %}
 
   <h4 class="pp-h">Nächste Fahrpläne</h4>
   {% for t in tours %}
     {# Click: this plan in the side panel, the calendar jumps to its day #}
     <button class="pp-tour" hx-get="{% url 'planning:tour_detail' t.pk %}" hx-target="#cal-side" data-goto="{{ t.date|date:'Y-m-d' }}">
       <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% else %}📖 Ablesung{% endif %}</span>
-      <b>{{ t.date|date:"D d.m." }}</b> {{ t.start_time|time:"H:i" }}–{{ t.end_shown|time:"H:i" }}
+      <b>{{ t.date|date:"D d.m." }}</b>{% if t.employee_id != employee.pk or t.team.all %} <span class="small">👥 {{ t.people_label }}</span>{% endif %} {{ t.start_time|time:"H:i" }}–{{ t.end_shown|time:"H:i" }}
       <span class="na small">· {{ t.stops.all|length }} Stopp{{ t.stops.all|length|pluralize:"s" }} · {{ t.net_minutes|hours }}{% if t.status == "provisional" %} · ⏳ vorläufig{% endif %}</span>
     </button>
   {% empty %}<div class="na small">Keine Fahrpläne ab heute.</div>{% endfor %}

@@ -12,6 +12,7 @@ the 6-hour condition from the spec.
 """
 
 import datetime
+import math
 from dataclasses import dataclass
 
 MAX_NET_MINUTES = 450         # 7.5 h
@@ -140,3 +141,14 @@ def confirmation_problems(day_plan, all_drives_from_tomtom, time_approved=False)
             problems.append(f"Netto-Arbeitszeit nur {_h(day_plan.net_minutes)} h – Stopps ergänzen "
                             "oder die Arbeitszeit bewusst so übernehmen.")
     return problems
+
+
+def team_minutes(minutes, people, split=True):
+    """Work time per stop when `people` work together: divided and rounded up to 5 min.
+
+    team_minutes(240, 2) -> 120; team_minutes(50, 3) -> 20 (16,7 rounded up); one person or
+    split=False -> unchanged.
+    """
+    if not split or people <= 1 or not minutes:
+        return minutes
+    return max(5, math.ceil(minutes / people / 5) * 5)
