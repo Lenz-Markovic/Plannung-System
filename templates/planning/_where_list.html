@@ -1,0 +1,22 @@
+{# 🛰 the people at the chosen time - replaced when the slider moves; the map reads #where-data #}
+<div id="where-list" class="where-list">
+  {{ map_data|json_script:"where-data" }}
+  <div class="where-head">{{ day|date:"D d.m.Y" }} · <b>{{ time }} Uhr</b> · {{ positions|length }} Fahrpl{{ positions|length|pluralize:"an,äne" }}</div>
+  {% if counts %}<div class="where-counts">{% for state, label, n in counts %}<span class="where-chip {{ state }}"><b>{{ n }}</b> {{ label }}</span>{% endfor %}</div>{% endif %}
+  {% for p in positions %}
+    <button type="button" class="where-row {{ p.where.state }}" data-where-id="{{ p.tour.pk }}">
+      <span class="where-dot" style="background: {{ p.colour }}"></span>
+      <span class="where-main">
+        <span class="where-line1"><b>{{ p.people }}</b> <span class="where-state {{ p.where.state }}">{{ p.label }}</span>
+          <span class="na small">{% if p.kind == "installation" %}🔧{% elif p.kind == "mixed" %}📖🔧{% else %}📖{% endif %}
+            {% if p.tour.status == "provisional" %}· ⏳ vorläufig{% endif %}{% if p.estimated %} · <span title="Der Plan hat keine gespeicherten Uhrzeiten – gerechnet aus Beginn, Arbeitszeit und ca. 15 min Fahrt">Zeiten geschätzt</span>{% endif %}</span></span>
+        <span class="where-line2">{{ p.text }}</span>
+        <span class="where-line3 na small">{{ p.reported }}/{{ p.stops|length }} gemeldet{% if p.last_report %} · letzte Meldung {{ p.last_report|time:"H:i" }}{% endif %}</span>
+        {% if p.behind %}<span class="where-behind">⚠ Stopp {{ p.behind|join:", " }} laut Plan vorbei, aber noch nicht gemeldet – nachfragen?</span>{% endif %}
+      </span>
+    </button>
+  {% empty %}
+    <div class="card-lite fu-empty">An diesem Tag gibt es keine Fahrpläne{% if art %} dieser Art{% endif %}.</div>
+  {% endfor %}
+  <a class="na small" href="{% url 'planning:calendar' %}?datum={{ day|date:'Y-m-d' }}">📅 diesen Tag im Kalender öffnen</a>
+</div>

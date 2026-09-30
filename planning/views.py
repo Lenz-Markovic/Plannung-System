@@ -921,3 +921,39 @@ def autoplan_page(request):
         "default_start": monday, "default_end": monday + datetime.timedelta(days=4),
         "employees": Employee.objects.filter(active=True),
     })
+
+
+# --- 🛰 Wer ist wo? (planning/whereabouts.py) ------------------------------------------------------
+
+@permission_required("planning.view_tour", raise_exception=True)
+def where_page(request):
+    """Map: where each person should be at the chosen moment according to the Fahrplan (not GPS)."""
+    from buildings.views import clean_url
+
+    from . import whereabouts
+    from .rules import whereabouts as where_rules
+
+    now = timezone.localtime()
+    today = now.date()
+    try:
+        day = datetime.date.fromisoformat(request.GET.get("datum", "")) if request.GET.get("datum") else today
+    except ValueError:
+        day = today
+    default = min(max(now.hour * 60 + now.minute, where_rules.DAY_START), where_rules.DAY_END) if day == today else 10 * 60
+    t = where_rules.clamp_time(request.GET.get("zeit", ""), default)
+    kind = request.GET.get("art", "") if request.GET.get("art", "") in ("reading", "installation") else ""
+    found = whereabouts.positions(day, t, kind, today)
+    counts = where_rules.count_states(p.where.state for p in found)
+    context = {
+        "day": day, "t": t, "time": where_rules.clock(t), "art": kind, "positions": found, "today": today,
+        "is_today": day == today, "now_time": where_rules.clock(now.hour * 60 + now.minute),
+        "counts": [(state, where_rules.STATE_LABELS[state], counts[state]) for state in where_rules.STATE_ORDER if counts[state]],
+        "map_data": whereabouts.map_data(found), "map_available": bool(current_api_key()),
+        "slider_min": where_rules.DAY_START, "slider_max": where_rules.DAY_END,
+        "previous_day": day - datetime.timedelta(days=1), "next_day": day + datetime.timedelta(days=1),
+    }
+    if request.htmx_target == "where-list":
+        response = render(request, "planning/_where_list.html", context)
+        response["HX-Push-Url"] = clean_url(request)
+        return response
+    return render(request, "planning/where.html", context)

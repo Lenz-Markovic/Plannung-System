@@ -287,12 +287,13 @@ The only JavaScript is `static/js/calendar.js` (commented).
 
 ## ☰ Side menu (top left)
 
-The **☰ Menü** button at the top left opens a menu at the left with every page, action and
-quick filter as a button – only what the role may use (`templates/core/_side_menu.html`,
+There are no tabs at the top any more: the top bar only has **☰ Menü**, the 14-day reminder,
+your name (🕘 Verlauf) and Abmelden. The **☰ Menü** button at the top left opens a menu at the
+left with every page, action and quick filter as a button – only what the role may use (`templates/core/_side_menu.html`,
 `static/js/side_menu.js`):
 
-- **Seiten:** Liegenschaften, Montage, Rückmeldungen (with the open count), Unterlagen,
-  Kalender, Konflikte, Mein Tag.
+- **Seiten:** Liegenschaften, Montage, Rückmeldungen, Unterlagen, Konflikte (with their
+  red numbers), Kalender, 🛰 Wer ist wo?, Mein Tag.
 - **Planen:** 🗺 Fahrplan erstellen (with what is ticked), 🗓 Erste freie Tage (opens the calendar
   with it switched on), 📄 Alle Fahrpläne (Excel).
 - **Quick filters** (one click instead of choosing in the filter fields): Rückmeldungen (prüfen,
@@ -301,9 +302,29 @@ quick filter as a button – only what the role may use (`templates/core/_side_m
   Montage (Offen, Verplant, In Bearbeitung, ohne Termin, Nachtermin nötig, Konflikt, 💶 Material
   & Kosten for Admin), Unterlagen (über der Frist, bald fällig …).
 - **Mehr:** 🕘 Verlauf, ⚙ Verwaltung (Admin), 🔔 pop-ups on/off, 🚪 Abmelden.
-- **📌 anheften** (wide screens): the menu stays open at the left on every page and the tabs at
-  the top disappear. "📌 lösen" brings them back. It is remembered in this browser.
+- **📌 anheften** (wide screens): the menu stays open at the left on every page. "📌 lösen" brings them back. It is remembered in this browser.
 - The page (and quick filter) you are on is marked blue. Esc or a click next to it closes it.
+
+## 🛰 Wer ist wo? (map by the Fahrplan)
+
+☰ Menü → **🛰 Wer ist wo?** shows on a map where every Ableser/Monteur **should be at that
+moment according to their Fahrplan** – no GPS, only the planned times
+(`planning/rules/whereabouts.py`, `planning/whereabouts.py`, `static/js/where_map.js`).
+
+- One circle per plan (colour as in the calendar, short name), its stops as small dots
+  (white = already reported) and the planned order as a dashed line.
+- States: 📍 vor Ort (Stopp n, bis …) · 🚗 unterwegs (the circle is between the two stops,
+  dashed border) · ☕ Pause · ⏱ wartet auf Termin (fixed appointment) · 🚗 Anfahrt ·
+  ⏳ noch nicht unterwegs · 🏠 Heimfahrt · ✓ Feierabend.
+- **Time slider** 06:00–20:00 (5-minute steps), **▶ Abspielen** plays the day in fast motion,
+  **⏱ jetzt**, ◀ ▶ for the day, filter Ablesung / Montage. Click a person in the list → the map
+  flies there.
+- Today only: **"⚠ Stopp 2 laut Plan vorbei, aber noch nicht gemeldet – nachfragen?"** when a
+  stop should have been over for 30 minutes and nothing was reported.
+- Plans without saved times (e.g. imported) are worked out from the start time, the work
+  minutes and ~15 min drive: "Zeiten geschätzt".
+- The map images come through our server as always (the TomTom key stays on the server);
+  without a key only the list is shown.
 
 ## 🧾 Rückmeldungen (office worklist after the visits)
 

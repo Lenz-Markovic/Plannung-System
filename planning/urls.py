@@ -17,6 +17,7 @@ urlpatterns = [
     path("entwurf/speichern/", views.draft_save, name="draft_save"),
     path("entwurf/verwerfen/", views.draft_discard, name="draft_discard"),
     path("kalender/", views.calendar_page, name="calendar"),
+    path("wo/", views.where_page, name="where"),
     path("kalender/termine/", views.calendar_feed, name="calendar_feed"),
     path("fahrplan/<int:pk>/", views.tour_detail, name="tour_detail"),
     path("person/<int:pk>/", views.person_overview, name="person"),

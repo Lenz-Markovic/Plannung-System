@@ -13,10 +13,13 @@
       {% if perms.buildings.view_building %}<a class="sm-btn" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>{% endif %}
       {% if perms.buildings.view_installationorder %}<a class="sm-btn" href="{% url 'orders:list' %}">🔧 Montage</a>{% endif %}
       {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:followup' %}">🧾 Rückmeldungen
-        <span id="rm-side-count" class="rm-side-count">…</span></a>{% endif %}
-      {% if perms.documents.view_costdocumentreceipt %}<a class="sm-btn" href="{% url 'documents:list' %}">📄 Unterlagen</a>{% endif %}
+        <span id="rm-badge" class="sm-count" hx-get="{% url 'planning:followup_badge' %}"
+              hx-trigger="load, followup-changed from:body, buildings-changed from:body, orders-changed from:body, notes-changed from:body, every 60s"></span></a>{% endif %}
+      {% if perms.documents.view_costdocumentreceipt %}<a class="sm-btn" href="{% url 'documents:list' %}">📄 Unterlagen <span id="ul-badge" class="sm-count"></span></a>{% endif %}
       {% if perms.planning.view_tour or perms.planning.view_own_tours %}<a class="sm-btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>{% endif %}
-      {% if perms.conflicts.view_conflict %}<a class="sm-btn" href="{% url 'conflicts:list' %}">⚠ Konflikte</a>{% endif %}
+      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:where' %}">🛰 Wer ist wo? (Karte laut Fahrplan)</a>{% endif %}
+      {% if perms.conflicts.view_conflict %}<a class="sm-btn" href="{% url 'conflicts:list' %}">⚠ Konflikte
+        <span id="cf-badge" class="sm-count" hx-get="{% url 'conflicts:badge' %}" hx-trigger="load, conflicts-changed from:body, calendar-changed from:body, every 60s"></span></a>{% endif %}
       {% if perms.planning.view_own_tours %}<a class="sm-btn" href="{% url 'planning:my_day' %}">📱 Mein Tag</a>{% endif %}
     </div>
 

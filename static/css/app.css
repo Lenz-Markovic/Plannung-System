@@ -757,8 +757,6 @@ button.cal-pill:hover { border-color: var(--axis); }
 .fu-empty { font-size: 15px; padding: 18px; text-align: center; }
 
 /* ---- 🧾 Rückmeldungen at the side: tab, panel, pop-ups -------------------------------------- */
-.rm-side-count { min-width: 24px; padding: 1px 6px; border-radius: 999px; background: var(--ring); font-size: 12px; text-align: center; margin-left: auto; }
-.rm-side-count.on { background: var(--critical); color: #fff; animation: rm-pulse 2.4s ease-in-out 3; }
 @keyframes rm-pulse { 50% { transform: scale(1.18); } }
 
 .rm-back { z-index: 640; }
@@ -824,16 +822,51 @@ button.cal-pill:hover { border-color: var(--axis); }
   margin: 2px 0; border: 1px solid transparent; border-radius: 8px; background: none; color: inherit; text-decoration: none; cursor: pointer; }
 .sm-btn:hover { background: var(--accent-wash); border-color: var(--ring); color: inherit; }
 .sm-btn.on { background: var(--accent); color: #fff; font-weight: 650; }
-.sm-btn.on .rm-side-count { background: rgba(255, 255, 255, .3); }
+.sm-count { margin-left: auto; }
+.sm-btn.on .cf-badge { outline: 2px solid rgba(255, 255, 255, .6); }
 .sm-reset { color: var(--ink-2); font-size: 13px; }
-.rm-side-count.on { background: var(--critical); color: #fff; }
 /* 📌 pinned: always open at the left on a wide screen, the tabs at the top are not needed then */
 @media (min-width: 1100px) {
   .menu-pinned .side-menu { transform: none; box-shadow: none; z-index: 500; }
   .menu-pinned .side-menu-back { display: none; }
   .menu-pinned body { padding-left: 290px; }
-  .menu-pinned .appnav .tab, .menu-pinned .menu-btn, .menu-pinned .sm-head .dlg-x { display: none; }
+  .menu-pinned .menu-btn, .menu-pinned .sm-head .dlg-x { display: none; }
 }
 @media (max-width: 1099px) { .sm-pin { display: none; } }
 @media (max-width: 640px) { .menu-btn span { display: none; } }
 @media print { .side-menu, .side-menu-back, .menu-btn { display: none !important; } .menu-pinned body { padding-left: 0; } }
+
+/* ---- 🛰 Wer ist wo? ------------------------------------------------------------------------- */
+.where-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+.where-day { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+.where-day input[type=date] { font: inherit; padding: 3px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.where-slider { flex: 1; min-width: 260px; }
+.where-slider input[type=range] { width: 100%; accent-color: var(--accent); }
+.where-slider #where-clock { font-size: 16px; color: var(--accent); }
+.where-ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); }
+.where-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); gap: 14px; margin-top: 12px; align-items: start; }
+.where-map { height: 68vh; min-height: 380px; border-radius: 12px; border: 1px solid var(--ring); overflow: hidden; }
+.where-nomap { padding: 30px; text-align: center; }
+.where-list { display: flex; flex-direction: column; gap: 6px; max-height: 74vh; overflow-y: auto; padding-right: 2px; }
+.where-head { font-size: 15px; }
+.where-counts { display: flex; flex-wrap: wrap; gap: 5px; }
+.where-chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ring); }
+.where-chip.at { background: rgba(34, 139, 34, .12); color: var(--good); border-color: transparent; }
+.where-chip.driving { background: var(--accent-wash); color: var(--accent); border-color: transparent; }
+.where-chip.pause, .where-chip.waiting { background: var(--warn-wash); color: var(--warn-ink); border-color: transparent; }
+.where-row { display: flex; gap: 10px; align-items: flex-start; text-align: left; font: inherit; font-size: 13px; color: inherit; width: 100%;
+  padding: 8px 10px; border: 1px solid var(--ring); border-radius: 10px; background: var(--surface); cursor: pointer; }
+.where-row:hover { border-color: var(--accent); background: var(--accent-wash); }
+.where-row.done, .where-row.before, .where-row.home { opacity: .72; }
+.where-dot { flex: none; width: 14px; height: 14px; border-radius: 50%; margin-top: 3px; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--ring); }
+.where-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.where-state { font-size: 12px; font-weight: 700; padding: 0 7px; border-radius: 999px; background: var(--surface-2); white-space: nowrap; }
+.where-state.at { background: rgba(34, 139, 34, .14); color: var(--good); }
+.where-state.driving, .where-state.commute { background: var(--accent-wash); color: var(--accent); }
+.where-state.pause, .where-state.waiting { background: var(--warn-wash); color: var(--warn-ink); }
+.where-behind { color: var(--critical); font-weight: 600; font-size: 12.5px; }
+.where-pin { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 11.5px; display: flex; align-items: center;
+  justify-content: center; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .35); cursor: pointer; transition: opacity .2s; }
+.where-pin.driving, .where-pin.commute, .where-pin.home { border-style: dashed; }
+.where-pin.before, .where-pin.done { opacity: .55; }
+@media (max-width: 900px) { .where-grid { grid-template-columns: 1fr; } .where-map { height: 52vh; } .where-list { max-height: none; } }

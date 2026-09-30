@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Wer ist wo?{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🛰 Wer ist wo?</h1>
+  <span class="sub">Wo jeder laut Fahrplan in diesem Moment sein sollte – keine GPS-Ortung, nur die geplanten Zeiten</span>
+</header>
+
+<form id="where-form" class="filters where-controls" hx-get="{% url 'planning:where' %}" hx-target="#where-list" hx-swap="outerHTML"
+      hx-trigger="change, input changed delay:120ms from:#where-time" hx-sync="this:replace">
+  <div class="f"><label for="where-day">Tag</label>
+    <div class="where-day">
+      <a class="btn mini" href="?datum={{ previous_day|date:'Y-m-d' }}&zeit={{ time }}&art={{ art }}" title="Vortag">◀</a>
+      <input id="where-day" type="date" name="datum" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()">
+      <a class="btn mini" href="?datum={{ next_day|date:'Y-m-d' }}&zeit={{ time }}&art={{ art }}" title="Folgetag">▶</a>
+      {% if not is_today %}<a class="btn mini" href="{% url 'planning:where' %}">heute, jetzt</a>{% endif %}
+    </div></div>
+  <div class="f where-slider"><label for="where-time">Uhrzeit: <b id="where-clock">{{ time }}</b></label>
+    <input id="where-time" type="range" min="{{ slider_min }}" max="{{ slider_max }}" step="5" value="{{ t }}"
+           aria-label="Uhrzeit" data-clock="where-clock">
+    <input type="hidden" name="zeit" id="where-zeit" value="{{ time }}">
+    <div class="where-ticks"><span>06:00</span><span>09:00</span><span>12:00</span><span>15:00</span><span>18:00</span><span>20:00</span></div>
+  </div>
+  <div class="f"><label>&nbsp;</label>
+    <div class="where-day">
+      <button type="button" class="btn mini primary" id="where-play" title="Den Tag im Zeitraffer abspielen">▶ Abspielen</button>
+      {% if is_today %}<button type="button" class="btn mini" id="where-now" data-now="{{ now_time }}">⏱ jetzt ({{ now_time }})</button>{% endif %}
+    </div></div>
+  <div class="f"><label for="where-art">Art</label>
+    <select id="where-art" name="art"><option value="">alle</option>
+      <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+      <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></div>
+</form>
+
+<div class="where-grid">
+  <div class="where-map-box">
+    {% if map_available %}
+      {% url 'planning:map_tile' 0 0 0 as tile_url %}
+      <div id="where-map" class="where-map" data-tiles="{{ tile_url }}" role="img" aria-label="Karte: wer ist wo laut Fahrplan"></div>
+    {% else %}
+      <div class="where-nomap card-lite">🗺 Für die Karte fehlt der TomTom-Schlüssel (TOMTOM_API_KEY in der .env).
+        Die Liste rechts zeigt trotzdem, wo jeder laut Fahrplan ist.</div>
+    {% endif %}
+    <div class="na small mt-1">Kreis = Person (Farbe wie im Kalender) · kleine Punkte = ihre Stopps (✓ = gemeldet) ·
+      Linie = geplante Reihenfolge (gerade Linie, nicht die Straße) · auf der Fahrt steht der Kreis dazwischen.</div>
+  </div>
+  {% include "planning/_where_list.html" %}
+</div>
+
+{% if map_available %}
+  {% load static %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tomtom-international/web-sdk-maps@6.25.0/dist/maps.css">
+  <script src="{% static 'js/route_map.js' %}?v={{ STATIC_VERSION }}"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tomtom-international/web-sdk-maps@6.25.0/dist/maps-web.min.js"></script>
+{% endif %}
+{% load static %}
+<script src="{% static 'js/where_map.js' %}?v={{ STATIC_VERSION }}"></script>
+{% endblock %}
