@@ -89,3 +89,18 @@ def test_only_office_roles(demo):
     assert client_for(roles.READER, "abl").get(reverse("planning:overview")).status_code == 403
     html = client_for(roles.DISPATCHER, "dispo").get(reverse("planning:calendar")).content.decode()
     assert "📊 Übersicht" in html
+
+
+def test_per_stichtag_and_filter(demo):
+    add_visits()
+    rows = overview.stichtag_rows()
+    assert sum(r.total for r in rows) == 240 and rows[0].stichtag
+    c = client_for(roles.DISPATCHER, "dispo2")
+    day = rows[0].stichtag.isoformat()
+    html = c.get(reverse("planning:overview"), {"stichtag": day}).content.decode()
+    assert "Nach Stichtag (Abrechnungszeitraum)" in html and f'value="{day}" selected' in html
+    assert overview.collect("30", "", TODAY, rows[0].stichtag)["buildings_total"] == rows[0].total
+    other = datetime.date(1999, 12, 31)
+    empty = overview.collect("30", "", TODAY, other)
+    assert empty["buildings_total"] == 0 and empty["reported"] == 0 and empty["stichtag_rows"] == []
+    assert "Stichtag 01.01." not in c.get(reverse("planning:overview"), {"stichtag": "2001-01-01"}).content.decode()

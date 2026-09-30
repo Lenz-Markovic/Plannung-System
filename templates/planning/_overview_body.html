@@ -1,6 +1,7 @@
+{% load core_tags %}
 {# 📊 everything scoped by the time range - replaced when a filter changes #}
 <div id="ov-body" class="ov-body">
-  <p class="na small">Zeitraum {{ start|date:"d.m.Y" }} – {{ end|date:"d.m.Y" }}{% if art == "reading" %} · nur Ablesung{% elif art == "installation" %} · nur Montage{% endif %}</p>
+  <p class="na small">Zeitraum {{ start|date:"d.m.Y" }} – {{ end|date:"d.m.Y" }}{% if art == "reading" %} · nur Ablesung{% elif art == "installation" %} · nur Montage{% endif %}{% if stichtag %} · Stichtag {{ stichtag|date:"d.m.Y" }}{% endif %}</p>
 
   <section class="ov-card ov-wide">
     <div class="ov-card-head">
@@ -50,6 +51,27 @@
       </div>
     </section>
   </div>
+
+  <section class="ov-card ov-wide">
+    <h2>Nach Stichtag (Abrechnungszeitraum)</h2>
+    <p class="na small">Alle Liegenschaften je Stichtag – unabhängig vom Zeitraum oben</p>
+    <div class="table-responsive"><table class="table table-sm ov-people ov-stichtage">
+      <thead><tr><th>Stichtag</th><th>Abrechnungszeitraum</th><th class="ov-num">Liegenschaften</th><th>Status</th>
+        <th class="ov-num">freigegeben</th><th class="ov-num">geplant</th><th class="ov-num">ohne Termin</th><th class="ov-num">🔁 Nachtermin</th></tr></thead>
+      <tbody>{% for r in stichtag_rows %}<tr>
+        <td><a href="?{% query_with request stichtag=r.stichtag|date:'Y-m-d' %}"><b>{{ r.stichtag|date:"d.m.Y" }}</b></a></td>
+        <td>{% if r.period_start %}{{ r.period_start|date:"d.m.Y" }} – {{ r.period_end|date:"d.m.Y" }}{% else %}–{% endif %}</td>
+        <td class="ov-num">{{ r.total }}</td>
+        <td class="ov-st-cell"><span class="ov-share ov-share-mini" role="img" aria-label="Status-Anteile">
+          {% for key, label, n, share in r.segments %}<span class="ov-share-seg b-{{ key }}" style="width: {{ share|floatformat:'2u' }}%" tabindex="0" data-tip="Stichtag {{ r.stichtag|date:'d.m.Y' }}|{{ label }}: {{ n }} ({{ share|floatformat:0 }} %)"></span>{% endfor %}</span>
+          <span class="na small">● {{ r.open }} · ▲ {{ r.rework }} · ✓ {{ r.released }}</span></td>
+        <td class="ov-num"><b>{{ r.released_share }} %</b></td>
+        <td class="ov-num"><a href="{% url 'buildings:list' %}?stichtag={{ r.stichtag|date:'Y-m-d' }}">{{ r.planned }}</a></td>
+        <td class="ov-num">{% if r.unplanned %}<span class="ov-status warning">{{ r.unplanned }}</span>{% else %}<span class="ov-status good">✓ 0</span>{% endif %}</td>
+        <td class="ov-num">{% if r.revisit %}<a href="{% url 'buildings:list' %}?stichtag={{ r.stichtag|date:'Y-m-d' }}&nachtermin=noetig">{{ r.revisit }}</a>{% else %}–{% endif %}</td>
+      </tr>{% empty %}<tr><td colspan="8" class="na">Keine Liegenschaften.</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
 
   <div class="ov-row">
     <section class="ov-card">

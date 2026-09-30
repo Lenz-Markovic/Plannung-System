@@ -153,3 +153,62 @@ def share_segments(parts):
     """[(key, label, n)] -> [(key, label, n, percent)] for a 100 % bar (no empty parts)."""
     total = sum(n for _, _, n in parts)
     return [(key, label, n, 100 * n / total) for key, label, n in parts if n] if total else []
+
+
+# --- per Stichtag (Abrechnungszeitraum) --------------------------------------------------------
+
+STATUS_ORDER = [("open", "offen"), ("rework", "Nacharbeit"), ("released", "freigegeben")]
+
+
+@dataclass
+class StichtagRow:
+    stichtag: datetime.date
+    period_start: datetime.date | None = None
+    period_end: datetime.date | None = None
+    open: int = 0
+    rework: int = 0
+    released: int = 0
+    planned: int = 0          # not released, with an open reading appointment
+    revisit: int = 0          # 🔁 Nachtermin nötig
+
+    @property
+    def total(self):
+        return self.open + self.rework + self.released
+
+    @property
+    def released_share(self):
+        return percent(self.released, self.total)
+
+    @property
+    def unplanned(self):
+        """Still to do and no appointment yet."""
+        return max(0, self.open + self.rework - self.planned)
+
+    @property
+    def segments(self):
+        return share_segments([(key, label, getattr(self, key)) for key, label in STATUS_ORDER])
+
+
+def per_stichtag(buildings):
+    """buildings: (stichtag, period start, period end, status, planned?, revisit?) -> [StichtagRow], by date."""
+    rows = {}
+    for stichtag, start, end, status, planned, revisit in buildings:
+        row = rows.setdefault(stichtag, StichtagRow(stichtag, start, end))
+        row.period_start = row.period_start or start
+        row.period_end = row.period_end or end
+        if status in ("open", "rework", "released"):
+            setattr(row, status, getattr(row, status) + 1)
+        if planned and status != "released":
+            row.planned += 1
+        if revisit:
+            row.revisit += 1
+    return [rows[d] for d in sorted(rows)]
+
+
+def chosen_stichtag(value, known):
+    """'2026-12-31' from the page -> a date that exists, else None (= alle)."""
+    try:
+        day = datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return day if day in known else None

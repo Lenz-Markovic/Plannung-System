@@ -321,6 +321,10 @@ counted fresh on every load (`planning/rules/overview.py`, `planning/overview.py
   - **Warum nicht erledigt?** (the reasons of ✗) and **Wie viele Termine bis fertig?**
     (1. / 2. / 3.+ Termin).
   - **Pro Person:** planned stops, how many reported, ✓ / ◐ / ✗, success rate, still open.
+- **Stichtag** filter (next to Art): scopes the whole page to the buildings (and their orders)
+  of one Stichtag. The table **Nach Stichtag (Abrechnungszeitraum)** shows every Stichtag with
+  its period, number of buildings, the status split (offen / Nacharbeit / freigegeben),
+  % freigegeben, how many are planned, how many still have **no appointment**, and 🔁 Nachtermine.
 - Hover (or Tab to) a bar for its exact numbers.
 
 ## 🛰 Wer ist wo? (map by the Fahrplan)

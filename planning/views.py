@@ -972,8 +972,10 @@ def overview_page(request):
     today = timezone.localdate()
     period = overview_rules.chosen_period(request.GET.get("zeitraum", ""))
     kind = request.GET.get("art", "") if request.GET.get("art", "") in ("reading", "installation") else ""
-    context = {**overview.collect(period, kind, today), "tiles": overview.headline(today), "period": period,
-               "periods": overview_rules.PERIODS, "art": kind, "today": today}
+    known = overview.stichtage()
+    stichtag = overview_rules.chosen_stichtag(request.GET.get("stichtag", ""), set(known))
+    context = {**overview.collect(period, kind, today, stichtag), "tiles": overview.headline(today), "period": period,
+               "periods": overview_rules.PERIODS, "art": kind, "today": today, "stichtag": stichtag, "stichtage": known}
     if request.htmx_target == "ov-body":
         response = render(request, "planning/_overview_body.html", context)
         response["HX-Push-Url"] = clean_url(request)

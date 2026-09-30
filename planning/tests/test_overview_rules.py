@@ -71,3 +71,21 @@ def test_share_segments():
     parts = share_segments([("open", "offen", 3), ("rework", "Nacharbeit", 0), ("released", "frei", 1)])
     assert [p[0] for p in parts] == ["open", "released"] and parts[0][3] == 75
     assert share_segments([("a", "a", 0)]) == []
+
+
+def test_per_stichtag():
+    from planning.rules.overview import chosen_stichtag, per_stichtag
+    a, b = datetime.date(2026, 6, 30), datetime.date(2026, 12, 31)
+    rows = per_stichtag([
+        (b, datetime.date(2026, 1, 1), b, "open", True, False),
+        (b, None, None, "open", False, True),
+        (b, None, None, "released", True, False),
+        (a, None, None, "rework", False, False),
+    ])
+    assert [r.stichtag for r in rows] == [a, b]
+    row = rows[1]
+    assert (row.total, row.open, row.released, row.planned, row.unplanned, row.revisit) == (3, 2, 1, 1, 1, 1)
+    assert row.released_share == 33 and row.period_start == datetime.date(2026, 1, 1)
+    assert [s[0] for s in row.segments] == ["open", "released"]
+    assert chosen_stichtag("2026-12-31", {b}) == b and chosen_stichtag("2026-01-01", {b}) is None
+    assert chosen_stichtag("x", {b}) is None

@@ -15,6 +15,8 @@
   <label class="ov-kind">Art <select name="art"><option value="">alle</option>
     <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
     <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+  <label class="ov-kind">Stichtag <select name="stichtag"><option value="">alle</option>
+    {% for d in stichtage %}<option value="{{ d|date:'Y-m-d' }}" {% if d == stichtag %}selected{% endif %}>{{ d|date:"d.m.Y" }}</option>{% endfor %}</select></label>
 </form>
 
 {# what is open NOW - not scoped by the time range #}

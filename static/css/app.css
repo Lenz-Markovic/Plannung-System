@@ -943,3 +943,5 @@ button.cal-pill:hover { border-color: var(--axis); }
 .ov-tip-head { font-weight: 650; margin-bottom: 2px; color: var(--ink-2); }
 .ov-xlabel:not(.wide) { display: none; }
 @media (max-width: 640px) { .ov-xlabel.wide { display: none; } .ov-xlabel.narrow { display: block; } .ov-cols { margin-left: 28px; } .ov-hbar { grid-template-columns: 40% 1fr 30px; } }
+.ov-st-cell { min-width: 180px; }
+.ov-share-mini { display: flex; height: 10px; margin: 3px 0 2px; }

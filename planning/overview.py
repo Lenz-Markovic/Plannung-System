@@ -3,7 +3,7 @@
 Everything is counted on every page load (nothing extra is stored).
 """
 
-from django.db.models import Count, Min
+from django.db.models import Count, Min, Q
 
 from buildings.models import Building, BuildingStatus, InstallationOrder, OrderStatus
 
@@ -28,12 +28,35 @@ def season_start():
     return min([d for d in (first, planned) if d], default=None)
 
 
-def collect(period, kind, today):
+def stichtage():
+    return list(Building.objects.order_by("stichtag").values_list("stichtag", flat=True).distinct())
+
+
+def _stichtag_filter(queryset, stichtag, building="building", order="installation_order__building"):
+    if stichtag is None:
+        return queryset
+    return queryset.filter(Q(**{f"{building}__stichtag": stichtag}) | Q(**{f"{order}__stichtag": stichtag}))
+
+
+def stichtag_rows():
+    """📅 per Stichtag (Abrechnungszeitraum): status, planned, without appointment, 🔁."""
+    from .queries import OPEN_STOP
+    from .visits import revisit_ids
+
+    planned = set(TourStop.objects.filter(OPEN_STOP, kind=StopKind.READING).values_list("building_id", flat=True))
+    revisits = revisit_ids()[0]
+    return rules.per_stichtag(
+        (d, a, b, status, pk in planned, pk in revisits)
+        for pk, d, a, b, status in Building.objects.values_list(
+            "pk", "stichtag", "billing_period_start", "billing_period_end", "status"))
+
+
+def collect(period, kind, today, stichtag=None):
     start, end = rules.period_range(period, today, season_start())
-    visits = _kind_filter(Visit.objects.filter(date__gte=start, date__lte=end), kind)
+    visits = _stichtag_filter(_kind_filter(Visit.objects.filter(date__gte=start, date__lte=end), kind), stichtag)
     rows = list(visits.values_list("date", "outcome", "reason", "attempt", "people"))
-    stops = _kind_filter(TourStop.objects.filter(tour__date__gte=start, tour__date__lte=end).exclude(kind=StopKind.HELP),
-                         kind).select_related("tour__employee").prefetch_related("tour__team")
+    stops = _stichtag_filter(_kind_filter(TourStop.objects.filter(tour__date__gte=start, tour__date__lte=end)
+                                          .exclude(kind=StopKind.HELP), kind), stichtag).select_related("tour__employee").prefetch_related("tour__team")
 
     per_bucket = rules.visits_per_bucket(start, end, [(r[0], r[1]) for r in rows])
     top, ticks = rules.nice_max(max((b.total for b in per_bucket), default=0))
@@ -47,8 +70,10 @@ def collect(period, kind, today):
     people = rules.per_person([(s.tour.people_label, bool(s.done_at or s.outcome)) for s in stops if s.tour.date <= today],
                               [(r[4], r[1]) for r in rows])
 
-    status = dict(Building.objects.values_list("status").annotate(n=Count("pk")))
-    orders = dict(InstallationOrder.objects.values_list("status").annotate(n=Count("pk")))
+    buildings = Building.objects.filter(stichtag=stichtag) if stichtag else Building.objects.all()
+    order_list = InstallationOrder.objects.filter(building__stichtag=stichtag) if stichtag else InstallationOrder.objects.all()
+    status = dict(buildings.values_list("status").annotate(n=Count("pk")))
+    orders = dict(order_list.values_list("status").annotate(n=Count("pk")))
     return {
         "start": start, "end": end, "per_week": bool(per_bucket and per_bucket[0].per_week),
         "columns": columns, "label_every": max(1, -(-len(columns) // 12)), "label_every_narrow": max(1, -(-len(columns) // 4)), "ticks": [(t, 100 * t / top) for t in ticks], "top": top,
@@ -65,6 +90,7 @@ def collect(period, kind, today):
         "orders": [(s.value, s.label, orders.get(s.value, 0)) for s in OrderStatus],
         "orders_max": max(orders.values(), default=0),
         "orders_total": sum(orders.values()),
+        "stichtag_rows": [r for r in stichtag_rows() if stichtag is None or r.stichtag == stichtag],
     }
 
 
