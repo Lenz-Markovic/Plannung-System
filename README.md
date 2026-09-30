@@ -285,6 +285,26 @@ The only JavaScript is `static/js/calendar.js` (commented).
   "✓ abschließen – kein Nachtermin nötig" for the office (e.g. settled on the phone).
 - Mein Tag on a PC is the normal page again (no phone frame).
 
+## ☰ Side menu (top left)
+
+The **☰ Menü** button at the top left opens a menu at the left with every page, action and
+quick filter as a button – only what the role may use (`templates/core/_side_menu.html`,
+`static/js/side_menu.js`):
+
+- **Seiten:** Liegenschaften, Montage, Rückmeldungen (with the open count), Unterlagen,
+  Kalender, Konflikte, Mein Tag.
+- **Planen:** 🗺 Fahrplan erstellen (with what is ticked), 🗓 Erste freie Tage (opens the calendar
+  with it switched on), 📄 Alle Fahrpläne (Excel).
+- **Quick filters** (one click instead of choosing in the filter fields): Rückmeldungen (prüfen,
+  Nachtermin, keine Rückmeldung, Probleme, geplant, "seitlich öffnen"), Liegenschaften (offen,
+  Nacharbeit, freigegeben, Nachtermin nötig, 2× besucht, Unterlagen fehlen, Termin-Konflikte …),
+  Montage (Offen, Verplant, In Bearbeitung, ohne Termin, Nachtermin nötig, Konflikt, 💶 Material
+  & Kosten for Admin), Unterlagen (über der Frist, bald fällig …).
+- **Mehr:** 🕘 Verlauf, ⚙ Verwaltung (Admin), 🔔 pop-ups on/off, 🚪 Abmelden.
+- **📌 anheften** (wide screens): the menu stays open at the left on every page and the tabs at
+  the top disappear. "📌 lösen" brings them back. It is remembered in this browser.
+- The page (and quick filter) you are on is marked blue. Esc or a click next to it closes it.
+
 ## 🧾 Rückmeldungen (office worklist after the visits)
 
 New tab **🧾 Rückmeldungen** (badge = open entries). Day by day and person by person it
@@ -305,8 +325,7 @@ lists what the office still has to do after the visits (`planning/rules/followup
   - "✓ n unauffällige abhaken" checks all plain ✓ readings of a day in one go.
 - After the office closed an Ergebnis, the phone can no longer undo it ("vom Büro
   bearbeitet"); a new note on site opens it again, so nothing slips through.
-- **At the side of every office page:** the blue tab **🧾 Rückmeldungen** on the right edge
-  (red number = open) opens a side panel. It is sorted: **⚠ Probleme vor Ort → ❓ Keine
+- **At the side of every office page:** ☰ Menü → **"↔ seitlich öffnen"** opens a side panel. It is sorted: **⚠ Probleme vor Ort → ❓ Keine
   Rückmeldung → 🔁 Nachtermin nötig → ✓ prüfen**, inside each section the one waiting longest
   first (or "neueste zuerst" / "nach Person"; filter Ablesung / Montage). "seit 5 Tagen" is
   red after 3 days. A click on a card opens it with all its buttons, right there.

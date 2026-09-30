@@ -130,6 +130,8 @@ document.addEventListener("DOMContentLoaded", function () {
       calendar.refetchEvents();
       if (showFree) { loadFreeList(); } else { document.getElementById("cal-side").innerHTML = ""; calendar.updateSize(); }
     });
+    // opened from the side menu ("🗓 Erste freie Tage"): ?frei=1 switches it on at once
+    if (new URLSearchParams(window.location.search).get("frei") === "1") { freeButton.click(); }
   }
 
   // Planning panel of a free day: live sum of the ticked work minutes

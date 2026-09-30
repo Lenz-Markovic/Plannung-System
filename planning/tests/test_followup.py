@@ -303,13 +303,13 @@ def test_side_panel_is_sorted_by_urgency(demo):
     assert f'id="fu-v{visit.pk}"' in full and "Problem erledigt" in full
 
 
-def test_side_tab_only_for_the_office(demo):
+def test_side_panel_only_for_the_office(demo):
     tour, reader = past_tour()
     office = client_for(user(roles.PROCESSING, "sb"))
     page = office.get(reverse("buildings:list")).content.decode()
-    assert 'id="rm-side"' in page and "leisten=0" in page  # the list has its own Fahrplan bar
+    assert 'id="rm-panel"' in page and "leisten=0" in page  # the list has its own Fahrplan bar
     assert "leisten=1" in office.get(reverse("planning:calendar")).content.decode()
-    assert 'id="rm-side"' not in client_for(reader).get(reverse("planning:my_day")).content.decode()
+    assert 'id="rm-panel"' not in client_for(reader).get(reverse("planning:my_day")).content.decode()
     assert client_for(reader).get(reverse("planning:followup_panel")).status_code == 403
     assert client_for(reader).get(reverse("planning:followup_popups")).content.decode() == ""
 

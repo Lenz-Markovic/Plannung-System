@@ -1,10 +1,4 @@
-{# bars="0": this page has its own "Fahrplan erstellen" bar, the panel does not show a second one #}
-<button type="button" id="rm-side" class="rm-side{% if request.resolver_match.url_name == 'followup' %} d-none{% endif %}"
-        title="Rückmeldungen aus dem Außendienst – sortiert, dringendste zuerst"
-        hx-get="{% url 'planning:followup_panel' %}?leisten={{ bars }}" hx-target="#rm-panel">
-  <span class="rm-side-icon">🧾</span><span class="rm-side-text">Rückmeldungen</span>
-  <span id="rm-side-count" class="rm-side-count">…</span>
-</button>
+{# the 🧾 side panel and the pop-ups for new reports (opened from the ☰ menu or a pop-up) #}
 <div id="rm-panel"></div>
 <div id="rm-popups" aria-live="polite"></div>
 {# the time of the last look lives in the browser (localStorage), so a page change misses nothing #}

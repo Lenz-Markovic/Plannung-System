@@ -1,0 +1,89 @@
+{# ☰ The side menu (top left): every page, action and quick filter as a button - by role.   #}
+{# Opens over the page; "📌 anheften" keeps it open at the left on a wide screen (static/js/side_menu.js). #}
+<aside id="side-menu" class="side-menu" aria-label="Menü" aria-hidden="true">
+  <div class="sm-head">
+    <span class="sm-user">👤 <b>{{ user.get_full_name|default:user.username }}</b><br>
+      <span class="na small">{% for g in user.groups.all %}{{ g.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></span>
+    <button type="button" class="btn mini sm-pin" data-menu-pin title="Menü links immer offen lassen (breiter Bildschirm)">📌 anheften</button>
+    <button type="button" class="dlg-x position-static" data-menu-close aria-label="Menü schließen">✕</button>
+  </div>
+
+  <nav class="sm-body">
+    <div class="sm-group"><div class="sm-title">Seiten</div>
+      {% if perms.buildings.view_building %}<a class="sm-btn" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>{% endif %}
+      {% if perms.buildings.view_installationorder %}<a class="sm-btn" href="{% url 'orders:list' %}">🔧 Montage</a>{% endif %}
+      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:followup' %}">🧾 Rückmeldungen
+        <span id="rm-side-count" class="rm-side-count">…</span></a>{% endif %}
+      {% if perms.documents.view_costdocumentreceipt %}<a class="sm-btn" href="{% url 'documents:list' %}">📄 Unterlagen</a>{% endif %}
+      {% if perms.planning.view_tour or perms.planning.view_own_tours %}<a class="sm-btn" href="{% url 'planning:calendar' %}">📅 Kalender</a>{% endif %}
+      {% if perms.conflicts.view_conflict %}<a class="sm-btn" href="{% url 'conflicts:list' %}">⚠ Konflikte</a>{% endif %}
+      {% if perms.planning.view_own_tours %}<a class="sm-btn" href="{% url 'planning:my_day' %}">📱 Mein Tag</a>{% endif %}
+    </div>
+
+    {% if perms.planning.add_tour or perms.planning.view_tour %}
+    <div class="sm-group"><div class="sm-title">Planen</div>
+      {% if perms.planning.add_tour %}
+        <button type="button" class="sm-btn" hx-get="{% url 'planning:dialog' %}" hx-target="#modal" data-menu-close>🗺 Fahrplan erstellen (Angekreuztes)</button>
+        <a class="sm-btn" href="{% url 'planning:calendar' %}?frei=1">🗓 Erste freie Tage</a>
+        {% if FEATURES.autoplan %}<a class="sm-btn" href="{% url 'planning:autoplan' %}">🤖 Automatisch planen</a>{% endif %}
+      {% endif %}
+      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:tours_excel' %}">📄 Alle Fahrpläne (Excel)</a>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if perms.planning.view_tour %}
+    <div class="sm-group"><div class="sm-title">🧾 Rückmeldungen</div>
+      <button type="button" class="sm-btn" hx-get="{% url 'planning:followup_panel' %}?leisten={{ bars }}" hx-target="#rm-panel" data-menu-close>↔ seitlich öffnen (dringendste zuerst)</button>
+      <a class="sm-btn" href="{% url 'planning:followup' %}?f=pruefen">✓ im Büro prüfen</a>
+      <a class="sm-btn" href="{% url 'planning:followup' %}?f=nachtermin">🔁 Nachtermin nötig</a>
+      <a class="sm-btn" href="{% url 'planning:followup' %}?f=ohne">❓ keine Rückmeldung</a>
+      <a class="sm-btn" href="{% url 'planning:followup' %}?f=probleme">⚠ Probleme vor Ort</a>
+      <a class="sm-btn" href="{% url 'planning:followup' %}?f=geplant">📅 Nachtermin geplant</a>
+    </div>
+    {% endif %}
+
+    {% if perms.buildings.view_building %}
+    <div class="sm-group"><div class="sm-title">🏢 Liegenschaften – schnell filtern</div>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?status=open">offen</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?status=rework">▲ Nacharbeit</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?status=released">✓ freigegeben</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?nachtermin=noetig">🔁 Nachtermin nötig</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?nachtermin=mehrfach">2 × oder öfter besucht</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?documents=nein">📄 Unterlagen fehlen noch</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?montage=krit">⚠ Termin-Konflikte</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?montage=kein">Umrüstung ohne Termin</a>
+      <a class="sm-btn sm-reset" href="{% url 'buildings:list' %}">✕ alle zeigen</a>
+    </div>
+    {% endif %}
+
+    {% if perms.buildings.view_installationorder %}
+    <div class="sm-group"><div class="sm-title">🔧 Montage – schnell filtern</div>
+      <a class="sm-btn" href="{% url 'orders:list' %}?status=open">Offen</a>
+      <a class="sm-btn" href="{% url 'orders:list' %}?status=planned">Verplant</a>
+      <a class="sm-btn" href="{% url 'orders:list' %}?status=in_progress">In Bearbeitung</a>
+      <a class="sm-btn" href="{% url 'orders:list' %}?termin=ohne">ohne Montagetermin</a>
+      <a class="sm-btn" href="{% url 'orders:list' %}?termin=nachtermin">🔁 Nachtermin nötig</a>
+      <a class="sm-btn" href="{% url 'orders:list' %}?konflikt=offen">⚠ mit offenem Konflikt</a>
+      {% if perms.buildings.view_costs %}<a class="sm-btn" href="{% url 'orders:material' %}">💶 Material &amp; Kosten</a>{% endif %}
+      <a class="sm-btn sm-reset" href="{% url 'orders:list' %}">✕ alle zeigen</a>
+    </div>
+    {% endif %}
+
+    {% if perms.documents.view_costdocumentreceipt %}
+    <div class="sm-group"><div class="sm-title">📄 Unterlagen – 14-Tage-Frist</div>
+      <a class="sm-btn" href="{% url 'documents:list' %}?f=ueber">⏰ über der Frist</a>
+      <a class="sm-btn" href="{% url 'documents:list' %}?f=bald">bald fällig</a>
+      <a class="sm-btn" href="{% url 'documents:list' %}?f=offen">noch nicht freigegeben</a>
+      <a class="sm-btn" href="{% url 'documents:list' %}?f=frei">✓ freigegeben</a>
+    </div>
+    {% endif %}
+
+    <div class="sm-group"><div class="sm-title">Mehr</div>
+      {% if perms.journal.view_activity %}<button type="button" class="sm-btn" hx-get="{% url 'journal:activity' %}" hx-target="#drawer" data-menu-close>🕘 Verlauf – wer hat was geändert?</button>{% endif %}
+      {% if user.is_staff %}<a class="sm-btn" href="{% url 'admin:index' %}">⚙ Verwaltung (Personen, Rollen, Einstellungen)</a>{% endif %}
+      {% if perms.planning.view_tour %}<button type="button" class="sm-btn" data-popups-toggle>🔔 Pop-ups bei neuen Rückmeldungen: <b data-popups-state>an</b></button>{% endif %}
+      <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}<button class="sm-btn">🚪 Abmelden</button></form>
+    </div>
+  </nav>
+</aside>
+<div id="side-menu-back" class="side-menu-back" data-menu-close></div>
