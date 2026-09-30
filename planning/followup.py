@@ -46,6 +46,8 @@ class FollowUp:
     can_release: bool = False
     can_rework: bool = False
     can_accept: bool = False
+    waiting: str = ""              # side panel: "seit 3 Tagen"
+    overdue: bool = False
 
     @property
     def target(self):
@@ -368,3 +370,45 @@ def check_quiet(day, user, today):
             visits.close(e.visit, user, True)
             done += 1
     return done
+
+
+def panel_sections(user, today, sort="dringend", kind=""):
+    """The 🧾 side panel: open entries in sections, most urgent section first, sorted inside."""
+    entries = decorate(filter_entries(followup_entries(today), kind=kind), user, today)
+    sections = {state: [] for state in rules.URGENCY}
+    for e in entries:
+        section = rules.section_of(e.state, e.has_problem)
+        if section is not None:
+            e.waiting = rules.waiting_label(e.date, today)
+            e.overdue = rules.is_overdue(rules.CHECK if section == rules.PROBLEM else e.state, e.date, today)
+            sections[section].append(e)
+    result = []
+    for state in rules.URGENCY:
+        items = sorted(sections[state], key=lambda e: rules.panel_sort_key(sort, e.date, e.people, e.position))
+        result.append({"state": state, "label": rules.SECTION_LABELS[state], "items": items})
+    return result
+
+
+def new_since(since, user):
+    """New field reports and ⚠ problems after `since` (not the user's own, not entered in the office):
+    [(when, text, key)] newest first - for the pop-ups."""
+    from journal.models import Note, NoteKind
+
+    from .rules.visits import OUTCOMES
+
+    found = []
+    reports = (Visit.objects.filter(reported_at__gt=since, entered_by_office=False).exclude(reported_by=user)
+               .select_related("building", "installation_order", "reported_by"))
+    for v in reports.order_by("-reported_at")[:20]:
+        target = v.building or v.installation_order
+        ref = f"AZ {v.building.file_number}" if v.building_id else f"RE {v.installation_order.re_number}"
+        rest = f" – {v.todo}" if v.todo else ""
+        found.append((v.reported_at, v.outcome, f"{v.people}: {ref} {target.street} · {OUTCOMES[v.outcome]}{rest}",
+                      f"v{v.pk}"))
+    problems = (Note.objects.filter(kind=NoteKind.PROBLEM, resolved_at=None, created_at__gt=since).exclude(author=user)
+                .select_related("author", "building", "installation_order"))
+    for n in problems.order_by("-created_at")[:20]:
+        target = n.building or n.installation_order
+        found.append((n.created_at, "problem", f"{n.author or '?'}: {target.street} · ⚠ {n.text[:120]}", f"n{n.pk}"))
+    found.sort(key=lambda item: item[0], reverse=True)
+    return found

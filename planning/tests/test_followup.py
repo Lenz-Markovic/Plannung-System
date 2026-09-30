@@ -274,3 +274,71 @@ def test_object_box_shows_close_picks_for_the_office(demo):
     box = client_for(user(roles.PROCESSING, "sb")).get(
         reverse("planning:visits", args=["liegenschaft", stop.building_id])).content.decode()
     assert "telefonisch geklärt" in box and "Mieter anrufen" in box
+
+
+# --- 🧾 side panel and pop-ups ------------------------------------------------------------------
+
+def test_side_panel_is_sorted_by_urgency(demo):
+    tour, reader = past_tour()
+    stops = list(tour.stops.filter(kind=StopKind.READING).order_by("position"))
+    report(stops[0], reader, "complete")
+    if len(stops) > 1:
+        report(stops[1], reader, "partial", "Keller fehlt")
+    client_for(reader).post(reverse("planning:stop_note", args=[stops[0].pk]), {"field_note": "Wasserschaden", "problem": "1"})
+    office = client_for(user(roles.PROCESSING, "sb"))
+    html = office.get(reverse("planning:followup_panel")).content.decode()
+    assert html.index("⚠ Probleme vor Ort") < html.index("❓ Keine Rückmeldung") < html.index("🔁 Nachtermin nötig") \
+        < html.index("✓ Fertig – im Büro prüfen")
+    assert "Wasserschaden" in html and 'id="rm-sections"' in html
+    if len(stops) > 1:
+        assert "Keller fehlt" in html
+    only = office.get(reverse("planning:followup_panel"), {"sort": "neu", "art": "installation"},
+                      headers={"HX-Request": "true", "HX-Target": "rm-sections"}).content.decode()
+    assert only.strip().startswith('<div id="rm-sections"') and stops[0].building.street not in only
+
+    visit = Visit.objects.get(stop=stops[0])
+    shown = office.get(reverse("planning:followup_panel"), {"zeige": f"v{visit.pk}"}).content.decode()
+    assert f'hx-get="{reverse("planning:followup_entry", args=[f"v{visit.pk}"])}" hx-trigger="load"' in shown
+    full = office.get(reverse("planning:followup_entry", args=[f"v{visit.pk}"])).content.decode()
+    assert f'id="fu-v{visit.pk}"' in full and "Problem erledigt" in full
+
+
+def test_side_tab_only_for_the_office(demo):
+    tour, reader = past_tour()
+    office = client_for(user(roles.PROCESSING, "sb"))
+    page = office.get(reverse("buildings:list")).content.decode()
+    assert 'id="rm-side"' in page and "leisten=0" in page  # the list has its own Fahrplan bar
+    assert "leisten=1" in office.get(reverse("planning:calendar")).content.decode()
+    assert 'id="rm-side"' not in client_for(reader).get(reverse("planning:my_day")).content.decode()
+    assert client_for(reader).get(reverse("planning:followup_panel")).status_code == 403
+    assert client_for(reader).get(reverse("planning:followup_popups")).content.decode() == ""
+
+
+def look(c, since):
+    response = c.get(reverse("planning:followup_popups"), {"seit": since} if since else {})
+    return response.content.decode(), response["X-RM-Seen"]
+
+
+def test_popups_show_new_reports_once(demo):
+    tour, reader = past_tour()
+    stops = list(tour.stops.filter(kind=StopKind.READING).order_by("position"))
+    office = client_for(user(roles.PROCESSING, "sb"))
+    html, seen = look(office, "")
+    assert html.strip() == ""  # first look
+    report(stops[0], reader, "partial", "NE003 fehlt")
+    html, seen = look(office, seen)
+    assert "Neue Rückmeldung" in html and "NE003 fehlt" in html and "◐" in html and "zeige=v" in html
+    html, seen = look(office, seen)
+    assert html.strip() == ""  # shown once
+    client_for(reader).post(reverse("planning:stop_note", args=[stops[0].pk]), {"field_note": "Hund bissig", "problem": "1"})
+    assert "Hund bissig" in look(office, seen)[0]
+    assert look(office, "kaputt")[0].strip() == ""
+
+
+def test_no_popup_for_what_the_office_entered_itself(demo):
+    tour, _ = past_tour()
+    stop = first_stop(tour)
+    office, other = client_for(user(roles.PROCESSING, "sb")), client_for(user(roles.DISPATCHER, "dispo"))
+    seen = look(office, "")[1]
+    office.post(reverse("planning:followup_report", args=[stop.pk]), {"outcome": "complete"})
+    assert look(office, seen)[0].strip() == "" and look(other, seen)[0].strip() == ""  # nachgetragen: no news

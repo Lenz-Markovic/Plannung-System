@@ -1,0 +1,16 @@
+{# New reports from the field since the last look (polled from templates/base.html) - appended to #rm-popups. #}
+{% for when, kind, text, key in items %}
+  <div class="rm-pop {{ kind }}" role="status">
+    <span class="rm-pop-icon">{% if kind == "problem" %}⚠{% elif kind == "complete" %}✓{% elif kind == "partial" %}◐{% else %}✗{% endif %}</span>
+    <span class="rm-pop-text"><b>Neue Rückmeldung</b> · {{ when|date:"H:i" }}<br>{{ text|truncatechars:140 }}</span>
+    <span class="rm-pop-btns">
+      <button type="button" class="btn mini primary" hx-get="{% url 'planning:followup_panel' %}?zeige={{ key }}&leisten={{ bars }}"
+              hx-target="#rm-panel" hx-on:htmx:after-request="this.closest('.rm-pop').remove()">ansehen</button>
+      <button type="button" class="dlg-x position-static" aria-label="Schließen" onclick="this.closest('.rm-pop').remove()">✕</button>
+    </span>
+  </div>
+{% endfor %}
+{% if more %}<div class="rm-pop more" role="status"><span class="rm-pop-text">+ {{ more }} weitere neue Rückmeldungen</span>
+  <span class="rm-pop-btns"><button type="button" class="btn mini" hx-get="{% url 'planning:followup_panel' %}?leisten={{ bars }}" hx-target="#rm-panel"
+    hx-on:htmx:after-request="this.closest('.rm-pop').remove()">alle ansehen</button>
+  <button type="button" class="dlg-x position-static" aria-label="Schließen" onclick="this.closest('.rm-pop').remove()">✕</button></span></div>{% endif %}

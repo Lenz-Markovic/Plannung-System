@@ -1,0 +1,16 @@
+{# bars="0": this page has its own "Fahrplan erstellen" bar, the panel does not show a second one #}
+<button type="button" id="rm-side" class="rm-side{% if request.resolver_match.url_name == 'followup' %} d-none{% endif %}"
+        title="Rückmeldungen aus dem Außendienst – sortiert, dringendste zuerst"
+        hx-get="{% url 'planning:followup_panel' %}?leisten={{ bars }}" hx-target="#rm-panel">
+  <span class="rm-side-icon">🧾</span><span class="rm-side-text">Rückmeldungen</span>
+  <span id="rm-side-count" class="rm-side-count">…</span>
+</button>
+<div id="rm-panel"></div>
+<div id="rm-popups" aria-live="polite"></div>
+{# the time of the last look lives in the browser (localStorage), so a page change misses nothing #}
+<div id="rm-poll" class="d-none" hx-get="{% url 'planning:followup_popups' %}?leisten={{ bars }}" hx-trigger="load, every 30s"
+     hx-target="#rm-popups" hx-swap="afterbegin"
+     hx-vals='js:{seit: (() => { try { return localStorage.getItem("rmSeen") || ""; } catch (e) { return ""; } })()}'
+     hx-on:htmx:after-request="const seen = event.detail.xhr.getResponseHeader('X-RM-Seen'); try { if (seen) localStorage.setItem('rmSeen', seen); } catch (e) {}
+       const box = document.getElementById('rm-popups'); while (box.children.length > 6) box.lastElementChild.remove();
+       if (event.detail.xhr.responseText.trim()) htmx.trigger(document.body, 'followup-changed')"></div>

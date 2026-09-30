@@ -1,1 +1,2 @@
 {% if count %}<span class="cf-badge" title="{{ count }} Rückmeldungen offen">{{ count }}</span>{% endif %}
+<span id="rm-side-count" class="rm-side-count{% if count %} on{% endif %}" hx-swap-oob="true">{{ count|default:"✓" }}</span>

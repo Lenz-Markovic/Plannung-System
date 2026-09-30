@@ -1,0 +1,16 @@
+{# One short card in the side panel; the click loads the full entry below it. #}
+<div class="rm-card {{ s.state }}{% if e.overdue %} overdue{% endif %}" id="rm-card-{{ e.key }}">
+  <button type="button" class="rm-card-head" hx-get="{% url 'planning:followup_entry' e.key %}" hx-target="#rm-body-{{ e.key }}"
+          hx-on:htmx:before-request="const b = document.getElementById('rm-body-{{ e.key }}'); if (b.innerHTML.trim()) { b.innerHTML = ''; this.closest('.rm-card').classList.remove('open'); event.preventDefault(); } else { this.closest('.rm-card').classList.add('open'); }">
+    <span class="rm-line1">{% if e.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ e.ref }}</b> · {{ e.target.street }}, {{ e.target.city }}</span>
+    <span class="rm-line2">👤 {{ e.people }} · {{ e.date|date:"D d.m." }} · <span class="rm-wait">{{ e.waiting }}</span>
+      {% if e.visit %} · {{ e.visit.attempt }}. Termin{% endif %}</span>
+    <span class="rm-line3">
+      {% if e.problems %}⚠ {{ e.problems.0.text|truncatechars:90 }}
+      {% elif e.visit %}{% if e.visit.outcome == "complete" %}✓ fertig{% elif e.visit.outcome == "partial" %}◐ teilweise{% else %}✗ nicht erledigt{% endif %}{% if e.visit.todo %} – {{ e.visit.todo|truncatechars:80 }}{% elif e.visit.note %} – 📱 {{ e.visit.note|truncatechars:80 }}{% endif %}
+      {% else %}kein Ergebnis gemeldet{% endif %}</span>
+    {% if e.step %}<span class="rm-step">→ {{ e.step|truncatechars:95 }}</span>{% endif %}
+  </button>
+  <div id="rm-body-{{ e.key }}" class="rm-body" {% if show == e.key %}hx-get="{% url 'planning:followup_entry' e.key %}" hx-trigger="load"
+       hx-on:htmx:after-swap="this.closest('.rm-card').classList.add('open'); this.scrollIntoView({block: 'center'})"{% endif %}></div>
+</div>

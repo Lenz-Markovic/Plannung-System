@@ -1,0 +1,11 @@
+<div id="rm-sections" class="rm-sections">
+  {% for s in sections %}
+    <details class="rm-section {{ s.state }}" {% if s.items %}open{% endif %}>
+      <summary><span class="rm-sec-label">{{ s.label }}</span> <b class="rm-count {% if s.items %}{{ s.state }}{% endif %}">{{ s.items|length }}</b></summary>
+      {% for e in s.items %}{% include "planning/_followup_card.html" %}
+      {% empty %}<p class="na small rm-none">✓ nichts offen</p>{% endfor %}
+    </details>
+  {% endfor %}
+  {% if not total %}<div class="fu-empty">✓ Alles bearbeitet – nichts vergessen.</div>{% endif %}
+  <p class="na small">Klick auf eine Karte öffnet sie mit allen Knöpfen. Rot = länger als 3 Tage offen.</p>
+</div>

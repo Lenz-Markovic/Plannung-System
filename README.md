@@ -305,6 +305,15 @@ lists what the office still has to do after the visits (`planning/rules/followup
   - "✓ n unauffällige abhaken" checks all plain ✓ readings of a day in one go.
 - After the office closed an Ergebnis, the phone can no longer undo it ("vom Büro
   bearbeitet"); a new note on site opens it again, so nothing slips through.
+- **At the side of every office page:** the blue tab **🧾 Rückmeldungen** on the right edge
+  (red number = open) opens a side panel. It is sorted: **⚠ Probleme vor Ort → ❓ Keine
+  Rückmeldung → 🔁 Nachtermin nötig → ✓ prüfen**, inside each section the one waiting longest
+  first (or "neueste zuerst" / "nach Person"; filter Ablesung / Montage). "seit 5 Tagen" is
+  red after 3 days. A click on a card opens it with all its buttons, right there.
+- **Pop-ups:** when an Ableser/Monteur reports something (or ⚠ a problem), a small card pops up
+  at the bottom right within 30 seconds: "Neue Rückmeldung · Demo-Ableser: AZ … ✗ nicht
+  erledigt – …" with **ansehen** (opens the panel at that entry) and ✕. Your own entries and
+  what the office entered itself do not pop up.
 - New right **"Rückmeldungen bearbeiten"** (`planning.process_visit`) for Disposition and
   Sachbearbeitung; added automatically by `python manage.py migrate`.
 

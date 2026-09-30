@@ -17,7 +17,8 @@ from journal.models import ActivityKind
 
 from . import followup, services, visits
 from .models import StopKind, TourStop
-from .rules.followup import CLOSE_PICKS, FILTERS, MISSING_LOOKBACK_DAYS, STATE_LABELS, chosen_filter, in_filter
+from .rules.followup import (CLOSE_PICKS, FILTERS, MISSING_LOOKBACK_DAYS, POPUP_MAX, SORTS, STATE_LABELS, chosen_filter,
+                             chosen_sort, in_filter)
 from .rules.visits import OUTCOMES, REASON_LABELS, REASONS
 
 VIEW = "planning.view_tour"
@@ -161,4 +162,62 @@ def followup_quiet(request):
     html += render_to_string("core/_toast.html", {"message": f"{done} unauffällige abgehakt"}, request=request)
     response = HttpResponse(html)
     response["HX-Trigger"] = "followup-changed"
+    return response
+
+
+# --- 🧾 side panel and pop-ups (on every office page, templates/base.html) ------------------------
+
+
+@login_required
+def followup_panel(request):
+    """The side panel: open Rückmeldungen, most urgent first. ?zeige=<key> opens that one."""
+    if not request.user.has_perm(VIEW):
+        raise PermissionDenied
+    today = timezone.localdate()
+    sort = chosen_sort(request.GET.get("sort", ""))
+    kind = request.GET.get("art", "") if request.GET.get("art", "") in ("reading", "installation") else ""
+    sections = followup.panel_sections(request.user, today, sort, kind)
+    context = {**_entry_context(request), "sections": sections, "sort": sort, "sorts": SORTS, "art": kind,
+               "total": sum(len(s["items"]) for s in sections), "show": request.GET.get("zeige", ""),
+               "bars": request.GET.get("leisten", "1") == "1" and request.user.has_perm("planning.add_tour"),
+               "reading_bar": services.plan_bar_context(request.session),
+               "order_bar": services.order_bar_context(request.session)}
+    if request.htmx_target == "rm-sections":
+        return render(request, "planning/_followup_sections.html", context)
+    return render(request, "planning/_followup_panel.html", context)
+
+
+@login_required
+def followup_entry(request, key):
+    """One entry in full (opened from a card in the side panel)."""
+    if not request.user.has_perm(VIEW):
+        raise PermissionDenied
+    if not KEY.match(key):
+        raise Http404
+    e = followup.entry(key, request.user, timezone.localdate())
+    if e is None:
+        return HttpResponse('<p class="na small">Diese Rückmeldung ist schon erledigt.</p>')
+    return render(request, "planning/_followup_entry.html", {**_entry_context(request), "e": e})
+
+
+@login_required
+def followup_popups(request):
+    """Polled every 30 s: new reports from the field since the last look -> pop-ups at the side.
+
+    The browser keeps the time of the last look (?seit=..., header X-RM-Seen) - not the session,
+    which other requests running at the same time would overwrite."""
+    if not request.user.has_perm(VIEW):
+        return HttpResponse("")
+    now = timezone.now()
+    try:
+        since = datetime.datetime.fromisoformat(request.GET.get("seit", ""))
+        if since.tzinfo is None or since > now:
+            raise ValueError
+    except ValueError:
+        since = None  # the first look: nothing is "new"
+    found = followup.new_since(max(since, now - datetime.timedelta(hours=12)), request.user) if since else []
+    response = render(request, "planning/_followup_popups.html",
+                      {"items": found[:POPUP_MAX], "more": max(0, len(found) - POPUP_MAX),
+                       "bars": "1" if request.GET.get("leisten", "1") == "1" else "0"}) if found else HttpResponse("")
+    response["X-RM-Seen"] = now.isoformat()
     return response

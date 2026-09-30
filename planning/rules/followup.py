@@ -148,3 +148,51 @@ def close_problems(outcome, note):
     if outcome in (PARTIAL, ABSENT) and not note:
         return ["Bitte kurz eintragen, warum kein Nachtermin nötig ist (z. B. „telefonisch geklärt“)."]
     return []
+
+
+# --- the 🧾 side panel: sorted, most urgent first ------------------------------------------------
+
+# what needs the office first: a problem on site, nobody reported, a Nachtermin to organise, a ✓ to check
+URGENCY = [PROBLEM, MISSING, REVISIT, CHECK]
+SECTION_LABELS = {
+    PROBLEM: "⚠ Probleme vor Ort",
+    MISSING: "❓ Keine Rückmeldung",
+    REVISIT: "🔁 Nachtermin nötig",
+    CHECK: "✓ Fertig – im Büro prüfen",
+}
+SORTS = [("dringend", "dringend zuerst"), ("alt", "am längsten offen zuerst"), ("neu", "neueste zuerst"),
+         ("person", "nach Person")]
+SORT_KEYS = [key for key, _ in SORTS]
+POPUP_MAX = 4  # more new reports at once: "+ n weitere"
+
+
+def section_of(state, has_problem=False):
+    """The panel section of an open entry (a problem wins), None when nothing is to do."""
+    if has_problem or state == PROBLEM:
+        return PROBLEM
+    return state if state in URGENCY else None
+
+
+def chosen_sort(value):
+    return value if value in SORT_KEYS else "dringend"
+
+
+def panel_sort_key(sort, date, people, position):
+    """Sort key inside a section. dringend = waiting longest first, like alt (the section order does the rest)."""
+    if sort == "neu":
+        return (-date.toordinal(), people, position)
+    if sort == "person":
+        return (people.lower(), date.toordinal(), position)
+    return (date.toordinal(), people, position)
+
+
+def waiting_label(date, today):
+    days = (today - date).days
+    if days <= 0:
+        return "heute" if days == 0 else f"in {-days} Tagen"
+    return "gestern" if days == 1 else f"seit {days} Tagen"
+
+
+def is_overdue(state, date, today, limit=3):
+    """Open for more than `limit` days: shown in red in the panel."""
+    return state in OPEN_STATES and (today - date).days > limit

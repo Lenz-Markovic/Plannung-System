@@ -104,3 +104,19 @@ def test_close_problems():
     assert close_problems(PARTIAL, " ") and close_problems(ABSENT, "")
     assert close_problems(COMPLETE, "") == [] and close_problems(PARTIAL, "telefonisch geklärt") == []
     assert close_problems(COMPLETE, "x" * 301) == ["Höchstens 300 Zeichen."]
+
+
+def test_panel_sections_and_sort():
+    from planning.rules.followup import (URGENCY, chosen_sort, is_overdue, panel_sort_key, section_of,
+                                         waiting_label)
+    assert URGENCY[0] == PROBLEM and URGENCY[-1] == CHECK
+    assert section_of(CHECK, True) == PROBLEM and section_of(REVISIT) == REVISIT
+    assert section_of(PLANNED) is None and section_of(DONE) is None and section_of(DONE, True) == PROBLEM
+    assert chosen_sort("neu") == "neu" and chosen_sort("x") == "dringend"
+    old, new = D - datetime.timedelta(days=5), D
+    assert sorted([new, old], key=lambda d: panel_sort_key("dringend", d, "A", 1)) == [old, new]
+    assert sorted([old, new], key=lambda d: panel_sort_key("neu", d, "A", 1)) == [new, old]
+    assert panel_sort_key("person", new, "Bernd", 1) > panel_sort_key("person", old, "anna", 1)
+    assert waiting_label(D, D) == "heute" and waiting_label(D - datetime.timedelta(days=1), D) == "gestern"
+    assert waiting_label(old, D) == "seit 5 Tagen"
+    assert is_overdue(REVISIT, old, D) and not is_overdue(REVISIT, D, D) and not is_overdue(PLANNED, old, D)

@@ -1,0 +1,29 @@
+{# 🧾 Rückmeldungen as a side panel (on every office page): open entries, most urgent first. #}
+<div class="drawer-back rm-back" hx-get="{% url 'empty' %}" hx-target="#rm-panel" hx-trigger="click target:.rm-back"></div>
+<aside class="drawer rm-drawer" role="dialog" aria-label="Rückmeldungen">
+  <div class="drawer-head">
+    <h3>🧾 Rückmeldungen <span class="rm-total">{{ total }} offen</span></h3>
+    <span>
+      <a class="btn mini" href="{% url 'planning:followup' %}" title="Alle Rückmeldungen Tag für Tag auf einer Seite">ganze Seite ↗</a>
+      <button class="dlg-x position-static" type="button" aria-label="Schließen" hx-get="{% url 'empty' %}" hx-target="#rm-panel">✕</button>
+    </span>
+  </div>
+  <form id="rm-filter" class="drawer-filter" hx-get="{% url 'planning:followup_panel' %}" hx-target="#rm-sections" hx-swap="outerHTML" hx-trigger="change">
+    <div class="drawer-row">
+      <label>Sortieren <select name="sort">{% for key, label in sorts %}<option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label>Art <select name="art"><option value="">alle</option>
+        <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+        <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+      <button type="button" class="btn mini" title="Liste neu laden und neu sortieren" hx-get="{% url 'planning:followup_panel' %}"
+              hx-include="#rm-filter" hx-target="#rm-sections" hx-swap="outerHTML">↻</button>
+    </div>
+    {% if bars %}
+      <div class="drawer-row rm-bars">
+        {% include "planning/_plan_bar.html" with selected_count=reading_bar.selected_count selected_minutes=reading_bar.selected_minutes other_count=reading_bar.other_count %}
+        {% include "orders/_plan_bar.html" with selected_count=order_bar.selected_count selected_minutes=order_bar.selected_minutes other_count=order_bar.other_count %}
+      </div>
+    {% endif %}
+  </form>
+  <datalist id="fu-picks">{% for pick in close_picks %}<option value="{{ pick }}">{% endfor %}</datalist>
+  {% include "planning/_followup_sections.html" %}
+</aside>

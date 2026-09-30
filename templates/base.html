@@ -80,6 +80,18 @@
   {# The Verlauf drawer (journal/views.py: activity_drawer) #}
   <div id="drawer"></div>
 
+  {% if perms.planning.view_tour %}
+    {# 🧾 Rückmeldungen at the side on every page: the tab on the right opens the sorted panel, #}
+    {# new reports from the field pop up at the bottom right (planning/followup_views.py).      #}
+    {% with rm_page=request.resolver_match %}
+    {% if rm_page.url_name == "list" and rm_page.app_name == "buildings" or rm_page.url_name == "list" and rm_page.app_name == "orders" or rm_page.url_name == "followup" %}
+      {% with bars="0" %}{% include "planning/_followup_side.html" %}{% endwith %}
+    {% else %}
+      {% with bars="1" %}{% include "planning/_followup_side.html" %}{% endwith %}
+    {% endif %}
+    {% endwith %}
+  {% endif %}
+
 
 </body>
 </html>
