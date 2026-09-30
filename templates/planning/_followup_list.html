@@ -1,0 +1,9 @@
+<div id="followup-list">
+  {% for d in days %}{% include "planning/_followup_day.html" %}
+  {% empty %}
+    <div class="card-lite fu-empty">{% if chosen == "offen" %}✓ Alles bearbeitet – nichts vergessen.{% else %}Keine Rückmeldungen für diese Auswahl.{% endif %}</div>
+  {% endfor %}
+  <p class="na small mt-3">❓ keine Rückmeldung: Termine der letzten {{ lookback }} Tage ohne Ergebnis. · Nichts wird automatisch
+    freigegeben oder abgeschlossen – jeder Schritt ist ein Klick und steht im 🕘 Verlauf.</p>
+</div>
+{% if oob %}{% include "planning/_followup_counts.html" %}{% endif %}

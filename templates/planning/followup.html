@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Rückmeldungen{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🧾 Rückmeldungen aus dem Außendienst</h1>
+  <span class="sub">Was nach den Terminen im Büro noch zu tun ist – Tag für Tag</span>
+  <span class="spacer"></span>
+  {% if perms.planning.add_tour %}
+    {% include "planning/_plan_bar.html" with selected_count=reading_bar.selected_count selected_minutes=reading_bar.selected_minutes other_count=reading_bar.other_count %}
+    {% include "orders/_plan_bar.html" with selected_count=order_bar.selected_count selected_minutes=order_bar.selected_minutes other_count=order_bar.other_count %}
+  {% endif %}
+</header>
+
+{# the day: a normal page load ("alle" of that day) #}
+<form class="fu-daypick" method="get">
+  <a class="btn mini" href="?{% query_with request tag=previous_day|date:'Y-m-d' f='' %}">◀ Vortag</a>
+  <input type="date" name="tag" value="{{ day|date:'Y-m-d' }}" onchange="this.form.submit()" aria-label="Tag">
+  <input type="hidden" name="art" value="{{ art }}">
+  <a class="btn mini" href="?{% query_with request tag=next_day|date:'Y-m-d' f='' %}">Folgetag ▶</a>
+  {% if day %}<a class="btn mini" href="?{% query_with request tag='' %}">alle Tage</a>{% endif %}
+</form>
+
+<form id="fu-filters" class="filters" hx-get="{% url 'planning:followup' %}" hx-target="#followup-list" hx-swap="outerHTML"
+      hx-trigger="change, input changed delay:300ms from:[name=q]">
+  {% include "planning/_followup_counts.html" %}
+  <div class="f"><label for="fu-art">Art</label>
+    <select id="fu-art" name="art"><option value="">alle</option>
+      <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+      <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></div>
+  <div class="f"><label for="fu-q">Suchen</label><input id="fu-q" type="search" name="q" value="{{ q }}" placeholder="AZ, RE-Nr., Straße, Person"></div>
+  <input type="hidden" name="tag" value="{{ day|date:'Y-m-d' }}">
+</form>
+<datalist id="fu-picks">{% for pick in close_picks %}<option value="{{ pick }}">{% endfor %}</datalist>
+
+{% include "planning/_followup_list.html" %}
+{% endblock %}

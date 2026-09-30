@@ -73,12 +73,13 @@ class ActivityKind(models.TextChoices):
     STATUS = "status", "Status"
     NOTE = "note", "Notiz"
     DOCUMENTS = "documents", "Unterlagen"
+    OFFICE = "office", "Bearbeitung"  # the office works through the Rückmeldungen (geprüft, abgeschlossen, nachgetragen)
     FIELD = "field", "vor Ort"   # what the Ableser/Monteur did in "Mein Tag": done, note, problem, proposal
 
 
 ACTIVITY_ICONS = {ActivityKind.PLAN: "🗺", ActivityKind.NOTICE: "📄", ActivityKind.ORDER: "🔧",
                   ActivityKind.STATUS: "🏷", ActivityKind.NOTE: "📝", ActivityKind.DOCUMENTS: "📥",
-                  ActivityKind.FIELD: "📱"}
+                  ActivityKind.FIELD: "📱", ActivityKind.OFFICE: "🧾"}
 
 
 class Activity(models.Model):

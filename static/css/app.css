@@ -719,3 +719,39 @@ button.cal-pill:hover { border-color: var(--axis); }
 .visit.closed { opacity: .6; }
 .revisit-badge { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--warn-wash); color: var(--warn-ink); font-weight: 650; white-space: nowrap; }
 .attempt-tag { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--accent-wash); font-weight: 650; }
+
+/* ---- 🧾 Rückmeldungen (office worklist) --------------------------------------------- */
+.fu-daypick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+.fu-daypick input[type=date] { font: inherit; padding: 3px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.fu-day { margin-top: 16px; }
+.fu-day-head { font-size: 15px; font-weight: 650; margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fu-person { margin: 6px 0 12px; }
+.fu-person-head { font-size: 13px; margin-bottom: 4px; color: var(--ink-2); }
+.fu-entry { border: 1px solid var(--ring); border-left: 5px solid var(--warning); border-radius: 10px; padding: 9px 12px; margin: 6px 0;
+  background: var(--surface); font-size: 13.5px; display: flex; flex-direction: column; gap: 4px; }
+.fu-entry.revisit, .fu-entry.missing, .fu-entry.problem { border-left-color: var(--critical); }
+.fu-entry.planned { border-left-color: var(--accent); }
+.fu-entry.done, .fu-entry.later { border-left-color: var(--good); opacity: .78; }
+.fu-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.fu-state { font-weight: 700; font-size: 12.5px; padding: 1px 8px; border-radius: 999px; background: var(--warn-wash); color: var(--warn-ink); white-space: nowrap; }
+.fu-state.revisit, .fu-state.missing, .fu-state.problem { background: var(--crit-wash); color: var(--critical); }
+.fu-state.planned { background: var(--accent-wash); color: var(--accent); }
+.fu-state.done, .fu-state.later { background: rgba(34, 139, 34, .12); color: var(--good); }
+.fu-object { overflow-wrap: anywhere; }
+.fu-step { font-weight: 600; margin-top: 2px; }
+.fu-hint { font-size: 12.5px; color: var(--warn-ink); }
+.fu-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fu-inline { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.fu-inline input, .fu-more textarea, .fu-more input, .fu-more select { font: inherit; font-size: 13px; padding: 3px 7px;
+  border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.fu-more { display: inline-block; }
+.fu-more[open] { display: block; width: 100%; }
+.fu-more > summary { list-style: none; cursor: pointer; }
+.fu-more > summary::-webkit-details-marker { display: none; }
+.fu-more form { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; max-width: 520px; }
+.fu-plan { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; padding: 3px 9px; border: 1px solid var(--ring); border-radius: 6px; cursor: pointer; }
+.fu-plan.primary { border-color: var(--accent); background: var(--accent-wash); font-weight: 600; }
+.fu-done { font-size: 12.5px; color: var(--good); }
+.fu-done:empty { display: none; }
+.fu-links { margin-top: 2px; }
+.fu-empty { font-size: 15px; padding: 18px; text-align: center; }

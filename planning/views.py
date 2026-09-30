@@ -38,6 +38,7 @@ from .excel import build_workbook
 from .forms import DraftSettingsForm, PlanForm
 from .models import Absence, Employee, StopKind, Tour, TourStop, Visit
 from .rules.ordering import STRATEGIES
+from .rules.followup import CLOSE_PICKS
 from .rules.visits import REASONS
 from .tomtom import TomTomError, current_api_key, get_client
 
@@ -677,21 +678,26 @@ def object_visits(request, target, pk):
     if building is None and order is None:
         raise PermissionDenied
     return render(request, "planning/_visits.html", {
-        **visits.object_history(building, order), "target": target, "pk": pk, "reasons_dict": dict(REASONS)})
+        **visits.object_history(building, order), "target": target, "pk": pk, "reasons_dict": dict(REASONS),
+        "close_picks": CLOSE_PICKS})
 
 
 @require_POST
-@permission_required("planning.change_tour", raise_exception=True)
+@permission_required("planning.process_visit", raise_exception=True)
 def visit_close(request, pk):
-    """'✓ abschließen – kein Nachtermin nötig' (or open again)."""
+    """🧾 box: '✓ geprüft' / '✓ abschließen – kein Nachtermin nötig' (with a reason) / open again."""
     visit = get_object_or_404(Visit, pk=pk)
     closed = request.POST.get("closed") == "1"
-    visits.close(visit, request.user, closed)
-    target = visit.building or visit.installation_order
-    record(request.user, ActivityKind.FIELD, f"{'✓ abgeschlossen – kein Nachtermin nötig' if closed else '↺ wieder offen – Nachtermin nötig'}: "
-           f"{target.street} ({visit.attempt}. Termin {day_label(visit.date)})", building=visit.building, order=visit.installation_order)
+    try:
+        visits.close(visit, request.user, closed, request.POST.get("closed_note", ""))
+    except ValidationError as error:
+        response = render(request, "core/_toast.html", {"message": error.messages[0], "error": True})
+        response["HX-Reswap"] = "none"
+        return response
     response = object_visits(request, "liegenschaft" if visit.building_id else "auftrag", visit.building_id or visit.installation_order_id)
-    response["HX-Trigger"] = "buildings-changed, orders-changed"
+    message = ("Wieder offen" if not closed else "Geprüft" if visit.outcome == "complete" else "Abgeschlossen – kein Nachtermin nötig")
+    response.write(render(request, "core/_toast.html", {"message": message}).content)
+    response["HX-Trigger"] = "buildings-changed, orders-changed, followup-changed"
     return response
 
 

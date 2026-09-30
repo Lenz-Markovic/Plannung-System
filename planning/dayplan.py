@@ -41,8 +41,8 @@ def save_field_note(stop, text, user):
         raise PermissionDenied("Das ist nicht dein Stopp.")
     stop.field_note = text.strip()
     stop.save(update_fields=["field_note", "updated_at"])  # never writes back an older Ergebnis
-    from .models import Visit
-    Visit.objects.filter(stop=stop).update(note=stop.field_note)  # the 🧾 Bearbeitung shows the current note
+    from .visits import note_changed
+    note_changed(stop, user)  # the 🧾 Bearbeitung shows the current note; a closed result opens again
     return stop
 
 

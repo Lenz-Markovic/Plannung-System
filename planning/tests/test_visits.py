@@ -119,7 +119,9 @@ def test_office_can_close_it_without_a_nachtermin(demo):
                             {"outcome": "absent", "todo": "klärt die HV", "reason": "other"})
     visit = Visit.objects.get(stop=stop)
     dispo = client_for(user(roles.DISPATCHER, "dispo"))
-    html = dispo.post(reverse("planning:visit_close", args=[visit.pk]), {"closed": "1"}).content.decode()
+    empty = dispo.post(reverse("planning:visit_close", args=[visit.pk]), {"closed": "1"})
+    assert "Bitte kurz eintragen" in empty.content.decode() and empty["HX-Reswap"] == "none"
+    html = dispo.post(reverse("planning:visit_close", args=[visit.pk]), {"closed": "1", "closed_note": "telefonisch geklärt"}).content.decode()
     assert "abgeschlossen" in html and stop.building_id not in visits.revisit_ids()[0]
 
 
@@ -231,7 +233,7 @@ def test_closed_result_cannot_be_undone_from_the_phone(demo):
     stop = tour.stops.filter(kind=StopKind.READING).first()
     report_on(stop, reader, "absent", "klärt die HV", "other")
     visit = Visit.objects.get(stop=stop)
-    visits.close(visit, user(roles.ADMIN, "adm"), True)
+    visits.close(visit, user(roles.ADMIN, "adm"), True, "klärt die HV")
     answer = client_for(reader).post(reverse("planning:stop_done", args=[stop.pk]), {"done": "0"})
     assert "schon abgeschlossen" in answer.content.decode() and Visit.objects.filter(pk=visit.pk).exists()
 

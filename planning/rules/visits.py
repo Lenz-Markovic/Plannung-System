@@ -22,6 +22,7 @@ REASONS = [
     ("no_access", "Kein Zugang (Schlüssel / Heizraum)"),
     ("refused", "Mieter hat abgelehnt"),
     ("defect", "Gerät defekt / fehlt"),
+    ("no_time", "Nicht geschafft / Termin ausgefallen"),
     ("other", "Sonstiges"),
 ]
 REASON_LABELS = dict(REASONS)

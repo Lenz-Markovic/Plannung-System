@@ -46,6 +46,11 @@ WRITE_NOTES = [
     "journal.change_note",
 ]
 
+# "🧾 Rückmeldungen bearbeiten": geprüft, abschließen (kein Nachtermin), Ergebnis nachtragen
+PROCESS_VISITS = [
+    "planning.process_visit",
+]
+
 # "🕘 Verlauf sehen": who changed what (plans, appointments, printed notices, status)
 VIEW_ACTIVITY = [
     "journal.view_activity",
@@ -100,6 +105,7 @@ ROLE_PERMISSIONS = {
         "planning.view_reports",
         *WRITE_NOTES,
         *VIEW_ACTIVITY,
+        *PROCESS_VISITS,
     ],
     PROCESSING: [
         *VIEW_DATA,
@@ -110,6 +116,7 @@ ROLE_PERMISSIONS = {
         "planning.view_reports",
         *WRITE_NOTES,
         *VIEW_ACTIVITY,
+        *PROCESS_VISITS,
     ],
     READER: [
         # "nur eigene Termine": no view_building; the views show them only

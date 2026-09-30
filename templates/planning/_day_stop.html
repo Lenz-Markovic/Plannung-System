@@ -47,7 +47,9 @@
       </div>
     {% endif %}
     <div class="day-actions">
-      {% if s.done_at %}
+      {% if s.visit.closed_at %}
+        <span class="na small">🧾 vom Büro bearbeitet ({{ s.visit.closed_by }}, {{ s.visit.closed_at|date:"d.m. H:i" }}) – Änderung bitte über das Büro</span>
+      {% elif s.done_at %}
         <button class="btn" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "0"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
                 hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">↺ Ergebnis ändern</button>
       {% else %}

@@ -48,11 +48,19 @@ def _update_tour_status(tour):
         tour.save()
 
 
-def report(stop, user, outcome, todo="", reason=""):
-    """Save the Ergebnis of a stop. Returns the Visit (None for a help stop)."""
+def report(stop, user, outcome, todo="", reason="", on_behalf=False):
+    """Save the Ergebnis of a stop. Returns the Visit (None for a help stop).
+
+    on_behalf: the office enters it after a phone call ("im Büro nachgetragen", planning.process_visit).
+    """
     from .dayplan import may_work_on
 
-    if not user.has_perm("planning.mark_stop_done") or not may_work_on(user, stop.tour):
+    if on_behalf:
+        if not user.has_perm("planning.process_visit"):
+            raise PermissionDenied("Nachtragen darf deine Rolle nicht.")
+        if stop.tour.date > timezone.localdate():
+            raise ValidationError("Nachtragen geht erst ab dem Termintag.")
+    elif not user.has_perm("planning.mark_stop_done") or not may_work_on(user, stop.tour):
         raise PermissionDenied("Diesen Stopp darfst du nicht melden.")
     if stop.kind == StopKind.HELP and outcome != COMPLETE:
         raise ValidationError("Bei einer Hilfe meldet der Plan, dem du hilfst, das Ergebnis – bitte dort Bescheid geben.")
@@ -72,6 +80,7 @@ def report(stop, user, outcome, todo="", reason=""):
         "tour": stop.tour, "people": stop.tour.people_label,
         "outcome": outcome, "reason": reason if outcome == ABSENT else "",
         "todo": todo.strip() if outcome != COMPLETE else "", "note": stop.field_note, "reported_by": user,
+        "reported_at": timezone.now(), "entered_by_office": on_behalf,
     })
     others = list(_visits_of(building, order).order_by("date", "pk"))
     visit.attempt = attempt_in_series([_info(v) for v in _earlier(others, visit.date, visit)])
@@ -93,13 +102,64 @@ def undo(stop, user):
     _update_tour_status(stop.tour)
 
 
-def close(visit, user, closed=True):
-    """Office: 'kein Nachtermin nötig' (e.g. settled on the phone) - or open it again."""
-    if not user.has_perm("planning.change_tour"):
-        raise PermissionDenied("Das darf deine Rolle nicht.")
-    visit.closed_at, visit.closed_by = (timezone.now(), user) if closed else (None, None)
-    visit.save(update_fields=["closed_at", "closed_by"])
+def _label(visit):
+    target = visit.building or visit.installation_order
+    ref = f"AZ {target.file_number}" if visit.building_id else target.re_number
+    return f"{ref} {target.street} ({visit.attempt}. Termin {visit.date:%d.%m.%Y})"
+
+
+def close(visit, user, closed=True, note=""):
+    """Office: ✓ geprüft (a complete visit) / 'kein Nachtermin nötig' with a reason (◐/✗) - or open it again.
+    Writes its own 🧾 line into the Verlauf."""
+    from journal.activity import record, who
+    from journal.models import ActivityKind
+
+    from .rules.followup import close_problems
+
+    if not user.has_perm("planning.process_visit"):
+        raise PermissionDenied("Rückmeldungen bearbeiten darf deine Rolle nicht.")
+    visit.refresh_from_db()
+    note = (note or "").strip()
+    if closed:
+        if visit.closed_at:
+            raise ValidationError(f"Schon erledigt von {who(visit.closed_by)} um "
+                                  f"{timezone.localtime(visit.closed_at):%H:%M}.")
+        problems = close_problems(visit.outcome, note)
+        if problems:
+            raise ValidationError(problems[0])
+        visit.closed_at, visit.closed_by, visit.closed_note = timezone.now(), user, note
+    else:
+        visit.closed_at, visit.closed_by = None, None  # the reason stays to pre-fill the form next time
+    visit.save(update_fields=["closed_at", "closed_by", "closed_note"])
+    if not closed:
+        text = f"↺ wieder offen: {_label(visit)}"
+    elif visit.outcome == COMPLETE:
+        text = f"✓ geprüft: {_label(visit)}" + (f": {note}" if note else "")
+    else:
+        text = f"✓ abgeschlossen – kein Nachtermin nötig: {_label(visit)}: {note}"
+    record(user, ActivityKind.OFFICE, text, tour=visit.tour, building=visit.building, order=visit.installation_order)
     return visit
+
+
+def note_changed(stop, user):
+    """A new Notiz vor Ort after the office closed the visit: it is open again (nothing slips through)."""
+    from journal.activity import record, who
+    from journal.models import ActivityKind
+
+    visit = Visit.objects.filter(stop=stop).first()
+    if visit is None:
+        return
+    fields = []
+    if visit.note != stop.field_note:
+        visit.note = stop.field_note
+        fields.append("note")
+    if visit.closed_at and "note" in fields:
+        visit.closed_at, visit.closed_by = None, None
+        fields += ["closed_at", "closed_by"]
+        record(user, ActivityKind.OFFICE, f"↺ wieder offen (neue Notiz vor Ort von {who(user)}): {_label(visit)}: "
+               f"{stop.field_note[:120]}", tour=visit.tour, building=visit.building, order=visit.installation_order)
+    if fields:
+        visit.save(update_fields=fields)
 
 
 def _planned_dates(building_ids, order_ids):

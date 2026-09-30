@@ -1,0 +1,15 @@
+<section class="fu-day" id="fu-day-{{ d.date|date:'Y-m-d' }}">
+  <h2 class="fu-day-head">{{ d.date|date:"D d.m.Y" }} · {{ d.total }} Rückmeldung{{ d.total|pluralize:"en" }} ·
+    {% if d.open %}<span class="t-warn">{{ d.open }} offen</span>{% else %}<span class="t-good">✓ Tag vollständig bearbeitet</span>{% endif %}
+    {% if perms.planning.process_visit and d.quiet %}
+      <button class="btn mini" hx-post="{% url 'planning:followup_quiet' %}" hx-vals='{"tag": "{{ d.date|date:'Y-m-d' }}"}'
+              hx-include="#fu-filters" hx-target="#fu-day-{{ d.date|date:'Y-m-d' }}" hx-swap="outerHTML"
+              hx-confirm="{{ d.quiet }} unauffällige Ablesungen (✓ fertig, ohne Notiz, ohne Problem) als geprüft abhaken?">✓ {{ d.quiet }} unauffällige abhaken</button>
+    {% endif %}
+  </h2>
+  {% for people, items in d.persons %}
+    <div class="fu-person"><div class="fu-person-head">👤 <b>{{ people }}</b></div>
+      {% for e in items %}{% include "planning/_followup_entry.html" %}{% endfor %}
+    </div>
+  {% endfor %}
+</section>

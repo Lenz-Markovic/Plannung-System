@@ -12,6 +12,7 @@ import datetime
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.models import GeocodedAddress, TimeStampedModel
@@ -301,16 +302,21 @@ class Visit(models.Model):
     note = models.TextField("Notiz vor Ort", blank=True)
     reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="gemeldet von", null=True,
                                     on_delete=models.SET_NULL, related_name="+")
-    reported_at = models.DateTimeField("gemeldet am", auto_now=True)
-    # the office decides that no further visit is needed ("✓ abgeschlossen")
+    reported_at = models.DateTimeField("gemeldet am", default=timezone.now)  # set by report(); office saves never move it
+    entered_by_office = models.BooleanField("im Büro nachgetragen", default=False)
+    # the office is done with this Rückmeldung: for ✓ it means "geprüft", for ◐/✗ "kein Nachtermin nötig"
+    # (planning/followup.py). Anything that reads closed_at must also look at the outcome.
     closed_at = models.DateTimeField("abgeschlossen am", null=True, blank=True)
     closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="abgeschlossen von", null=True, blank=True,
                                   on_delete=models.SET_NULL, related_name="+")
+
+    closed_note = models.CharField("Bemerkung Büro", max_length=300, blank=True)  # why closed / Vermerk on "geprüft"
 
     history = HistoricalRecords()
 
     class Meta:
         ordering = ["date", "pk"]
+        permissions = [("process_visit", "Rückmeldungen bearbeiten (geprüft, abschließen, nachtragen)")]
         verbose_name = "Termin-Ergebnis"
         verbose_name_plural = "Termin-Ergebnisse"
         constraints = [

@@ -1,0 +1,138 @@
+{% load core_tags %}
+{# One Rückmeldung: state, object, what happened, what is still to do, the next step and its buttons. #}
+{% with v=e.visit t=e.target %}
+<article class="fu-entry {{ e.state }}{% if not e.is_open %} done{% endif %}{% if e.has_problem %} problem{% endif %}" id="fu-{{ e.key }}">
+  <div class="fu-head">
+    <span class="fu-state {{ e.state }}">{{ labels|get_item:e.state }}</span>
+    <span class="fu-object">{% if e.kind == "installation" %}🔧 Montage{% else %}📖 Ablesung{% endif %} · <b>{{ e.ref }}</b> ·
+      {{ t.street }}, {{ t.zip_code }} {{ t.city }}</span>
+  </div>
+
+  {% if v %}
+    <div class="fu-result">
+      <span class="attempt-tag">{{ v.attempt }}. Termin</span>
+      {% if v.outcome == "complete" %}<b>✓ fertig (100 %)</b>{% elif v.outcome == "partial" %}<b>◐ teilweise erledigt</b>{% else %}<b>✗ nicht erledigt</b>{% endif %}
+      {% if v.reason %}– {{ reasons_dict|get_item:v.reason }}{% endif %}
+      {% if v.todo %}<div>Noch zu tun: <b>{{ v.todo }}</b></div>{% endif %}
+      {% if v.note %}<div>📱 vor Ort: {{ v.note }}</div>{% endif %}
+      <div class="na small">gemeldet {{ v.reported_at|date:"d.m. H:i" }}{% if v.reported_by %} von {{ v.reported_by }}{% endif %}
+        {% if v.entered_by_office %} · 📝 im Büro nachgetragen{% endif %}</div>
+    </div>
+  {% elif e.stop %}
+    <div class="fu-result">Für diesen Termin (Stopp {{ e.stop.position }} im Plan von {{ e.stop.tour.people_label }},
+      {{ e.stop.tour.date|date:"D d.m." }}) wurde <b>kein Ergebnis</b> gemeldet – bitte nachfragen.
+      <a href="{% url 'planning:calendar' %}?datum={{ e.stop.tour.date|date:'Y-m-d' }}">📅 im Kalender</a></div>
+  {% endif %}
+
+  {% if e.building and e.object_key.0 == "building" %}
+    <div class="na small">Status: <b>{{ e.building.get_status_display }}</b>{% if e.building.property_manager %} · HV: {{ e.building.property_manager.name }}{% endif %}
+      {% if e.deadline %} · 📄 Unterlagen da – Frist bis {{ e.deadline.deadline_end|date:"d.m." }}{% if e.deadline.days_left > 0 %} (noch {{ e.deadline.days_left }} Tage){% else %} (<b class="t-crit">überfällig</b>){% endif %}{% endif %}</div>
+  {% endif %}
+
+  {% for n in e.problems %}
+    <div class="stop-note problem">⚠ <b>Problem vor Ort</b> ({{ n.author|default:"?" }} {{ n.created_at|date:"d.m. H:i" }}): {{ n.text }}
+      {% if perms.journal.change_note %}
+        <form class="fu-inline" hx-post="{% url 'planning:followup_action' e.key %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+          <input type="hidden" name="action" value="resolve"><input type="hidden" name="note" value="{{ n.pk }}">
+          <input name="answer" maxlength="200" placeholder="Wie gelöst? (optional)">
+          <button class="btn mini {% if e.primary == 'resolve' %}primary{% endif %}">✓ Problem erledigt</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+  {% for n in e.wishes %}<div class="stop-note wish">📅 <b>Terminwunsch</b> ({{ n.author|default:"?" }} {{ n.created_at|date:"d.m." }}): {{ n.text }}</div>{% endfor %}
+  {% if e.proposal %}
+    <div class="stop-note">🏷 Vorschlag vom Ableser: <b>{% if e.proposal == "released" %}freigegeben{% elif e.proposal == "rework" %}Nacharbeit{% else %}offen{% endif %}</b>
+      {% if e.can_accept %}<button class="btn mini" hx-post="{% url 'planning:followup_action' e.key %}" hx-vals='{"action": "accept"}'
+              hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">✓ Vorschlag übernehmen</button>{% endif %}</div>
+  {% endif %}
+  {% for h in e.hints %}<div class="fu-hint">💡 {{ h }}</div>{% endfor %}
+
+  {% if e.step %}<div class="fu-step">Nächster Schritt: {{ e.step }}</div>{% endif %}
+
+  {% if e.is_open or e.state == "planned" %}
+  <div class="fu-actions">
+    {% if e.state == "check" and e.object_key.0 == "building" %}
+      {% if e.can_release %}<button class="btn mini {% if e.primary == 'release' %}primary{% endif %}" hx-post="{% url 'planning:followup_action' e.key %}"
+              hx-vals='{"action": "release"}' hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">✓ freigeben{% if e.proposal == "released" %} (wie vorgeschlagen){% endif %}</button>{% endif %}
+      {% if e.can_rework %}<button class="btn mini" hx-post="{% url 'planning:followup_action' e.key %}" hx-vals='{"action": "rework"}'
+              hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">▲ Nacharbeit</button>{% endif %}
+      {% if perms.planning.process_visit %}
+        <form class="fu-inline" hx-post="{% url 'planning:followup_action' e.key %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+          <input type="hidden" name="action" value="check"><input name="closed_note" maxlength="300" placeholder="Vermerk (optional)">
+          <button class="btn mini {% if e.primary == 'check' %}primary{% endif %}">✓ geprüft</button></form>
+      {% endif %}
+    {% elif e.state == "check" %}
+      {% if perms.buildings.change_installationorder %}<button class="btn mini {% if e.primary == 'finish_order' %}primary{% endif %}"
+              hx-post="{% url 'planning:followup_action' e.key %}" hx-vals='{"action": "finish_order"}' hx-target="#fu-{{ e.key }}"
+              hx-swap="outerHTML">✓ Auftrag erledigt</button>{% endif %}
+    {% endif %}
+
+    {% if e.state == "revisit" or e.state == "missing" %}
+      {% if perms.planning.add_tour %}
+        {% if e.object_key.0 == "building" %}
+          <label class="fu-plan {% if e.primary == 'plan' %}primary{% endif %}"><input type="checkbox" name="checked" {% if e.building.pk in selection %}checked{% endif %}
+                 hx-post="{% url 'planning:select' %}" hx-vals='{"building": "{{ e.building.pk }}"}' hx-target="#plan-bar" hx-swap="outerHTML"> für Nachtermin vormerken</label>
+        {% else %}
+          <label class="fu-plan {% if e.primary == 'plan' %}primary{% endif %}"><input type="checkbox" name="checked" {% if e.order.pk in order_selection %}checked{% endif %}
+                 hx-post="{% url 'orders:select' %}" hx-vals='{"order": "{{ e.order.pk }}"}' hx-target="#order-plan-bar" hx-swap="outerHTML"> für Nachtermin vormerken</label>
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+    {% if e.state == "revisit" %}
+      {% if perms.journal.add_note and not perms.planning.add_tour %}{# the Disposition plans it itself #}
+        <details class="fu-more"><summary class="btn mini {% if e.primary == 'wish' %}primary{% endif %}">📅 Terminwunsch an Disposition …</summary>
+          <form hx-post="{% url 'planning:followup_action' e.key %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+            <input type="hidden" name="action" value="wish">
+            <textarea name="wish" rows="2" required placeholder="Terminwunsch / Absprache, z. B. Mieterin ab 16 Uhr, Tel. …"></textarea>
+            <button class="btn mini primary">An Disposition geben</button></form></details>
+      {% endif %}
+      {% if perms.planning.process_visit %}
+        <details class="fu-more"><summary class="btn mini">✓ abschließen – kein Nachtermin nötig …</summary>
+          <form hx-post="{% url 'planning:followup_action' e.key %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+            <input type="hidden" name="action" value="close">
+            <input name="closed_note" list="fu-picks" required maxlength="300" value="{{ v.closed_note }}" placeholder="Warum kein Nachtermin?">
+            <button class="btn mini primary">Abschließen</button></form></details>
+      {% endif %}
+    {% endif %}
+
+    {% if e.state == "missing" and perms.planning.process_visit %}
+      <button class="btn mini {% if e.primary == 'report' %}primary{% endif %}" hx-post="{% url 'planning:followup_report' e.stop.pk %}"
+              hx-vals='{"outcome": "complete"}' hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">✓ fertig nachtragen</button>
+      <details class="fu-more"><summary class="btn mini">◐ teilweise …</summary>
+        <form hx-post="{% url 'planning:followup_report' e.stop.pk %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+          <input type="hidden" name="outcome" value="partial">
+          <textarea name="todo" rows="2" required placeholder="Was ist noch zu tun? (Pflicht)"></textarea>
+          <button class="btn mini primary">Nachtragen</button></form></details>
+      <details class="fu-more"><summary class="btn mini">✗ nicht erledigt …</summary>
+        <form hx-post="{% url 'planning:followup_report' e.stop.pk %}" hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">
+          <input type="hidden" name="outcome" value="absent">
+          <select name="reason">{% for value, label in reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+          <textarea name="todo" rows="2" required placeholder="Was ist noch zu tun? (Pflicht)"></textarea>
+          <button class="btn mini primary">Nachtragen</button></form></details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="fu-done">
+    {% if v.closed_at %}
+      {% if v.outcome == "complete" %}✓ geprüft{% else %}✓ abgeschlossen – kein Nachtermin nötig{% endif %}
+      {% if v.closed_note %}: „{{ v.closed_note }}“{% endif %} – {{ v.closed_by|default:"?" }} {{ v.closed_at|date:"d.m. H:i" }}
+      {% if perms.planning.process_visit and e.state == "done" %}
+        · <button class="linkish" hx-post="{% url 'planning:followup_action' e.key %}" hx-vals='{"action": "reopen"}'
+                  hx-target="#fu-{{ e.key }}" hx-swap="outerHTML">↺ wieder öffnen</button>{% endif %}
+    {% elif e.state == "done" and e.object_key.0 == "building" %}✓ erledigt: freigegeben
+    {% elif e.state == "done" %}✓ erledigt: Auftrag erledigt
+    {% elif e.state == "planned" %}📅 Nachtermin geplant: <b>{{ e.planned_on|date:"D d.m.Y" }}</b>{% if e.planned_attempt %} · {{ e.planned_attempt }}. Termin{% endif %}
+    {% elif e.state == "later" %}↪ später wieder besucht{% endif %}
+  </div>
+
+  <div class="fu-links na small">
+    <button type="button" class="linkish" hx-get="{% url 'planning:visits' e.target_key e.object_key.1 %}" hx-target="#fu-box-{{ e.key }}">🧾 alle Termine</button>
+    {% if perms.journal.view_activity %} · <button type="button" class="linkish" hx-get="{% url 'journal:activity' %}?{{ e.target_key }}={{ e.object_key.1 }}" hx-target="#drawer">🕘 Verlauf</button>{% endif %}
+    · {% if e.object_key.0 == "building" %}<a href="{% url 'buildings:list' %}?q={{ e.building.file_number }}">↗ in der Liste</a>{% else %}<a href="{% url 'orders:list' %}?q={{ e.order.re_number }}">↗ in der Liste</a>{% endif %}
+  </div>
+  <div id="fu-box-{{ e.key }}"></div>
+</article>
+{% endwith %}

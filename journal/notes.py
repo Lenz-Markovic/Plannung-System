@@ -41,7 +41,7 @@ def add_note(user, text, kind=NoteKind.INFO, building=None, order=None):
     return note
 
 
-def set_resolved(note, user, done=True):
+def set_resolved(note, user, done=True, answer=""):
     if not user.has_perm("journal.change_note"):
         raise PermissionDenied("Notizen abhaken darf deine Rolle nicht.")
     note.refresh_from_db()
@@ -50,7 +50,8 @@ def set_resolved(note, user, done=True):
     note.resolved_at, note.resolved_by = (timezone.now(), user) if done else (None, None)
     note.save(update_fields=["resolved_at", "resolved_by"])
     what = "erledigt" if done else "wieder offen"
-    record(user, ActivityKind.NOTE, f"{_mark(note)}{note.get_kind_display()} {what}: {note.text[:120]}",
+    how = f" – Wie gelöst: {answer.strip()[:200]}" if done and (answer or "").strip() else ""
+    record(user, ActivityKind.NOTE, f"{_mark(note)}{note.get_kind_display()} {what}: {note.text[:120]}{how}",
            building=note.building, order=note.installation_order)
     return note
 

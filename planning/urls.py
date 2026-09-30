@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import followup_views, views
 
 app_name = "planning"
 
@@ -34,6 +34,12 @@ urlpatterns = [
     path("mein-tag/", views.my_day, name="my_day"),
     path("stopp/<int:pk>/ergebnis/", views.stop_report, name="stop_report"),
     path("bearbeitung/<str:target>/<int:pk>/", views.object_visits, name="visits"),
+    path("rueckmeldungen/", followup_views.followup_page, name="followup"),
+    path("rueckmeldungen/zaehler/", followup_views.followup_badge, name="followup_badge"),
+    path("rueckmeldungen/zahlen/", followup_views.followup_counts, name="followup_counts"),
+    path("rueckmeldungen/eintrag/<str:key>/", followup_views.followup_action, name="followup_action"),
+    path("rueckmeldungen/stopp/<int:pk>/nachtragen/", followup_views.followup_report, name="followup_report"),
+    path("rueckmeldungen/abhaken/", followup_views.followup_quiet, name="followup_quiet"),
     path("bearbeitung/termin/<int:pk>/abschliessen/", views.visit_close, name="visit_close"),
     path("mein-tag/pruefen/<int:pk>/", views.my_day_check, name="my_day_check"),
     path("stopp/<int:pk>/erledigt/", views.stop_done, name="stop_done"),

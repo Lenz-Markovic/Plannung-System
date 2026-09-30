@@ -24,6 +24,12 @@
     {% if perms.buildings.view_installationorder %}
       <a class="tab {% if request.resolver_match.app_name == 'orders' %}on{% endif %}" href="{% url 'orders:list' %}">🔧 Montage</a>
     {% endif %}
+    {% if perms.planning.view_tour %}
+      {# 🧾 what came back from the field and still needs the office (planning/followup.py) #}
+      <a class="tab {% if request.resolver_match.url_name == 'followup' %}on{% endif %}" href="{% url 'planning:followup' %}">🧾 Rückmeldungen
+        <span id="rm-badge" hx-get="{% url 'planning:followup_badge' %}"
+              hx-trigger="load, followup-changed from:body, buildings-changed from:body, orders-changed from:body, notes-changed from:body, every 60s"></span></a>
+    {% endif %}
     {% if perms.documents.view_costdocumentreceipt %}
       <a class="tab {% if request.resolver_match.app_name == 'documents' %}on{% endif %}" href="{% url 'documents:list' %}">📄 Unterlagen <span id="ul-badge"></span></a>
     {% endif %}

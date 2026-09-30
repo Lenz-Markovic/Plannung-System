@@ -21,11 +21,24 @@
         {% if v.todo %}<div>Noch zu tun: <b>{{ v.todo }}</b></div>{% endif %}
         {% if v.note %}<div>📱 vor Ort: {{ v.note }}</div>{% endif %}
         <div class="na small">gemeldet {{ v.reported_at|date:"d.m. H:i" }}{% if v.reported_by %} von {{ v.reported_by }}{% endif %}
-          {% if v.closed_at %} · ✓ abgeschlossen {{ v.closed_at|date:"d.m." }}{% if v.closed_by %} von {{ v.closed_by }}{% endif %}{% endif %}
-          {% if perms.planning.change_tour and v.outcome != "complete" and forloop.last %}
-            · <button class="linkish" hx-post="{% url 'planning:visit_close' v.pk %}" hx-vals='{"closed": "{% if v.closed_at %}0{% else %}1{% endif %}"}'
-                      hx-target="#visits-{{ target }}-{{ pk }}" hx-swap="outerHTML">{% if v.closed_at %}↺ doch Nachtermin nötig{% else %}✓ abschließen – kein Nachtermin nötig{% endif %}</button>
-          {% endif %}</div>
+          {% if v.entered_by_office %} · 📝 im Büro nachgetragen{% endif %}
+          {% if v.closed_at %} · {% if v.outcome == "complete" %}✓ geprüft{% else %}✓ abgeschlossen – kein Nachtermin nötig{% endif %}
+            {{ v.closed_at|date:"d.m." }}{% if v.closed_by %} von {{ v.closed_by }}{% endif %}{% if v.closed_note %}: „{{ v.closed_note }}“{% endif %}{% endif %}</div>
+        {% if perms.planning.process_visit and forloop.last %}
+          {% if v.closed_at %}
+            <button class="linkish small" hx-post="{% url 'planning:visit_close' v.pk %}" hx-vals='{"closed": "0"}'
+                    hx-target="#visits-{{ target }}-{{ pk }}" hx-swap="outerHTML">↺ wieder öffnen</button>
+          {% elif v.outcome == "complete" %}
+            <button class="linkish small" hx-post="{% url 'planning:visit_close' v.pk %}" hx-vals='{"closed": "1"}'
+                    hx-target="#visits-{{ target }}-{{ pk }}" hx-swap="outerHTML">✓ geprüft</button>
+          {% else %}
+            <form class="fu-inline close-form" hx-post="{% url 'planning:visit_close' v.pk %}" hx-target="#visits-{{ target }}-{{ pk }}" hx-swap="outerHTML">
+              <input type="hidden" name="closed" value="1">
+              <input name="closed_note" list="close-picks-{{ target }}-{{ pk }}" required maxlength="300" value="{{ v.closed_note }}" placeholder="Warum kein Nachtermin?">
+              <datalist id="close-picks-{{ target }}-{{ pk }}">{% for pick in close_picks %}<option value="{{ pick }}">{% endfor %}</datalist>
+              <button class="btn mini">✓ abschließen – kein Nachtermin nötig</button></form>
+          {% endif %}
+        {% endif %}
       </li>
     {% empty %}
       <li class="na small">Noch kein Termin vor Ort gemeldet.</li>

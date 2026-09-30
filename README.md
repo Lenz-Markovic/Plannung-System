@@ -285,6 +285,29 @@ The only JavaScript is `static/js/calendar.js` (commented).
   "✓ abschließen – kein Nachtermin nötig" for the office (e.g. settled on the phone).
 - Mein Tag on a PC is the normal page again (no phone frame).
 
+## 🧾 Rückmeldungen (office worklist after the visits)
+
+New tab **🧾 Rückmeldungen** (badge = open entries). Day by day and person by person it
+lists what the office still has to do after the visits (`planning/rules/followup.py`,
+`planning/followup.py`). Nothing is decided automatically; every click is in the 🕘 Verlauf.
+
+- States: **✓ fertig – im Büro prüfen** · **🔁 Nachtermin nötig** · **📅 Nachtermin geplant**
+  (with "2. / 3. Termin") · **❓ keine Rückmeldung** (past stops of the last 30 days without
+  Ergebnis) · **⚠ Problem vor Ort** · **✓ erledigt**. Filter chips count each state; a
+  day picker (◀ Vortag / Folgetag ▶) and a search (AZ, RE-Nr., street, person).
+- Every entry shows the result, "noch zu tun", the note on site, who reported it and the
+  **Nächster Schritt** for *your* role, with its main button:
+  - Sachbearbeitung: **✓ freigeben** / ▲ Nacharbeit / **✓ geprüft**, **📅 Terminwunsch an
+    Disposition** (a wish note), **✓ abschließen – kein Nachtermin nötig** (reason required),
+    **✓ Problem erledigt** (with "wie gelöst"), **📝 nachtragen** for ❓ (after a phone call).
+  - Disposition: **für Nachtermin vormerken** → 🗺 Fahrplan erstellen, ✓ Auftrag erledigt.
+  - Leitung: sees everything, no buttons.
+  - "✓ n unauffällige abhaken" checks all plain ✓ readings of a day in one go.
+- After the office closed an Ergebnis, the phone can no longer undo it ("vom Büro
+  bearbeitet"); a new note on site opens it again, so nothing slips through.
+- New right **"Rückmeldungen bearbeiten"** (`planning.process_visit`) for Disposition and
+  Sachbearbeitung; added automatically by `python manage.py migrate`.
+
 ## 📱 Reports from "Mein Tag" (live in the office)
 
 - On the phone every stop has "Notiz vor Ort" and **⚠ Problem ans Büro melden** (the note

@@ -1,0 +1,14 @@
+{% load core_tags %}
+{# the chips (filters) - refreshed after every action; "neue Rückmeldungen" when reports came in #}
+<div id="fu-counts" class="ul-zahlen" {% if oob %}hx-swap-oob="true"{% endif %}
+     hx-get="{% url 'planning:followup_counts' %}?stand={{ stamp|urlencode }}" hx-include="#fu-filters"
+     hx-trigger="followup-changed from:body, every 60s" hx-target="this" hx-swap="outerHTML">
+  {% for key, label in filters %}
+    <label class="ul-f {% if key == 'nachtermin' or key == 'ohne' or key == 'probleme' %}red{% elif key == 'pruefen' %}yellow{% elif key == 'erledigt' %}green{% endif %} {% if chosen == key %}an{% endif %}">
+      <input type="radio" name="f" value="{{ key }}" {% if chosen == key %}checked{% endif %} hidden form="fu-filters"><b>{{ counts|get_item:key }}</b> {{ label }}</label>
+  {% endfor %}
+  {% if news %}
+    <button type="button" class="btn mini primary" hx-get="{% url 'planning:followup' %}" hx-include="#fu-filters"
+            hx-target="#followup-list" hx-swap="outerHTML">🔄 Neue Rückmeldungen – Liste neu laden</button>
+  {% endif %}
+</div>
