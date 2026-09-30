@@ -28,6 +28,7 @@
     <div class="sm-group"><div class="sm-title">Planen</div>
       {% if perms.planning.add_tour %}
         <button type="button" class="sm-btn" hx-get="{% url 'planning:dialog' %}" hx-target="#modal" data-menu-close>🗺 Fahrplan erstellen (Angekreuztes)</button>
+        <a class="sm-btn" href="{% url 'planning:week' %}">🗓 Wochenplanung (von Hand)</a>
         <a class="sm-btn" href="{% url 'planning:calendar' %}?frei=1">🗓 Erste freie Tage</a>
         {% if FEATURES.autoplan %}<a class="sm-btn" href="{% url 'planning:autoplan' %}">🤖 Automatisch planen</a>{% endif %}
       {% endif %}

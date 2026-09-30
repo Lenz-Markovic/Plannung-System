@@ -227,6 +227,28 @@ The only JavaScript is `static/js/calendar.js` (commented).
   Calendar ("🤝 1× Hilfe"), Excel and "Mein Tag" show the help stop. Deleting one of
   the plans marks the other one for recalculation.
 
+## 🗓 Wochenplanung (by hand)
+
+☰ Menü → **🗓 Wochenplanung** (Admin, Disposition): the whole week for everyone on one board.
+**The office decides** – nothing is spread automatically (the frozen 🤖 autoplan stays off).
+Code: `planning/rules/week.py` (pure), `planning/week.py`, `planning/week_views.py`, `static/js/week.js`.
+
+- ◀ **KW** ▶, Art (Ablesung / Montage), search. Rows = people (📖 / 🔧 from their master data),
+  columns = Monday–Friday.
+- Left: **Noch nicht geplant** – open objects without an appointment and 🔁 Nachtermine
+  (✓ ticked in Liegenschaften/Montage first, then Nachtermine, then with a date window, then by
+  postcode), with minutes, assigned person and "frühestens / spätestens" from the Montage rule.
+- **Tick objects → click "+ hierher"** on a free day of a person, or **drag** one object onto a
+  day (the ticked ones come along). An object in a day can be dragged to another day (it moves,
+  never twice). ✕ takes it back to the list, "✕ Tag leeren" the whole day.
+- Every day shows the estimated hours (work + ~drive): "noch Platz" under 6 h, **red** above the
+  person's maximum. Wrong kind for the person (e.g. Montage for a pure Ableser) is refused.
+- Existing plans (📅, also 🤝 in a team) and absences (🏖) are shown and **never overwritten**.
+- **🔍 prüfen** opens one day in "Fahrplan prüfen" (exact TomTom times, order, Bist du sicher?).
+  **✓ Alle … vorläufig erstellen** saves every day of the week as a provisional plan (in the
+  Verlauf as usual) – then confirm them in the calendar. The draft of a week stays in your
+  session until then; "Entwurf verwerfen" drops it.
+
 ## 🤖 Automatic planning (FROZEN – switched off)
 
 > Decided with the team: this function is frozen for now and will be developed further
@@ -294,7 +316,7 @@ left with every page, action and quick filter as a button – only what the role
 
 - **Seiten:** Liegenschaften, Montage, Rückmeldungen, Unterlagen, Konflikte (with their
   red numbers), Kalender, 🛰 Wer ist wo?, 📊 Übersicht, Mein Tag.
-- **Planen:** 🗺 Fahrplan erstellen (with what is ticked), 🗓 Erste freie Tage (opens the calendar
+- **Planen:** 🗺 Fahrplan erstellen (with what is ticked), 🗓 Wochenplanung (by hand), 🗓 Erste freie Tage (opens the calendar
   with it switched on), 📄 Alle Fahrpläne (Excel).
 - **Quick filters** (one click instead of choosing in the filter fields): Rückmeldungen (prüfen,
   Nachtermin, keine Rückmeldung, Probleme, geplant, "seitlich öffnen"), Liegenschaften (offen,

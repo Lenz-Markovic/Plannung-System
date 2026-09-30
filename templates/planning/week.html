@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Wochenplanung{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🗓 Wochenplanung</h1>
+  <span class="sub">Die ganze Woche für alle auf einen Blick – <b>du entscheidest</b>, wer wann wohin fährt. Nichts wird automatisch verteilt.</span>
+</header>
+
+<form id="week-params" class="filters wk-params" method="get">
+  <div class="wk-weekpick">
+    <a class="btn mini" href="?kw={{ previous|date:'Y-m-d' }}&art={{ art }}" title="Vorwoche">◀</a>
+    <b class="wk-label">{{ label }}</b>
+    <a class="btn mini" href="?kw={{ next|date:'Y-m-d' }}&art={{ art }}" title="Folgewoche">▶</a>
+    {% if monday != this_week %}<a class="btn mini" href="?art={{ art }}">diese Woche</a>{% endif %}
+    <input type="hidden" name="kw" value="{{ monday|date:'Y-m-d' }}">
+  </div>
+  <label class="ov-kind">Art <select name="art" onchange="this.form.submit()"><option value="">alle</option>
+    <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+    <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+  <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="AZ, RE, Straße, PLZ, Ort, Person"
+    hx-get="{% url 'planning:week' %}" hx-include="#week-params" hx-target="#week-pool" hx-swap="outerHTML"
+    hx-trigger="input changed delay:300ms, search"></label>
+</form>
+
+<ol class="wk-howto na small">
+  <li>Links in <b>„Noch nicht geplant“</b> Objekte ankreuzen (oder eins direkt in einen Tag <b>ziehen</b>).</li>
+  <li>Auf einen <b>freien Tag</b> einer Person klicken → die Objekte kommen dorthin. Ein Objekt aus einem Tag lässt sich in einen anderen ziehen.</li>
+  <li>Die Stunden je Tag sind geschätzt. <b>🔍 prüfen</b> öffnet den Tag in „Fahrplan prüfen“ mit genauen Zeiten – oder unten <b>alle vorläufig erstellen</b>.</li>
+</ol>
+
+<div class="wk-grid">
+  {% include "planning/_week_pool.html" %}
+  {% include "planning/_week_board.html" %}
+</div>
+<script src="{% static 'js/week.js' %}?v={{ STATIC_VERSION }}"></script>
+{% endblock %}

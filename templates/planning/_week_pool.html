@@ -1,0 +1,20 @@
+{# "Noch nicht geplant": open objects (and 🔁 Nachtermine) not in this week's draft - tick, then click a day #}
+<form id="week-pool" class="wk-pool" {% if oob %}hx-swap-oob="true"{% endif %} onsubmit="return false">
+  <div class="wk-pool-head"><b>Noch nicht geplant</b> <span class="na small">{{ pool_found }}{% if pool_found > pool|length %} · die ersten {{ pool|length }} – bitte suchen{% endif %}</span></div>
+  <div class="wk-pool-bar na small"><span id="wk-picked">0 angekreuzt</span> ·
+    <button type="button" class="linkish" data-wk-none>keine</button></div>
+  <div class="wk-pool-list">
+    {% for i in pool %}
+      <label class="wk-item {{ i.kind }}" draggable="true" data-item="{{ i.value }}">
+        <input type="checkbox" name="item" value="{{ i.value }}" {% if i.ticked %}checked{% endif %}>
+        <span class="wk-item-main">
+          <span>{% if i.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ i.ref }}</b> · {{ i.minutes }} min
+            {% if i.revisit %}<span class="wk-tag crit">🔁 Nachtermin</span>{% endif %}{% if i.ticked %}<span class="wk-tag">✓ angekreuzt</span>{% endif %}</span>
+          <span class="wk-item-addr">{{ i.street }}, {{ i.zip }} {{ i.city }}</span>
+          {% if i.person or i.earliest or i.latest %}<span class="na small">{% if i.person %}👤 {{ i.person }}{% endif %}
+            {% if i.earliest %} · frühestens {{ i.earliest|date:"d.m." }}{% endif %}{% if i.latest %} · spätestens {{ i.latest|date:"d.m." }}{% endif %}</span>{% endif %}
+        </span>
+      </label>
+    {% empty %}<p class="na small p-2">Nichts offen{% if q %} für „{{ q }}“{% endif %}.</p>{% endfor %}
+  </div>
+</form>

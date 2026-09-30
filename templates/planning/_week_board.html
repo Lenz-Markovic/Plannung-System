@@ -1,0 +1,55 @@
+{% load core_tags %}
+{# The week: people × Monday-Friday. Existing plans and absences are shown, never overwritten. #}
+<div id="week-board" class="wk-board" data-place="{% url 'planning:week_place' %}">
+  <div class="table-responsive"><table class="wk-table">
+    <thead><tr><th class="wk-person-col">Person</th>{% for d in dates %}<th>{{ d|date:"D d.m." }}</th>{% endfor %}</tr></thead>
+    <tbody>
+      {% for person, cells in rows %}
+        <tr><th class="wk-person"><span class="where-dot" style="background: {{ person.calendar_color }}"></span> {{ person.short_name }}
+          <span class="na small">{% if person.can_read %}📖{% endif %}{% if person.can_install %}🔧{% endif %}</span></th>
+          {% for c in cells %}
+            <td class="wk-cell {{ c.state }}{% if c.level %} {{ c.level }}{% endif %}" {% if c.droppable %}data-drop data-employee="{{ person.pk }}" data-date="{{ c.iso }}"{% endif %}>
+              {% if c.state == "absent" %}<span class="wk-note">🏖 {{ c.absence.get_kind_display }}</span>
+              {% elif c.state == "planned" or c.state == "team" %}
+                <a class="wk-note" href="{% url 'planning:calendar' %}?datum={{ c.iso }}" title="Plan im Kalender öffnen">
+                  {% if c.state == "team" %}🤝 im Team von {{ c.tour.employee }}{% else %}📅 Plan{% endif %} · {{ c.tour.stops.all|length }} Stopps · {{ c.tour.net_minutes|hours }}
+                  {% if c.tour.status == "provisional" %}<br>⏳ vorläufig{% endif %}</a>
+              {% else %}
+                {% for i in c.items %}
+                  <div class="wk-stop" draggable="true" data-item="{{ i.value }}">
+                    <span>{% if i.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ i.ref }}</b> {{ i.street }}, {{ i.city }} · {{ i.minutes }} min
+                      {% if i.hint %}<span class="wk-hint">⚠ {{ i.hint }}</span>{% endif %}</span>
+                    <button type="button" class="wk-x" title="Aus dem Tag nehmen" hx-post="{% url 'planning:week_remove' %}"
+                            hx-vals='{"employee": "{{ person.pk }}", "date": "{{ c.iso }}", "item": "{{ i.value }}"}' hx-include="#week-params"
+                            hx-target="#week-board" hx-swap="outerHTML">✕</button>
+                  </div>
+                {% endfor %}
+                {% if c.items %}
+                  <div class="wk-load {{ c.level }}">≈ {{ c.hours }}{% if c.level == "over" %} – zu viel!{% elif c.level == "under" %} – noch Platz{% endif %}</div>
+                  <div class="wk-day-btns">
+                    <button type="button" class="btn mini" hx-post="{% url 'planning:week_open' %}" hx-vals='{"employee": "{{ person.pk }}", "date": "{{ c.iso }}"}'
+                            hx-include="#week-params" hx-target="#week-board" hx-swap="outerHTML" title="In „Fahrplan prüfen“ öffnen: genaue Zeiten, Reihenfolge">🔍 prüfen</button>
+                    <button type="button" class="btn mini" hx-post="{% url 'planning:week_remove' %}" hx-vals='{"employee": "{{ person.pk }}", "date": "{{ c.iso }}"}'
+                            hx-include="#week-params" hx-target="#week-board" hx-swap="outerHTML">✕ Tag leeren</button>
+                  </div>
+                {% endif %}
+                <button type="button" class="wk-add" hx-post="{% url 'planning:week_place' %}" hx-vals='{"employee": "{{ person.pk }}", "date": "{{ c.iso }}"}'
+                        hx-include="#week-params, #week-pool" hx-target="#week-board" hx-swap="outerHTML">+ {% if c.items %}mehr {% endif %}hierher</button>
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+      {% empty %}<tr><td colspan="6" class="na">Keine Personen für diese Art.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+
+  <div class="wk-footer">
+    {% if totals.days %}
+      <span>Entwurf {{ label }}: <b>{{ totals.days }} Tag{{ totals.days|pluralize:"e" }}</b> · <b>{{ totals.stops }} Stopps</b> · ≈ {{ totals_hours }}</span>
+      <button type="button" class="btn primary" hx-post="{% url 'planning:week_save' %}" hx-include="#week-params" hx-target="#week-board" hx-swap="outerHTML"
+              hx-confirm="Bist du sicher? {{ totals.days }} Fahrpläne werden vorläufig erstellt – danach bitte im Kalender prüfen und bestätigen.">✓ Alle {{ totals.days }} vorläufig erstellen</button>
+      <button type="button" class="btn" hx-post="{% url 'planning:week_clear' %}" hx-include="#week-params" hx-target="#week-board" hx-swap="outerHTML"
+              hx-confirm="Den ganzen Entwurf dieser Woche verwerfen?">Entwurf verwerfen</button>
+    {% else %}<span class="na">Noch nichts im Entwurf dieser Woche.</span>{% endif %}
+  </div>
+</div>

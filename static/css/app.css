@@ -945,3 +945,53 @@ button.cal-pill:hover { border-color: var(--axis); }
 @media (max-width: 640px) { .ov-xlabel.wide { display: none; } .ov-xlabel.narrow { display: block; } .ov-cols { margin-left: 28px; } .ov-hbar { grid-template-columns: 40% 1fr 30px; } }
 .ov-st-cell { min-width: 180px; }
 .ov-share-mini { display: flex; height: 10px; margin: 3px 0 2px; }
+
+/* ---- 🗓 Wochenplanung (by hand) ----------------------------------------------------------- */
+.wk-params { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.wk-params input[type=search] { font: inherit; padding: 3px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; min-width: 220px; }
+.wk-weekpick { display: flex; gap: 6px; align-items: center; }
+.wk-label { font-size: 15px; }
+.wk-howto { margin: 8px 0 10px; padding-left: 20px; }
+.wk-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px; align-items: start; }
+.wk-pool { border: 1px solid var(--ring); border-radius: 12px; background: var(--surface); position: sticky; top: 8px; }
+.wk-pool-head { padding: 10px 12px 2px; font-size: 14px; }
+.wk-pool-bar { padding: 0 12px 6px; border-bottom: 1px solid var(--ring); }
+.wk-pool-list { max-height: 72vh; overflow-y: auto; padding: 6px; }
+.wk-item { display: flex; gap: 8px; align-items: flex-start; padding: 6px 8px; margin: 3px 0; border: 1px solid var(--ring); border-radius: 8px;
+  border-left: 4px solid var(--accent); font-size: 12.5px; cursor: grab; background: var(--surface); }
+.wk-item.installation { border-left-color: var(--ceos-ink); }
+.wk-item:hover { background: var(--accent-wash); }
+.wk-item:has(input:checked) { background: var(--accent-wash); border-color: var(--accent); }
+.wk-item input { margin-top: 3px; }
+.wk-item-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.wk-item-addr { color: var(--ink-2); }
+.wk-tag { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); margin-left: 3px; white-space: nowrap; }
+.wk-tag.crit { background: var(--crit-wash); color: var(--critical); }
+.wk-board { border: 1px solid var(--ring); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.wk-table { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; min-width: 820px; }
+.wk-table th, .wk-table td { border: 1px solid var(--grid); padding: 6px; vertical-align: top; }
+.wk-table thead th { background: var(--surface-2); font-weight: 650; text-align: left; }
+.wk-person-col { width: 120px; }
+.wk-person { background: var(--surface-2); font-weight: 650; white-space: nowrap; }
+.wk-cell.absent { background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, transparent 6px 12px); }
+.wk-cell.planned, .wk-cell.team { background: var(--surface-2); }
+.wk-cell.draft { background: var(--accent-wash); }
+.wk-cell.draft.over { background: var(--crit-wash); }
+.wk-cell.wk-over { outline: 2px dashed var(--accent); outline-offset: -3px; background: var(--accent-wash); }
+.wk-note { display: block; color: var(--ink-2); text-decoration: none; font-size: 12px; }
+a.wk-note:hover { color: var(--accent); }
+.wk-stop { display: flex; justify-content: space-between; gap: 4px; padding: 4px 6px; margin-bottom: 3px; border-radius: 6px; background: var(--surface);
+  border: 1px solid var(--ring); cursor: grab; overflow-wrap: anywhere; }
+.wk-hint { display: block; color: var(--critical); font-size: 11.5px; }
+.wk-x { flex: none; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
+.wk-x:hover { color: var(--critical); }
+.wk-load { font-weight: 650; margin: 3px 0; }
+.wk-load.over { color: var(--critical); }
+.wk-load.under { color: var(--warn-ink); }
+.wk-day-btns { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.wk-add { width: 100%; border: 1px dashed var(--axis); border-radius: 6px; background: none; color: var(--ink-2); font: inherit; font-size: 12px; padding: 5px; cursor: pointer; }
+.wk-add:hover { border-color: var(--accent); color: var(--accent); background: var(--surface); }
+.wk-cell.free .wk-add { min-height: 46px; }
+.wk-footer { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--ring);
+  position: sticky; bottom: 0; background: var(--surface); }
+@media (max-width: 900px) { .wk-grid { grid-template-columns: 1fr; } .wk-pool { position: static; } .wk-pool-list { max-height: 40vh; } }
