@@ -77,7 +77,7 @@ def test_deleting_and_notices_and_order_and_status(demo):
     change_status(building, "rework", dispo_user)
     assert Activity.objects.filter(kind=ActivityKind.STATUS, building=building, text__contains="→ Nacharbeit").exists()
 
-    other = Tour.objects.exclude(pk=tour.pk).first()
+    other = Tour.objects.exclude(pk=tour.pk).exclude(stops__done_at__isnull=False).first()
     dispo.post(reverse("planning:tour_delete", args=[other.pk]))
     deleted = Activity.objects.filter(kind=ActivityKind.PLAN).first()
     assert deleted.text.startswith("Fahrplan gelöscht") and deleted.tour is None  # the text stays
@@ -178,3 +178,29 @@ def test_backfill_fills_the_verlauf_from_the_history(demo):
     from journal.backfill import backfill
     Activity.objects.all().delete()
     assert backfill(apps) > 0 and Activity.objects.filter(kind=ActivityKind.PLAN).exists()
+
+
+def test_backfill_survives_deleted_objects(demo):
+    from django.apps import apps
+    from django.db import connection
+    from buildings.models import Building
+    from journal.backfill import backfill
+    building = Building.objects.filter(status="open").first()
+    change_status(building, "rework", user(roles.DISPATCHER, "d2"))
+    building.tour_stops.all().delete()
+    building.notes.all().delete()
+    building.visits.all().delete()
+    from documents.models import CostDocumentReceipt, CoverSheet
+    CostDocumentReceipt.objects.filter(building=building).delete()
+    CoverSheet.objects.filter(building=building).delete()
+    Activity.objects.filter(building=building).update(building=None)
+    building.delete()
+    Activity.objects.all().delete()
+    assert backfill(apps) > 0
+    connection.check_constraints()  # no link to the deleted building
+
+
+def test_drawer_ignores_odd_parameters(demo):
+    chef = client_for(user(roles.MANAGEMENT, "chef"))
+    for params in ({"tage": "99999999999"}, {"tour": "99999999999999999999"}, {"tage": "²"}, {"liegenschaft": "x"}):
+        assert chef.get(reverse("journal:activity"), params).status_code == 200

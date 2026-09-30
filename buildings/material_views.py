@@ -32,8 +32,10 @@ def _window(params):
         start = datetime.date.fromisoformat(params.get("von", ""))
         end = datetime.date.fromisoformat(params.get("bis", ""))
         if params.get("z", "frei") == "frei" and start <= end:
-            return start, min(end, start + datetime.timedelta(days=731)), "frei"
-    except ValueError:
+            if (end - start).days > 731:
+                end = start + datetime.timedelta(days=731)
+            return start, end, "frei"
+    except (ValueError, OverflowError):
         pass
     preset = params.get("z") if params.get("z") in PRESETS else "2w"
     return (*preset_window(preset, today), preset)

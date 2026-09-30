@@ -1,9 +1,11 @@
 """📝 Notes box (for a building or an order) and 🕘 the Verlauf side drawer."""
 
 import datetime
+import re
 
 from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -84,6 +86,7 @@ AREAS = [("", "Alle"), (ActivityKind.PLAN, "🗺 Fahrpläne"), (ActivityKind.NOT
          (ActivityKind.FIELD, "📱 vor Ort"), (ActivityKind.ORDER, "🔧 Aufträge"), (ActivityKind.STATUS, "🏷 Status"), (ActivityKind.NOTE, "📝 Notizen"),
          (ActivityKind.DOCUMENTS, "📥 Unterlagen")]
 PAGE = 60
+DAY_CHOICES = ("1", "7", "30")
 
 
 @permission_required("journal.view_activity", raise_exception=True)
@@ -95,17 +98,30 @@ def activity_drawer(request):
         entries = entries.filter(kind=area)
     if request.GET.get("wer") == "ich":
         entries = entries.filter(user=request.user)
-    for key, field in (("tour", "tour_id"), ("liegenschaft", "building_id"), ("auftrag", "installation_order_id")):
-        if request.GET.get(key, "").isdigit():
-            entries = entries.filter(**{field: int(request.GET[key])})
+    scope = {}
+    for key in ("tour", "liegenschaft", "auftrag"):
+        value = request.GET.get(key, "")
+        if re.fullmatch(r"[0-9]{1,12}", value):  # anything else is ignored (no 500 for odd links)
+            scope[key] = int(value)
+    if "tour" in scope:
+        entries = entries.filter(tour_id=scope["tour"])
+    if "liegenschaft" in scope:  # the object itself, and every plan it is (or was) in
+        entries = entries.filter(Q(building_id=scope["liegenschaft"]) | Q(tour__stops__building_id=scope["liegenschaft"]))
+    if "auftrag" in scope:
+        entries = entries.filter(Q(installation_order_id=scope["auftrag"])
+                                 | Q(tour__stops__installation_order_id=scope["auftrag"]))
     days = request.GET.get("tage", "")
-    if days.isdigit():
+    if days in DAY_CHOICES:
         entries = entries.filter(created_at__gte=timezone.now() - datetime.timedelta(days=int(days)))
-    entries = list(entries[:PAGE])
+    else:
+        days = ""
+    entries = list(entries.distinct()[:PAGE])
+    for entry in entries:
+        entry.local_day = timezone.localdate(entry.created_at)  # grouped by the day here, not by UTC
     template = "journal/_activity_list.html" if request.htmx_target == "activity-list" else "journal/_activity.html"
     return render(request, template, {
         "entries": entries, "areas": AREAS, "area": area, "mine": request.GET.get("wer") == "ich",
-        "days": days, "scope": {k: request.GET.get(k) for k in ("tour", "liegenschaft", "auftrag") if request.GET.get(k)},
+        "days": days, "scope": scope,
         "today": timezone.localdate(),
     })
 

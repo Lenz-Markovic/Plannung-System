@@ -17,11 +17,12 @@ from django.utils import timezone
 from buildings.models import Building, InstallationOrder, OrderStatus
 from buildings.rules.file_numbers import extract_re_numbers
 from planning.models import StopKind, TourStop
+from planning.queries import current_first
 
 from . import rules
 from .models import Conflict
 
-STOPS = TourStop.objects.select_related("tour__employee").order_by("tour__date", "start_time")
+STOPS = TourStop.objects.select_related("tour__employee")  # ordered by current_first (the current appointment first)
 
 
 # --- which orders belong to which building (same as reindexOne() in the prototype) ---
@@ -49,7 +50,7 @@ def _order_index(orders):
 
 def _orders():
     return list(InstallationOrder.objects.prefetch_related(
-        Prefetch("tour_stops", queryset=STOPS.filter(kind=StopKind.INSTALLATION), to_attr="planned"),
+        Prefetch("tour_stops", queryset=current_first(STOPS.filter(kind=StopKind.INSTALLATION)), to_attr="planned"),
         "items__category", "assigned_installers",
     ).order_by("re_number"))
 
@@ -89,7 +90,7 @@ def evaluate(buildings, orders=None):
     orders = _orders() if orders is None else orders
     by_re, by_core = _order_index(orders)
     buildings = buildings.prefetch_related(
-        Prefetch("tour_stops", queryset=STOPS.filter(kind=StopKind.READING), to_attr="planned"))
+        Prefetch("tour_stops", queryset=current_first(STOPS.filter(kind=StopKind.READING)), to_attr="planned"))
     result = {}
     for building in buildings:
         matches = matching_orders(building, by_re, by_core)
@@ -114,7 +115,7 @@ def installation_findings(order_ids, date, installer):
     orders = _orders()
     by_re, by_core = _order_index(orders)
     buildings = buildings_for(order_ids=wanted).prefetch_related(
-        Prefetch("tour_stops", queryset=STOPS.filter(kind=StopKind.READING), to_attr="planned"))
+        Prefetch("tour_stops", queryset=current_first(STOPS.filter(kind=StopKind.READING)), to_attr="planned"))
     found = {pk: [] for pk in wanted}
     for building in buildings:
         for order, via in matching_orders(building, by_re, by_core):

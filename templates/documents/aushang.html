@@ -49,7 +49,9 @@
     .box.waerme { --x: 111.8; --y: 93.4; }    .box.rwm { --x: 153.7; --y: 93.4; }
 
     @page { size: A4; margin: 0; }
+    body.preprinted .page img.bg { opacity: .25; }  /* on the screen: the form faint, to check the positions */
     @media print {
+      body.preprinted .page img.bg { display: none; }
       body { background: #fff; }
       .toolbar, .label { display: none; }
       .page { margin: 0; box-shadow: none; }
@@ -61,6 +63,8 @@
 <body>
   <div class="toolbar">
     <button onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+    <label class="hint" title="Auf die farbig vorgedruckten Aushang-Formulare nur die Eintragungen drucken (wie die Word-Vorlage)">
+      <input type="checkbox" id="preprinted" onchange="document.body.classList.toggle('preprinted', this.checked)"> auf vorgedrucktes Formular (nur Eintragungen)</label>
     <a class="btn light" href="{% url 'documents:notice_page' %}?format=docx{% for pk in stop_ids %}&amp;stop={{ pk }}{% endfor %}"
        title="Die Firmen-Vorlage mit ausgefüllten Feldern – zum Weiterbearbeiten in Word">⬇ Als Word-Datei</a>
     <span class="hint">{{ pages|length }} {% if pages|length == 1 %}Aushang{% else %}Aushänge{% endif %} auf der Firmen-Vorlage ·

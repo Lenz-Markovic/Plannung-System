@@ -15,7 +15,9 @@ def test_presets():
     assert preset_window("1w", TODAY) == (TODAY, datetime.date(2026, 10, 5))
     assert preset_window("2w", TODAY) == (TODAY, datetime.date(2026, 10, 12))
     assert preset_window("1m", TODAY) == (TODAY, datetime.date(2026, 10, 28))
-    assert preset_window("1m", datetime.date(2027, 1, 31)) == (datetime.date(2027, 1, 31), datetime.date(2027, 2, 27))
+    assert preset_window("1m", datetime.date(2027, 1, 31)) == (datetime.date(2027, 1, 31), datetime.date(2027, 2, 28))
+    assert preset_window("1m", datetime.date(2027, 3, 31))[1] == datetime.date(2027, 4, 30)  # the whole April
+    assert preset_window("3m", datetime.date(2026, 11, 30))[1] == datetime.date(2027, 2, 28)
 
 
 def test_groups():

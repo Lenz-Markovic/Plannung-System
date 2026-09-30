@@ -40,13 +40,16 @@ def save_field_note(stop, text, user):
     if not may_work_on(user, stop.tour):
         raise PermissionDenied("Das ist nicht dein Stopp.")
     stop.field_note = text.strip()
-    stop.save()
+    stop.save(update_fields=["field_note", "updated_at"])  # never writes back an older Ergebnis
+    from .models import Visit
+    Visit.objects.filter(stop=stop).update(note=stop.field_note)  # the 🧾 Bearbeitung shows the current note
     return stop
 
 
 def progress(stops):
     done = sum(1 for s in stops if s.done_at)
     return {"done": done, "total": len(stops), "percent": round(done / len(stops) * 100) if stops else 0,
+            "open_results": sum(1 for s in stops if s.outcome in ("partial", "absent")),
             "next": next((s for s in stops if not s.done_at), None)}
 
 

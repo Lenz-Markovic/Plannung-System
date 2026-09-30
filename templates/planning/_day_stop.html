@@ -31,9 +31,10 @@
     {# Note on site: saved when leaving the field #}
     {% for p in s.problems %}<div class="stop-note problem">⚠ <b>ans Büro gemeldet</b> {{ p.created_at|date:"d.m. H:i" }}: {{ p.text|truncatechars:140 }}</div>{% endfor %}
     <textarea class="day-note" id="fn-{{ s.pk }}" name="field_note" rows="2" placeholder="Notiz vor Ort (z. B. Mieter nicht da, Zähler defekt) …"
-              hx-post="{% url 'planning:stop_note' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">{{ s.field_note }}</textarea>
+              hx-post="{% url 'planning:stop_note' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
+              hx-sync="closest article:queue last">{{ s.field_note }}</textarea>
     {# something went wrong: the office sees it at once (📝 note ⚠, Verlauf 📱) #}
-    <button class="btn mini day-problem" hx-post="{% url 'planning:stop_note' s.pk %}" hx-include="#fn-{{ s.pk }}" hx-vals='{"problem": "1"}'
+    <button class="btn mini day-problem" hx-post="{% url 'planning:stop_note' s.pk %}" hx-include="#fn-{{ s.pk }}" hx-vals='{"problem": "1"}' hx-sync="closest article:replace"
             hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML" title="Die Notiz oben geht als Problem an das Büro">⚠ Problem ans Büro melden</button>
     {# Ergebnis: ✓ fertig · ◐ teilweise · ✗ nicht erledigt - the last two need "was ist noch zu tun?" #}
     {% if s.done_at %}
@@ -47,9 +48,11 @@
     {% endif %}
     <div class="day-actions">
       {% if s.done_at %}
-        <button class="btn" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "0"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">↺ Ergebnis ändern</button>
+        <button class="btn" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "0"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
+                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">↺ Ergebnis ändern</button>
       {% else %}
-        <button class="btn day-done" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "1"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">✓ fertig (100 %)</button>
+        <button class="btn day-done" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "1"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
+                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">✓ fertig (100 %)</button>
       {% endif %}
       {% if b and perms.buildings.propose_status %}
         {# Readers may only suggest a status; the office decides. #}
@@ -60,10 +63,11 @@
         </select>
       {% endif %}
     </div>
-    {% if not s.done_at %}
+    {% if not s.done_at and s.kind != "help" %}
       <div class="day-more">
         <details><summary class="btn day-partial">◐ teilweise erledigt</summary>
-          <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">
+          <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
+                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">
             <input type="hidden" name="outcome" value="partial">
             <label class="small">Was ist noch zu tun? (Pflicht)</label>
             <textarea name="todo" rows="2" required placeholder="z. B. NE003 und NE007 nicht abgelesen, 2 HKV im Keller fehlen"></textarea>
@@ -71,7 +75,8 @@
           </form>
         </details>
         <details><summary class="btn day-absent">✗ niemand da / nicht möglich</summary>
-          <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML">
+          <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
+                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">
             <input type="hidden" name="outcome" value="absent">
             <label class="small">Grund</label>
             <select name="reason">{% for value, label in reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>

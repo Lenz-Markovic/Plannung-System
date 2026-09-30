@@ -32,6 +32,7 @@ from documents.services import refresh_deadline
 
 from . import geocoding
 from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop, Visit
+from .queries import OPEN_STOP, current_first
 from .rules import autoplan as autoplan_rules
 from .rules.availability import HORIZON_DAYS, first_free_day
 from .rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
@@ -157,6 +158,19 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy, o
     return sort_draft(draft)
 
 
+def is_visited(stop):
+    """Reported from Mein Tag (done or an Ergebnis): the stop is history and stays where it is."""
+    return stop.done_at is not None or bool(stop.outcome)
+
+
+def _visited_here(draft):
+    """Buildings already visited (reported) in the plan being saved - they never pull the object away from other plans."""
+    if not draft.get("tour_id"):
+        return set()
+    return set(TourStop.objects.filter(tour_id=draft["tour_id"], kind=StopKind.READING)
+               .filter(Q(done_at__isnull=False) | ~Q(outcome="")).values_list("building_id", flat=True))
+
+
 def draft_from_tour(tour, date=None, employee=None):
     """Draft to recalculate or move an existing tour (calendar drag & drop).
 
@@ -167,8 +181,24 @@ def draft_from_tour(tour, date=None, employee=None):
     employee = employee or tour.employee
     if (employee.pk, date) != (tour.employee_id, tour.date) and Tour.objects.filter(employee=employee, date=date).exists():
         raise ValueError(f"{employee} hat am {date:%d.%m.%Y} schon einen Fahrplan. Bitte dort ergänzen oder zuerst diesen Tag leeren.")
-    stops = [stop_dict(stop) for stop in tour.stops.order_by("position")]
     moved = (employee.pk, date) != (tour.employee_id, tour.date)
+    all_stops = list(tour.stops.order_by("position"))
+    visited = [stop for stop in all_stops if is_visited(stop)]
+    if moved and visited:
+        # reported stops stay on their day as history - only the open ones move (a new plan on the new day)
+        open_stops = [stop for stop in all_stops if not is_visited(stop)]
+        if not open_stops:
+            raise ValueError("Alle Stopps dieses Plans sind schon gemeldet – der Plan bleibt als Nachweis an seinem Tag.")
+        return {
+            "employee": employee.pk, "date": date.isoformat(), "start": tour.start_time.strftime("%H:%M"),
+            "break": tour.break_minutes or 30, "strategy": "far", "tour_id": None, "tour_version": None,
+            "split_from": tour.pk, "split_version": tour.version,
+            "moved_from": f"{tour.employee} am {tour.date:%d.%m.%Y} (nur die {len(open_stops)} offenen Stopps; "
+                          f"{len(visited)} gemeldete bleiben dort)",
+            "stops": [stop_dict(stop) for stop in open_stops],
+            "team": [e.pk for e in tour.team.all() if e.pk != employee.pk], "split": tour.split_work,
+        }
+    stops = [stop_dict(stop) for stop in all_stops]
     return {
         "employee": employee.pk,
         "date": date.isoformat(),
@@ -289,7 +319,9 @@ def draft_suggestions(draft, limit=6, net_minutes=None):
     for order in InstallationOrder.objects.filter(pk__in=order_ids, building__isnull=False).select_related("building"):
         key = (StopKind.READING, order.building_id, None)
         if (key not in in_plan and order.building_id not in storno_buildings
-                and not order.building.tour_stops.filter(kind=StopKind.READING).exists()):
+                and not order.building.tour_stops.filter(OPEN_STOP, kind=StopKind.READING).exists()
+                and (order.building_id in visit_revisit_ids()[0]
+                     or not order.building.tour_stops.filter(kind=StopKind.READING).exists())):
             b = order.building
             found.append(Suggestion(StopKind.READING, b.pk, f"📖 Ablesung {b.file_number} · {b.street}, {b.city}",
                                     f"gleiche Liegenschaft wie {order.re_number}, noch kein Ablesetermin · {b.reading_minutes} min", b.reading_minutes))
@@ -863,6 +895,8 @@ def _calculate_legs(client, stops, date, start, work, break_after, break_minutes
 def _stops_in_other_tours(preview, draft, buildings):
     """Reading stops of these buildings in OTHER tours (not the day being planned,
     and not the tour that is being moved)."""
+    visited = _visited_here(draft)
+    buildings = [b for b in buildings if b.pk not in visited]
     stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings, done_at__isnull=True, outcome="")
              .exclude(tour__employee=preview.employee, tour__date=preview.date))  # a visited stop stays as history
     if draft.get("tour_id"):
@@ -879,7 +913,8 @@ def _add_findings(preview, draft):
         other_plans.setdefault(stop.building_id, []).append(
             OtherPlan(stop.tour.employee.short_name, stop.tour.date, stop.tour.status == TourStatus.PROVISIONAL))
     installations = {}
-    for stop in (TourStop.objects.filter(kind=StopKind.INSTALLATION, installation_order__building__in=[s.building for s in reading])
+    for stop in (TourStop.objects.filter(kind=StopKind.INSTALLATION, installation_order__building__in=[s.building for s in reading],
+                                         done_at__isnull=True, outcome="")
                  .select_related("tour", "installation_order")):
         installations.setdefault(stop.installation_order.building_id, set()).add(stop.tour.date)
 
@@ -940,8 +975,9 @@ def save_draft(draft, user, confirm):
     before = (tour.employee, tour.date, tour.status) if tour is not None else None  # for the Verlauf
     if tour is None:
         tour = Tour(employee=preview.employee, date=preview.date, created_by=user)
+    carried = _take_open_stops_from_split(draft, preview, user)  # a moved plan with reported stops
 
-    _move_buildings_out_of_other_tours(preview, draft)
+    carried.update(_move_buildings_out_of_other_tours(preview, draft, user))
 
     plan = preview.day_plan
     tour.employee, tour.date = preview.employee, preview.date  # a moved tour gets its new day
@@ -968,9 +1004,10 @@ def save_draft(draft, user, confirm):
     reported = {(st.kind, st.building_id, st.installation_order_id): st
                 for st in tour.stops.filter(Q(done_at__isnull=False) | ~Q(field_note="") | ~Q(outcome=""))} if tour.pk else {}
     visit_of = dict(Visit.objects.filter(stop__in=list(reported.values())).values_list("stop_id", "pk"))
-    notices = {(st.kind, st.building_id, st.installation_order_id):
-               (st.notice_printed_at, st.notice_for, st.notice_wanted, st.notice_printed_by_id)
-               for st in tour.stops.filter(Q(notice_wanted=True) | Q(notice_printed_at__isnull=False))} if tour.pk else {}
+    notices = dict(carried)  # notices of stops that came from other plans (they show "veraltet" if the day changed)
+    notices.update({(st.kind, st.building_id, st.installation_order_id):
+                    (st.notice_printed_at, st.notice_for, st.notice_wanted, st.notice_printed_by_id)
+                    for st in tour.stops.filter(Q(notice_wanted=True) | Q(notice_printed_at__isnull=False))} if tour.pk else {})
     tour.stops.all().delete()
     for position, stop in enumerate(preview.stops, start=1):
         printed_at, printed_for, wanted, printed_by = notices.get(
@@ -1080,20 +1117,62 @@ def _lock_tour(draft):
     return None
 
 
-def _move_buildings_out_of_other_tours(preview, draft):
-    """A building can only be in one tour: take it out of the others (prototype behaviour)."""
+def _notice_of(stop):
+    return {(stop.kind, stop.building_id, stop.installation_order_id):
+            (stop.notice_printed_at, stop.notice_for, stop.notice_wanted, stop.notice_printed_by_id)} \
+        if stop.notice_wanted or stop.notice_printed_at else {}
+
+
+def _take_open_stops_from_split(draft, preview, user):
+    """Moving a plan with reported stops: its open stops leave the old plan (the reported ones stay there)."""
+    if not draft.get("split_from"):
+        return {}
+    updated = Tour.objects.filter(pk=draft["split_from"], version=draft["split_version"]).update(version=F("version") + 1)
+    if not updated:
+        raise ConcurrentChange("Der Fahrplan wurde inzwischen von jemand anderem geändert.")
+    old = Tour.objects.get(pk=draft["split_from"])
+    carried = {}
+    moving = [st for st in old.stops.all() if not is_visited(st)]
+    for stop in moving:
+        carried.update(_notice_of(stop))
+        stop.delete()
+    for position, stop in enumerate(old.stops.order_by("position"), start=1):
+        if stop.position != position:
+            stop.position = position
+            stop.save(update_fields=["position"])
+    from journal.activity import day_label, record, streets
+    from journal.models import ActivityKind
+    record(user, ActivityKind.PLAN, f"{len(moving)} offene Stopps verschoben: {old.employee} {day_label(old.date)} → "
+           f"{preview.employee} {day_label(preview.date)} · {streets(moving)} (die gemeldeten bleiben als Nachweis)", tour=old)
+    return carried
+
+
+def _move_buildings_out_of_other_tours(preview, draft, user=None):
+    """A building can only be in one tour: take it out of the others (prototype behaviour).
+
+    Returns the notice data of the removed stops (a printed Aushang then shows "veraltet" in the new plan).
+    """
+    from journal.activity import day_label, record, streets
+    from journal.models import ActivityKind
+
     buildings = [s.building for s in preview.stops if s.kind == StopKind.READING]
     old_stops = _stops_in_other_tours(preview, draft, buildings)
-    changed_tours = {}
+    changed_tours, carried = {}, {}
     for stop in old_stops:
-        changed_tours.setdefault(stop.tour, 0)
-        changed_tours[stop.tour] += 1
+        changed_tours.setdefault(stop.tour, []).append(stop.building)
+        carried.update(_notice_of(stop))
         stop.delete()
-    for tour, count in changed_tours.items():
+    for tour, moved in changed_tours.items():
         remaining = list(tour.stops.order_by("position"))
+        where = f"{preview.employee} {day_label(preview.date)}"
         if not remaining:
+            record(user, ActivityKind.PLAN, f"Fahrplan gelöscht (leer nach Verschieben nach {where}): {tour.employee} "
+                   f"{day_label(tour.date)} · {streets(moved)}")
             tour.delete()
             continue
+        record(user, ActivityKind.PLAN, f"{len(moved)} Liegenschaft(en) aus {tour.employee} {day_label(tour.date)} "
+               f"in den Plan {where} verschoben: {streets(moved)}", tour=tour)
+        count = len(moved)
         for position, stop in enumerate(remaining, start=1):
             if stop.position != position:
                 stop.position = position
@@ -1103,10 +1182,28 @@ def _move_buildings_out_of_other_tours(preview, draft):
                               f"{preview.date:%d.%m.%Y} verschoben – bitte neu mit TomTom rechnen")
         tour.version += 1  # counts as a change for optimistic locking
         tour.save()
+    return carried
 
 
 def delete_tour(tour):
-    """Delete a tour; its buildings become 'unplanned' again (kept in the history)."""
+    """Delete a tour; its buildings become 'unplanned' again (kept in the history).
+
+    Stops already reported from Mein Tag are proof of a visit: they stay, only the open stops go
+    (the plan then remains with its reported stops). Returns True if the whole plan was deleted.
+    """
+    visited = [stop for stop in tour.stops.all() if is_visited(stop)]
+    if visited:
+        stops = [stop for stop in tour.stops.all() if not is_visited(stop)]
+        for stop in stops:
+            stop.delete()
+        for position, stop in enumerate(tour.stops.order_by("position"), start=1):
+            if stop.position != position:
+                stop.position = position
+                stop.save(update_fields=["position"])
+        tour.version += 1
+        tour.save()
+        _after_removal(tour, stops)
+        return False
     stops = list(tour.stops.all())
     buildings = [stop.building for stop in stops if stop.building and stop.kind != StopKind.HELP]
     order_ids = [stop.installation_order_id for stop in stops if stop.installation_order_id and stop.kind != StopKind.HELP]
@@ -1116,10 +1213,20 @@ def delete_tour(tour):
     tour.delete()
     _mark_helped(helped, f"🤝 Hilfe fällt weg (Plan {tour.employee} gelöscht) – bitte neu rechnen")
     _mark_helped(helpers, f"🤝 Der Plan {tour.employee} {tour.date:%d.%m.%Y} wurde gelöscht – Hilfe-Stopp bitte entfernen")
+    _after_removal(None, stops, buildings, order_ids)
+    return True
+
+
+def _after_removal(tour, stops, buildings=None, order_ids=None):
+    """Removed stops: deadlines, orders without appointment open again, conflicts."""
+    if buildings is None:
+        buildings = [stop.building for stop in stops if stop.building and stop.kind != StopKind.HELP]
+        order_ids = [stop.installation_order_id for stop in stops if stop.installation_order_id and stop.kind != StopKind.HELP]
     for building in buildings:
         refresh_deadline(building)
-    # orders without any appointment left are open again
-    for order in InstallationOrder.objects.filter(pk__in=order_ids, status=OrderStatus.PLANNED, tour_stops__isnull=True):
+    # orders without any appointment left are open again (not when an installation was already reported there)
+    for order in (InstallationOrder.objects.filter(pk__in=order_ids, status=OrderStatus.PLANNED, tour_stops__isnull=True)
+                  .exclude(visits__outcome="complete")):
         order.status = OrderStatus.OPEN
         order.save()
     refresh_conflicts_for([b.pk for b in buildings], order_ids)
@@ -1159,29 +1266,35 @@ def autoplan_slots(employees, start, end):
 def autoplan_jobs(kind):
     """Everything not planned yet, as jobs for the rule (with date windows from section 8)."""
     buffer = datetime.timedelta(days=autoplan_rules.BUFFER_DAYS)
+    revisit_buildings, revisit_orders = visit_revisit_ids()  # 🔁 Nachtermine are planned automatically, too
     jobs = []
     if kind in ("", "reading"):
-        installs = {}  # building number core -> latest planned installation
-        for stop in TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour", "installation_order__building"):
+        installs = {}  # building number core -> latest planned installation (still to do)
+        for stop in (TourStop.objects.filter(OPEN_STOP, kind=StopKind.INSTALLATION)
+                     .select_related("tour", "installation_order__building")):
             order = stop.installation_order
             core = order.building.file_number_core if order.building else order.building_file_number_core
             if core:
                 installs[core] = max(installs.get(core, stop.tour.date), stop.tour.date)
         # not planned, and not "freigegeben" (released = already done)
-        for b in (Building.objects.exclude(tour_stops__kind=StopKind.READING).exclude(status=BuildingStatus.RELEASED)
-                  .exclude(pk__in=_storno()[0])):
+        unplanned = Building.objects.exclude(tour_stops__kind=StopKind.READING) | Building.objects.filter(pk__in=revisit_buildings)
+        for b in unplanned.exclude(status=BuildingStatus.RELEASED).exclude(pk__in=_storno()[0]).distinct():
             jobs.append(autoplan_rules.Job(
                 key=(StopKind.READING, b.pk), kind="reading", minutes=b.reading_minutes,
                 point=geocoding.position(b, None)[0], region=b.region, person=b.assigned_reader_id,
                 earliest=installs[b.file_number_core] + buffer if b.file_number_core in installs else None,
                 group=b.file_number_core))
     if kind in ("", "installation"):
-        readings = {}  # building number core -> earliest planned reading
-        for stop in TourStop.objects.filter(kind=StopKind.READING).select_related("tour", "building"):
+        readings = {}  # building number core -> current reading appointment (the next open one, else the last visit)
+        current = {}
+        for stop in current_first(TourStop.objects.filter(kind=StopKind.READING)).select_related("tour", "building"):
+            current.setdefault(stop.building_id, stop)
+        for stop in current.values():
             core = stop.building.file_number_core
             readings[core] = min(readings.get(core, stop.tour.date), stop.tour.date)
-        for o in (InstallationOrder.objects.exclude(status=OrderStatus.DONE).exclude(tour_stops__kind=StopKind.INSTALLATION)
-                  .exclude(pk__in=_storno()[1])
+        unplanned = (InstallationOrder.objects.exclude(tour_stops__kind=StopKind.INSTALLATION)
+                     | InstallationOrder.objects.filter(pk__in=revisit_orders))
+        for o in (unplanned.exclude(status=OrderStatus.DONE).exclude(pk__in=_storno()[1]).distinct()
                   .select_related("building").prefetch_related("assigned_installers")):
             installers = sorted(o.assigned_installers.all(), key=lambda e: e.short_name)
             core = o.building.file_number_core if o.building else o.building_file_number_core

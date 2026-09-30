@@ -25,6 +25,9 @@ def backfill(apps):
     Tour = apps.get_model("planning", "Tour")
     names = dict(Employee.objects.values_list("pk", "short_name"))
     tours = set(Tour.objects.values_list("pk", flat=True))
+    # objects that still exist (a deleted building / order keeps only its text - no broken link)
+    existing = {"building": set(apps.get_model("buildings", "Building").objects.values_list("pk", flat=True)),
+                "order": set(apps.get_model("buildings", "InstallationOrder").objects.values_list("pk", flat=True))}
     entries = []  # (when, Activity)
 
     last = {}
@@ -69,12 +72,13 @@ def backfill(apps):
                 continue
             label = f"AZ {h.file_number}" if target == "building" else h.re_number
             text = f"{label} {h.street}: Status {labels.get(old, old)} → {labels.get(h.status, h.status)}"
-            fields = {"building_id": h.id} if target == "building" else {"installation_order_id": h.id}
+            link = h.id if h.id in existing[target] else None
+            fields = {"building_id": link} if target == "building" else {"installation_order_id": link}
             entries.append((h.history_date, Activity(user_id=h.history_user_id, kind=kind, text=text[:400], **fields)))
 
     first = Activity.objects.order_by("created_at").values_list("created_at", flat=True).first()
     if first:  # the Verlauf already recorded this itself
-        entries = [e for e in entries if e[0] < first]
+        entries = [e for e in entries if e[0] < first - SAME_SAVE]  # margin: the same save wrote both
     entries.sort(key=lambda e: e[0])
     for when, activity in entries:
         activity.save()

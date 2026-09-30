@@ -108,10 +108,27 @@ def test_reader_sees_only_own_tours_and_cannot_move(client, demo):
 
 def test_delete_tour(client, demo):
     login(client, roles.DISPATCHER)
-    tour = Tour.objects.first()
+    tour = Tour.objects.exclude(stops__done_at__isnull=False).first()  # nothing reported yet
     response = client.post(reverse("planning:tour_delete", args=[tour.pk]))
     assert response["HX-Trigger"] == "calendar-changed"
     assert not Tour.objects.filter(pk=tour.pk).exists()
+
+
+def test_delete_keeps_reported_stops_as_proof(client, demo):
+    login(client, roles.DISPATCHER)
+    from django.db.models import Count
+    tour = (Tour.objects.exclude(stops__done_at__isnull=False).annotate(n=Count("stops")).filter(n__gte=2)
+            .order_by("date").first())
+    first = tour.stops.order_by("position").first()
+    first.done_at, first.outcome = timezone.now(), "complete"  # reported from Mein Tag
+    first.save()
+    done = {first.pk}
+    response = client.post(reverse("planning:tour_delete", args=[tour.pk]))
+    assert "die gemeldeten bleiben als Nachweis" in response.content.decode()
+    assert set(Tour.objects.get(pk=tour.pk).stops.values_list("pk", flat=True)) == done
+    # everything reported: the plan cannot be deleted any more
+    answer = client.post(reverse("planning:tour_delete", args=[tour.pk])).content.decode()
+    assert "kann nicht gelöscht werden" in answer and Tour.objects.filter(pk=tour.pk).exists()
 
 
 def test_calendar_page(client, demo):

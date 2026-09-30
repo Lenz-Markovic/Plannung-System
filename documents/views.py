@@ -194,7 +194,17 @@ def receipt_update(request, pk):
 
 # --- Tenant notices (Aushang) -------------------------------------------------------------
 
+STALE = "Der Plan wurde inzwischen geändert – bitte den Kalender neu laden und nochmal drucken."
+
+
+def _stale():
+    """The page had stop ids that do not exist any more (every save of a plan makes new stops)."""
+    response = HttpResponse(f"<p style='font-family:sans-serif;padding:20px'>⚠ {STALE}</p>", status=409)
+    return response
+
+
 def _chosen_stops(values):
+    values = [v for v in values if str(v).isdigit()]  # "?stop=abc" is ignored, not a 500
     return list(TourStop.objects.filter(pk__in=values).select_related(
         "tour__employee", "building", "installation_order").prefetch_related("installation_order__items__category")
         .order_by("tour__date", "tour__employee__short_name", "position"))
@@ -228,6 +238,8 @@ def notice_toggle(request):
 def notice_print(request):
     """📄 Aushänge drucken / als Word: mark the chosen stops as printed, then the page or the .docx."""
     stops = [s for s in _chosen_stops(request.POST.getlist("stop")) if s.kind != StopKind.HELP]
+    if not stops:
+        return _stale()
     notices.mark_printed(stops, request.user)
     for tour in {s.tour for s in stops}:  # one line per plan
         mine = [s for s in stops if s.tour == tour]
@@ -252,6 +264,10 @@ def _docx_response(stops):
 def notice_confirm(request):
     """Too late (less than 14 days before) or the day is over: ask first, then print anyway."""
     stops = [s for s in _chosen_stops(request.GET.getlist("stop")) if s.kind != StopKind.HELP]
+    if not stops:
+        response = render(request, "core/_toast.html", {"message": STALE, "error": True})
+        response["HX-Reswap"] = "none"
+        return response
     today = timezone.localdate()
     days = []
     for tour in sorted({s.tour for s in stops}, key=lambda t: t.date):
@@ -267,6 +283,8 @@ def notice_page(request):
     """The notices on the company template, one A4 page each - print or save as PDF with the browser."""
     stops = _chosen_stops(request.GET.getlist("stop"))
     if request.GET.get("format") == "docx":
+        if not stops:
+            return _stale()
         return _docx_response(stops)
     return render(request, "documents/aushang.html", {
         "pages": _notice_pages(stops), "stop_ids": [s.pk for s in stops],

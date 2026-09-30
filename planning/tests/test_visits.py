@@ -155,3 +155,99 @@ def test_day_page_offers_the_reasons(demo):
     tour, reader = reader_tour()
     html = client_for(reader).get(reverse("planning:my_day"), {"datum": tour.date.isoformat()}).content.decode()
     assert '<option value="no_access">' in html and "◐ teilweise erledigt" in html and "✓ fertig (100 %)" in html
+
+
+# --- review fixes: visited stops are history ------------------------------------------------
+
+def report_on(stop, reader, outcome, todo="x", reason="absent"):
+    return client_for(reader).post(reverse("planning:stop_report", args=[stop.pk]),
+                                   {"outcome": outcome, "todo": todo, "reason": reason})
+
+
+def test_resaving_a_visited_plan_keeps_the_nachtermin_elsewhere(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    building = stop.building
+    report_on(stop, reader, "absent")
+    day = free_day(tour.employee, tour.date)
+    services.save_draft(services.create_draft([building.pk], tour.employee, day, datetime.time(8), 30, "short"),
+                        None, confirm=False)
+    nachtermin = TourStop.objects.get(tour__date=day, building=building)
+    services.save_draft(services.draft_from_tour(Tour.objects.get(pk=tour.pk)), None, confirm=False)  # Neu rechnen
+    assert TourStop.objects.filter(pk=nachtermin.pk).exists()  # still planned on the new day
+
+
+def test_moving_a_visited_plan_moves_only_the_open_stops(demo):
+    from django.db.models import Count
+    tour = (Tour.objects.filter(stops__kind=StopKind.READING).exclude(stops__done_at__isnull=False)
+            .annotate(n=Count("stops")).filter(n__gte=2).order_by("date").first())
+    reader = user(roles.READER, "abl-move")
+    tour.employee.user = reader
+    tour.employee.save()
+    stops = list(tour.stops.exclude(kind=StopKind.HELP).order_by("position"))
+    assert len(stops) >= 2
+    report_on(stops[0], reader, "partial", "NE003")
+    day = free_day(tour.employee, tour.date)
+    draft = services.draft_from_tour(Tour.objects.get(pk=tour.pk), date=day)
+    assert draft["split_from"] == tour.pk and len(draft["stops"]) == len(stops) - 1
+    new = services.save_draft(draft, None, confirm=False)
+    old = Tour.objects.get(pk=tour.pk)
+    assert list(old.stops.values_list("pk", flat=True)) == [stops[0].pk]  # the reported one stays as proof
+    assert new.date == day and new.stops.count() == len(stops) - 1
+    assert Visit.objects.get(stop=stops[0]).date == tour.date
+
+
+def test_same_day_second_visit_counts_and_decides(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    building = stop.building
+    report_on(stop, reader, "absent")
+    other = Employee.objects.filter(can_read=True, active=True).exclude(pk=tour.employee_id)\
+        .exclude(tours__date=tour.date).first()
+    services.save_draft(services.create_draft([building.pk], other, tour.date, datetime.time(15), 30, "short"),
+                        None, confirm=False)
+    second = TourStop.objects.get(tour__employee=other, tour__date=tour.date, building=building)
+    other.user = user(roles.READER, "abl-second")
+    other.save()
+    client_for(other.user).post(reverse("planning:stop_done", args=[second.pk]), {"done": "1"})
+    visit = Visit.objects.get(stop=second)
+    assert visit.attempt == 2 and building.pk not in visits.revisit_ids()[0]  # the later report decides
+
+
+def test_after_a_complete_visit_it_starts_again_at_1(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    client_for(reader).post(reverse("planning:stop_done", args=[stop.pk]), {"done": "1"})
+    day = free_day(tour.employee, tour.date)
+    draft = services.create_draft([stop.building_id], tour.employee, day, datetime.time(8), 30, "short")
+    preview = services.calculate_preview(draft)
+    visits.attach_attempts(preview.stops, preview.date)
+    again = next(s for s in preview.stops if s.building and s.building.pk == stop.building_id)
+    assert again.attempt == 1 and again.last_visit is None  # not a "Nachtermin"
+
+
+def test_closed_result_cannot_be_undone_from_the_phone(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    report_on(stop, reader, "absent", "klärt die HV", "other")
+    visit = Visit.objects.get(stop=stop)
+    visits.close(visit, user(roles.ADMIN, "adm"), True)
+    answer = client_for(reader).post(reverse("planning:stop_done", args=[stop.pk]), {"done": "0"})
+    assert "schon abgeschlossen" in answer.content.decode() and Visit.objects.filter(pk=visit.pk).exists()
+
+
+def test_help_stop_only_reports_fertig(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    stop.kind, stop.help_tour = StopKind.HELP, tour
+    stop.save()
+    html = report_on(stop, reader, "partial", "3 HKV fehlen").content.decode()
+    assert "Bei einer Hilfe meldet der Plan" in html and not Visit.objects.filter(stop=stop).exists()
+
+
+def test_note_typed_before_the_button_is_saved_with_it(demo):
+    tour, reader = reader_tour()
+    stop = tour.stops.filter(kind=StopKind.READING).first()
+    client_for(reader).post(reverse("planning:stop_done", args=[stop.pk]), {"done": "1", "field_note": "Zähler neu"})
+    stop.refresh_from_db()
+    assert stop.field_note == "Zähler neu" and Visit.objects.get(stop=stop).note == "Zähler neu"

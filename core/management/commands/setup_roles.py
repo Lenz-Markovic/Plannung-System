@@ -44,12 +44,15 @@ class Command(BaseCommand):
             else:
                 permissions = find_permissions(names)
 
+            from core.models import RoleDefault  # remembered: `migrate` will not add these again
+
             if options["reset"]:
                 group.permissions.set(permissions)
             else:
-                group.permissions.add(*permissions)
-
-            from core.models import RoleDefault  # remembered: `migrate` will not add these again
+                # only defaults never given before: what an admin took away stays away
+                given = set(RoleDefault.objects.filter(role=role).values_list("permission", flat=True))
+                group.permissions.add(*[p for p in permissions
+                                        if f"{p.content_type.app_label}.{p.codename}" not in given])
             for permission in permissions:
                 RoleDefault.objects.get_or_create(
                     role=role, permission=f"{permission.content_type.app_label}.{permission.codename}")

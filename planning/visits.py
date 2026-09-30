@@ -11,13 +11,25 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 
 from .models import StopKind, TourStatus, TourStop, Visit
-from .rules.visits import (ABSENT, COMPLETE, OUTCOMES, PARTIAL, REASON_LABELS, VisitInfo, attempt_number,
+from .rules.visits import (ABSENT, COMPLETE, OUTCOMES, PARTIAL, REASON_LABELS, VisitInfo, attempt_in_series,
                            needs_revisit, report_problems)
+
+OFFICE_DONE_MSG = "Das Büro hat dieses Ergebnis schon abgeschlossen – bitte im Büro anrufen."
+
+
+def _info(visit):
+    return VisitInfo(visit.date, visit.outcome, visit.closed_at is not None, visit.pk or 0)
+
+
+def _earlier(visits, date, own):
+    """Visits reported before `own` (another stop): earlier days, and on the same day the ones reported before."""
+    return [v for v in visits if v != own and v.stop_id != getattr(own, "stop_id", -1)
+            and (v.date < date or (v.date == date and (own is None or (v.pk or 0) < (own.pk or 0))))]
 
 
 def _target(stop):
     """(building, order) the visit belongs to: a reading -> building, an installation -> order."""
-    if stop.kind == StopKind.INSTALLATION or (stop.kind == StopKind.HELP and stop.installation_order_id):
+    if stop.kind == StopKind.INSTALLATION or (stop.kind == StopKind.HELP and getattr(stop, "installation_order_id", None)):
         return None, stop.installation_order
     return stop.building, None
 
@@ -42,22 +54,28 @@ def report(stop, user, outcome, todo="", reason=""):
 
     if not user.has_perm("planning.mark_stop_done") or not may_work_on(user, stop.tour):
         raise PermissionDenied("Diesen Stopp darfst du nicht melden.")
+    if stop.kind == StopKind.HELP and outcome != COMPLETE:
+        raise ValidationError("Bei einer Hilfe meldet der Plan, dem du hilfst, das Ergebnis – bitte dort Bescheid geben.")
     problems = report_problems(outcome, todo, reason)
     if problems:
         raise ValidationError(problems[0])
+    if Visit.objects.filter(stop=stop, closed_at__isnull=False).exists():
+        raise ValidationError(OFFICE_DONE_MSG)
     stop.outcome, stop.done_at, stop.done_by = outcome, timezone.now(), user
-    stop.save()
+    stop.save(update_fields=["outcome", "done_at", "done_by", "updated_at"])
     _update_tour_status(stop.tour)
     if stop.kind == StopKind.HELP:
         return None  # the helped plan has the visit
     building, order = _target(stop)
-    earlier = _visits_of(building, order).exclude(stop=stop).values_list("date", flat=True)
     visit, _ = Visit.objects.update_or_create(stop=stop, defaults={
         "building": building, "installation_order": order, "kind": stop.kind, "date": stop.tour.date,
-        "tour": stop.tour, "people": stop.tour.people_label, "attempt": attempt_number(list(earlier), stop.tour.date),
+        "tour": stop.tour, "people": stop.tour.people_label,
         "outcome": outcome, "reason": reason if outcome == ABSENT else "",
         "todo": todo.strip() if outcome != COMPLETE else "", "note": stop.field_note, "reported_by": user,
     })
+    others = list(_visits_of(building, order).order_by("date", "pk"))
+    visit.attempt = attempt_in_series([_info(v) for v in _earlier(others, visit.date, visit)])
+    visit.save(update_fields=["attempt"])
     return visit
 
 
@@ -67,9 +85,11 @@ def undo(stop, user):
 
     if not user.has_perm("planning.mark_stop_done") or not may_work_on(user, stop.tour):
         raise PermissionDenied("Diesen Stopp darfst du nicht ändern.")
+    if Visit.objects.filter(stop=stop, closed_at__isnull=False).exists():
+        raise ValidationError(OFFICE_DONE_MSG)  # the office decision stays (it is shown in 🧾 Bearbeitung)
     Visit.objects.filter(stop=stop).delete()
     stop.outcome, stop.done_at, stop.done_by = "", None, None
-    stop.save()
+    stop.save(update_fields=["outcome", "done_at", "done_by", "updated_at"])
     _update_tour_status(stop.tour)
 
 
@@ -103,7 +123,7 @@ def revisit_objects():
     planned = _planned_dates({k[1] for k in visits if k[0] == "building"}, {k[1] for k in visits if k[0] == "order"})
     result = {}
     for key, items in visits.items():
-        infos = [VisitInfo(v.date, v.outcome, v.closed_at is not None) for v in items]
+        infos = [_info(v) for v in items]
         if needs_revisit(infos, planned.get(key, [])):
             result[key] = items[-1]
     return result
@@ -120,7 +140,7 @@ def attach_attempts(stops, date):
     def key(stop):
         building = getattr(stop, "building", None)
         order = getattr(stop, "order", None) or getattr(stop, "installation_order", None)
-        if getattr(stop, "kind", "") == StopKind.INSTALLATION and order is not None:
+        if getattr(stop, "kind", "") in (StopKind.INSTALLATION, StopKind.HELP) and order is not None:
             return ("order", order.pk)
         return ("building", building.pk) if building is not None else ("order", order.pk if order else None)
 
@@ -133,11 +153,14 @@ def attach_attempts(stops, date):
         k = ("order", visit.installation_order_id) if visit.installation_order_id else ("building", visit.building_id)
         visits.setdefault(k, []).append(visit)
     for stop, k in zip(stops, keys):
-        own = getattr(stop, "pk", None)
-        earlier = [v for v in visits.get(k, []) if v.date < date and v.stop_id != own]
-        stop.attempt = len(earlier) + 1
-        stop.last_visit = earlier[-1] if earlier else None
-        stop.visit = next((v for v in visits.get(k, []) if own and v.stop_id == own), None)
+        own_pk = getattr(stop, "pk", None)
+        mine = next((v for v in visits.get(k, []) if own_pk and v.stop_id == own_pk), None)
+        earlier = [v for v in visits.get(k, []) if v is not mine and v.stop_id != own_pk
+                   and (v.date < date or (v.date == date and (mine is None or v.pk < mine.pk)))]
+        stop.attempt = attempt_in_series([_info(v) for v in earlier])
+        # "last time" only while a series of unsuccessful visits is running (a complete one starts again at 1.)
+        stop.last_visit = earlier[-1] if stop.attempt > 1 else None
+        stop.visit = mine
     return stops
 
 
@@ -180,12 +203,12 @@ def object_history(building=None, order=None):
     target = {"building": building} if building is not None else {"installation_order": order}
     planned = list(TourStop.objects.filter(**target, kind=kind, done_at__isnull=True, outcome="")
                    .select_related("tour__employee").order_by("tour__date"))
-    infos = [VisitInfo(v.date, v.outcome, v.closed_at is not None) for v in items]
+    infos = [_info(v) for v in items]
     last = items[-1] if items else None
     for stop in planned:
-        stop.attempt = attempt_number([v.date for v in items], stop.tour.date)
+        stop.attempt = attempt_in_series([_info(v) for v in items if v.date <= stop.tour.date])
     return {
         "visits": items, "planned": planned, "last": last,
         "needs_revisit": needs_revisit(infos, [s.tour.date for s in planned]),
-        "next_attempt": len(items) + 1,
+        "next_attempt": attempt_in_series(infos),
     }

@@ -44,6 +44,9 @@ def add_note(user, text, kind=NoteKind.INFO, building=None, order=None):
 def set_resolved(note, user, done=True):
     if not user.has_perm("journal.change_note"):
         raise PermissionDenied("Notizen abhaken darf deine Rolle nicht.")
+    note.refresh_from_db()
+    if note.is_open != done:
+        return note  # already like that (e.g. a colleague was quicker): nothing changes, no second line
     note.resolved_at, note.resolved_by = (timezone.now(), user) if done else (None, None)
     note.save(update_fields=["resolved_at", "resolved_by"])
     what = "erledigt" if done else "wieder offen"
@@ -93,6 +96,10 @@ def field_problem(stop, text, user):
         raise ValidationError("Bitte kurz beschreiben, was nicht geklappt hat.")
     building = stop.building if stop.kind == "reading" or not stop.installation_order else None
     order = stop.installation_order
+    same = Note.objects.filter(kind=NoteKind.PROBLEM, resolved_at=None, text=text[:MAX_TEXT],
+                               building=building, installation_order=order if building is None else None).first()
+    if same:
+        return same  # tapped twice: no second report
     return Note.objects.create(building=building, installation_order=order if building is None else None,
                                kind=NoteKind.PROBLEM, text=text[:MAX_TEXT], author=user)
 

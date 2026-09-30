@@ -49,6 +49,19 @@ class VisitInfo:
     date: object
     outcome: str
     closed: bool = False  # the office decided: no further visit
+    seq: int = 0          # order of reports on the same day (e.g. the database id)
+
+
+def attempt_in_series(earlier):
+    """Which Termin is the next visit? earlier: VisitInfo in reporting order (date, seq).
+
+    A complete visit, or one the office closed, ends a series: afterwards it is the 1. Termin
+    again (e.g. next year's reading). Otherwise every unsuccessful visit counts: 2., 3. Termin ...
+    """
+    series = 0
+    for visit in sorted(earlier, key=lambda v: (v.date, v.seq)):
+        series = 0 if (visit.outcome == COMPLETE or visit.closed) else series + 1
+    return series + 1
 
 
 def needs_revisit(visits, planned_dates):
@@ -59,7 +72,7 @@ def needs_revisit(visits, planned_dates):
     """
     if not visits:
         return False
-    last = max(visits, key=lambda v: v.date)
+    last = max(visits, key=lambda v: (v.date, v.seq))  # the last REPORTED one, also on the same day
     if last.outcome == COMPLETE or last.closed:
         return False
     return not any(d >= last.date for d in planned_dates)

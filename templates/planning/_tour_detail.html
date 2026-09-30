@@ -3,7 +3,7 @@
 <div class="card-lite">
   {# live: new notes at once, and every minute what the Ableser/Monteur reports from "Mein Tag" #}
   <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}" hx-trigger="notes-changed from:body" hx-target="#cal-side"></div>
-  <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}?check={{ stamp|urlencode }}" hx-trigger="every 30s" hx-target="#cal-side"></div>
+  <div hidden hx-get="{% url 'planning:tour_detail' tour.pk %}?check={{ stamp|urlencode }}" hx-trigger="every 30s [!document.querySelector('#cal-side details[open], #cal-side :focus')]" hx-target="#cal-side"></div>
   <div class="d-flex justify-content-between align-items-start">
     <div>
       <h3 class="h6 mb-1"><span class="dot" style="background:{{ tour.employee.calendar_color }}"></span> {% if tour.team.all %}👥 {% endif %}{{ tour.people_label }} · {{ tour.date|date:"l, d.m.Y" }}</h3>
@@ -72,7 +72,7 @@
               </form>
             </details>
           {% endif %}
-          <div class="g">{% if s.building %}AZ {{ s.building.file_number }}{% endif %}{% if s.installation_order %}{% if s.building %} · {% endif %}{{ s.installation_order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.done_at %} · ✓ erledigt{% endif %}</div></td>
+          <div class="g">{% if s.building %}AZ {{ s.building.file_number }}{% endif %}{% if s.installation_order %}{% if s.building %} · {% endif %}{{ s.installation_order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.done_at %}{% if s.outcome == "partial" %} · ◐ teilweise{% elif s.outcome == "absent" %} · ✗ nicht erledigt{% else %} · ✓ erledigt{% endif %}{% endif %}</div></td>
         <td class="f">{% if not forloop.last and s.drive_to_next_minutes %}↓ {{ s.drive_to_next_minutes }} min{% endif %}</td>
       </tr>
     {% endfor %}
@@ -127,8 +127,15 @@
       <button class="btn">Verschieben …</button>
     </form>
     {% if perms.planning.delete_tour %}
-      <button class="btn prio-leise" hx-post="{% url 'planning:tour_delete' tour.pk %}" hx-swap="none"
-              hx-confirm="Fahrplan {{ tour.employee }} am {{ tour.date|date:'d.m.Y' }} wirklich löschen? Die Liegenschaften sind danach wieder ungeplant.">🗑 Löschen</button>
+      {% if visited_count and visited_count == stops|length %}
+        <span class="na small">🔒 alle Stopps gemeldet – der Plan bleibt als Nachweis</span>
+      {% elif visited_count %}
+        <button class="btn prio-leise" hx-post="{% url 'planning:tour_delete' tour.pk %}" hx-swap="none"
+                hx-confirm="{{ visited_count }} Stopps sind schon gemeldet – sie bleiben als Nachweis. Nur die offenen Stopps löschen?">🗑 Offene Stopps löschen</button>
+      {% else %}
+        <button class="btn prio-leise" hx-post="{% url 'planning:tour_delete' tour.pk %}" hx-swap="none"
+                hx-confirm="Fahrplan {{ tour.employee }} am {{ tour.date|date:'d.m.Y' }} wirklich löschen? Die Liegenschaften sind danach wieder ungeplant.">🗑 Löschen</button>
+      {% endif %}
     {% endif %}
   </div>
   {% endif %}

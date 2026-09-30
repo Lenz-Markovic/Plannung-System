@@ -60,7 +60,7 @@ def test_day_page_shows_stops_with_navigation_and_phone_links(day):
     response = login(day["reader"]).get(reverse("planning:my_day"))
     html = response.content.decode()
     assert response.status_code == 200
-    assert "Heute" in html and "Mörikeweg 1" in html and "0 von 2 erledigt" in html
+    assert "Heute" in html and "Mörikeweg 1" in html and "0 von 2 gemeldet" in html
     assert "https://www.google.com/maps/dir/?api=1&amp;destination=M%C3%B6rikeweg+1" in html
     assert 'href="tel:0711123456"' in html
     assert "📱 Mein Tag" in html
@@ -72,7 +72,7 @@ def test_mark_stop_done_updates_progress_and_finishes_tour(day):
     first, second = day["stops"]
     response = client.post(reverse("planning:stop_done", args=[first.pk]), {"done": "1"})
     html = response.content.decode()
-    assert "1 von 2 erledigt" in html and 'hx-swap-oob="true"' in html and "Stopp erledigt" in html
+    assert "1 von 2 gemeldet" in html and 'hx-swap-oob="true"' in html and "Stopp erledigt" in html
     first.refresh_from_db()
     assert first.done_at and first.done_by == day["reader"]
 

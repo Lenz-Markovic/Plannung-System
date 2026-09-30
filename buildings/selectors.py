@@ -10,6 +10,7 @@ from django.db.models import Case, Count, Exists, IntegerField, OuterRef, Prefet
 from django.db.models.functions import Coalesce
 
 from journal.notes import note_annotations
+from planning.queries import current_first
 from planning.visits import needs_revisit_q, visit_annotations
 from planning.models import StopKind, TourStop
 
@@ -31,10 +32,9 @@ def building_list_queryset():
     installation_date earliest planned installation of one of its orders
     effective_minutes reading time (manual beats calculated)
     """
-    reading_stops = TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING).order_by("tour__date")
-    installation_stops = TourStop.objects.filter(
-        installation_order__building=OuterRef("pk"), kind=StopKind.INSTALLATION
-    ).order_by("tour__date")
+    reading_stops = current_first(TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING))
+    installation_stops = current_first(TourStop.objects.filter(
+        installation_order__building=OuterRef("pk"), kind=StopKind.INSTALLATION))
     return (
         Building.objects.select_related("property_manager", "assigned_reader", "cost_documents")
         .annotate(

@@ -42,8 +42,10 @@ def preset_window(preset, today):
     months = 3 if preset == "3m" else 1
     month = today.month - 1 + months
     year, month = today.year + month // 12, month % 12 + 1
-    day = min(today.day, calendar.monthrange(year, month)[1])
-    return today, datetime.date(year, month, day) - datetime.timedelta(days=1)
+    last = calendar.monthrange(year, month)[1]
+    if today.day > last:  # e.g. 31.03. + 1 month: the whole April counts, up to 30.04.
+        return today, datetime.date(year, month, last)
+    return today, datetime.date(year, month, today.day) - datetime.timedelta(days=1)
 
 
 def order_group(planned_date, latest, start, end):
@@ -127,6 +129,7 @@ class Summary:
     without_price: list        # articles in the total without a price (price 0)
     order_rows: list = field(default_factory=list)   # OrderRow of the counted groups, by date
     order_columns: list = field(default_factory=list)  # category codes used by them (table columns)
+    storno: list = field(default_factory=list)  # RE numbers not counted because of an open ⛔ Storno
 
     @property
     def total(self):
@@ -159,9 +162,10 @@ def summarize(lines, start, end, article_prices, category_prices, with_open=Fals
             entry.pieces[line.category] = entry.pieces.get(line.category, 0) + line.quantity
             entry.articles.append((line.article, line.description, line.quantity, price * line.quantity))
             entry.money += price * line.quantity
-        row = rows.get(line.article)
+        # one row per article AND category: the same article number can be priced by two categories
+        row = rows.get((line.article, line.category))
         if row is None:
-            row = rows[line.article] = Row(line.article, line.description, line.category, price)
+            row = rows[(line.article, line.category)] = Row(line.article, line.description, line.category, price)
         row.pieces[line.group] += line.quantity
         row.orders.add(line.order)
         row.uses.append(line)

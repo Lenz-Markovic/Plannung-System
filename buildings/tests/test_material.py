@@ -118,3 +118,47 @@ def test_per_contract_view_and_excel_sheet(demo):
     # a price change keeps the chosen view
     kept = admin.post(reverse("orders:material_price"), {"category": "EHKV", "price": "12,00", **params}).content.decode()
     assert "Je Auftrag ·" in kept
+
+
+def test_price_input_edge_cases():
+    assert parse_price("1.250") == Decimal("1250.00")  # German thousands, no decimals
+    for bad in ("NaN", "nan", "sNaN", "Infinity"):
+        with pytest.raises(ValueError):
+            parse_price(bad)
+
+
+def test_storno_orders_are_not_bought(demo):
+    from journal.models import Note
+    stop = a_planned_installation()
+    order = stop.installation_order
+    Note.objects.create(installation_order=order, kind="storno", text="abgesagt")
+    s = material_summary(stop.tour.date, stop.tour.date)
+    assert order.re_number in s.storno and order.re_number not in {u.order for r in s.rows for u in r.uses}
+
+
+def test_far_future_window_does_not_crash(demo):
+    admin = login(roles.ADMIN, "admin")
+    assert admin.get(reverse(URL), {"z": "frei", "von": "9999-12-01", "bis": "9999-12-31"}).status_code == 200
+    assert admin.post(reverse("orders:material_price"), {"category": "EHKV", "price": "NaN"})["HX-Reswap"] == "none"
+
+
+def test_nachtermin_order_counts_on_its_new_day(demo):
+    from planning import services
+    from planning.models import Tour
+    stop = (TourStop.objects.filter(kind=StopKind.INSTALLATION, done_at__isnull=True)
+            .exclude(installation_order__status="done").select_related("tour", "installation_order")
+            .order_by("tour__date").first())
+    order = stop.installation_order
+    stop.done_at, stop.outcome = timezone.now(), "absent"  # 1. Termin: niemand da
+    stop.save()
+    first_day = stop.tour.date
+    s = material_summary(first_day, first_day)
+    assert order.re_number not in {u.order for r in s.rows for u in r.uses if u.group == "planned"}
+    new_day = first_day + datetime.timedelta(days=7)
+    employee = stop.tour.employee
+    while Tour.objects.filter(employee=employee, date=new_day).exists():
+        new_day += datetime.timedelta(days=1)
+    services.save_draft(services.create_draft([], employee, new_day, datetime.time(8), 30, "short", order_ids=[order.pk]),
+                        None, confirm=False)
+    s = material_summary(new_day, new_day)
+    assert order.re_number in {u.order for r in s.rows for u in r.uses if u.group == "planned"}

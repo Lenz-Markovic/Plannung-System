@@ -440,6 +440,10 @@ def tour_detail(request, pk):
         stop.notice_possible = office and stop.kind != StopKind.HELP
         stop.notice = notices.state_of(stop) if office and notices.wanted(stop) else None
     notes.attach_notes(stops)  # 📝 open notes of each building / order
+    if not request.user.has_perm("journal.view_note"):
+        for stop in stops:  # Ableser/Monteur: only the problems they reported themselves, not the office notes
+            stop.notes = [n for n in stop.notes if n.kind == "problem"]
+            stop.storno = False
     visits.attach_attempts(stops, tour.date)  # 🔁 which visit is this, and the Ergebnis
     for stop in stops:  # a note on site that went to the office as ⚠ problem is shown once, as the problem
         stop.field_is_problem = any(n.kind == "problem" and n.text == stop.field_note for n in stop.notes)
@@ -451,6 +455,7 @@ def tour_detail(request, pk):
                              start_date__lte=tour.date, end_date__gte=tour.date).values("employee")))
     return render(request, "planning/_tour_detail.html", {
         "tour": tour, "stops": stops, "helper_candidates": helper_candidates, "stamp": stamp,
+        "visited_count": sum(1 for s in stops if services.is_visited(s)),
         # the last change (who to ask) - the full Verlauf is behind the user name in the navigation
         "last_change": tour.activities.select_related("user").first() if request.user.has_perm("journal.view_activity") else None,
         "notice_stops": [s for s in stops if s.notice], "notice_deadline": notice_deadline(tour.date),
@@ -552,10 +557,22 @@ def tour_recalculate(request, pk):
 def tour_delete(request, pk):
     tour = get_object_or_404(Tour, pk=pk)
     label = f"{tour.employee} am {tour.date:%d.%m.%Y}"
-    record(request.user, ActivityKind.PLAN, f"Fahrplan gelöscht: {tour.people_label} {day_label(tour.date)} · "
-           f"{tour.stops.count()} Stopps: {streets(tour.stops.select_related('building', 'installation_order'))}")
-    services.delete_tour(tour)
-    response = render(request, "core/_toast.html", {"message": f"Fahrplan {label} gelöscht"})
+    stops = list(tour.stops.select_related("building", "installation_order"))
+    open_stops = [s for s in stops if not services.is_visited(s)]
+    people, day = tour.people_label, day_label(tour.date)  # before the plan is gone
+    if not open_stops and stops:
+        return render(request, "core/_toast.html", {
+            "message": "Alle Stopps sind schon gemeldet – der Plan bleibt als Nachweis und kann nicht gelöscht werden.",
+            "error": True})
+    whole = services.delete_tour(tour)
+    if whole:
+        record(request.user, ActivityKind.PLAN, f"Fahrplan gelöscht: {people} {day} · {len(stops)} Stopps: {streets(stops)}")
+        message = f"Fahrplan {label} gelöscht"
+    else:
+        record(request.user, ActivityKind.PLAN, f"{len(open_stops)} offene Stopps gelöscht: {people} {day} · "
+               f"{streets(open_stops)} – die gemeldeten Stopps bleiben als Nachweis", tour=tour)
+        message = f"{len(open_stops)} offene Stopps gelöscht – die gemeldeten bleiben als Nachweis im Plan {label}"
+    response = render(request, "core/_toast.html", {"message": message})
     response["HX-Trigger"] = "calendar-changed"  # the calendar reloads its events
     return response
 
@@ -692,15 +709,31 @@ def _stop_answer(request, stop, message, error=False):
 def stop_done(request, pk):
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
     done = request.POST.get("done") == "1"
-    if done:
-        visits.report(stop, request.user, visits.COMPLETE)  # ✓ fertig (100 %)
-    else:
-        visits.undo(stop, request.user)
+    _save_note_with_action(request, stop)
+    try:
+        if done:
+            visits.report(stop, request.user, visits.COMPLETE)  # ✓ fertig (100 %)
+        else:
+            visits.undo(stop, request.user)
+    except ValidationError as error:
+        response = _stop_answer(request, stop, error.messages[0], error=True)
+        response["HX-Reswap"] = "none"
+        return response
     target = stop.building or stop.installation_order
     record(request.user, ActivityKind.FIELD, f"{'✓ fertig (100 %)' if done else '↺ Ergebnis zurückgesetzt'}: {target.street} "
            f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
            order=stop.installation_order)
     return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
+
+
+def _save_note_with_action(request, stop):
+    """The buttons send the note field along: a note typed just before tapping is never lost."""
+    if "field_note" in request.POST and request.POST["field_note"].strip() != stop.field_note:
+        dayplan.save_field_note(stop, request.POST["field_note"], request.user)
+        target = stop.building or stop.installation_order
+        record(request.user, ActivityKind.FIELD, f"Notiz vor Ort – {stop.tour.employee}, {target.street} "
+               f"({day_label(stop.tour.date)}): {stop.field_note or '(gelöscht)'}", tour=stop.tour,
+               building=stop.building, order=stop.installation_order)
 
 
 @require_POST
@@ -709,6 +742,7 @@ def stop_report(request, pk):
     """◐ teilweise erledigt / ✗ nicht erledigt (niemand da ...): what is still to do - required."""
     stop = get_object_or_404(TourStop.objects.select_related("tour__employee", "building", "installation_order"), pk=pk)
     outcome, todo, reason = request.POST.get("outcome", ""), request.POST.get("todo", ""), request.POST.get("reason", "")
+    _save_note_with_action(request, stop)
     try:
         visit = visits.report(stop, request.user, outcome, todo, reason)
     except ValidationError as error:

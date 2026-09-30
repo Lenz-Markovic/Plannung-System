@@ -19,6 +19,7 @@ import datetime
 from dataclasses import dataclass, field
 
 WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"]  # the dropdown of the template
+ALL_WEEKDAYS = WEEKDAYS + ["Sonntag"]  # Sonntag is added to the dropdown when needed
 
 WORK_BOXES = ["ablesung", "montage", "austausch", "wartung"]
 DEVICE_BOXES = ["hkv", "wasser", "waerme", "rwm"]
@@ -51,7 +52,7 @@ class Devices:
 class NoticeFields:
     number: str = ""                 # Text12
     address: str = ""                # Text2
-    weekday: int | None = None       # Dropdown1: 0 = Montag .. 5 = Samstag, None = Sunday / unknown
+    weekday: int | None = None       # Dropdown1: 0 = Montag .. 6 = Sonntag (added to the list), None = unknown
     date: str = ""                   # Text5 "03.11.2026"
     time: str = ""                   # Text4 "09:00 – 11:00 Uhr"
     bottom: str = ""                 # Text10
@@ -59,7 +60,7 @@ class NoticeFields:
 
     @property
     def weekday_name(self):
-        return WEEKDAYS[self.weekday] if self.weekday is not None else ""
+        return ALL_WEEKDAYS[self.weekday] if self.weekday is not None else ""
 
 
 def devices_from_counts(hkv=0, wmz=0, wwz=0, kwz=0, rwm=0, hwmz=0, has_rwm=None):
@@ -97,7 +98,7 @@ def notice_fields(kind, date, window, number="", address="", devices=Devices(), 
         boxes.add("austausch" if exchange else "montage")
         boxes |= {name for name, has in (("hkv", devices.hkv), ("wasser", devices.water),
                                          ("waerme", devices.heat), ("rwm", devices.rwm)) if has}
-    weekday = date.weekday() if isinstance(date, datetime.date) and date.weekday() < 6 else None
+    weekday = date.weekday() if isinstance(date, datetime.date) else None
     return NoticeFields(
         number=number, address=address, weekday=weekday,
         date=f"{date:%d.%m.%Y}" if date else "", time=time_text(window), boxes=boxes,

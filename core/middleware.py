@@ -22,7 +22,7 @@ class DatabaseNotUpToDateMiddleware:
     "no such table" until the migrations have run. This page says what to do.
     """
 
-    SIGNS = ("no such column", "no such table", "does not exist")
+    SIGNS = ("no such column", "no such table", "has no column named", "does not exist", "existiert nicht")
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -36,8 +36,11 @@ class DatabaseNotUpToDateMiddleware:
 
         if not isinstance(exception, (OperationalError, ProgrammingError)):
             return None
-        if not any(sign in str(exception).lower() for sign in self.SIGNS):
+        text = str(exception).lower()
+        if not any(sign in text for sign in self.SIGNS) or text.startswith(("database ", "role ", "datenbank ", "rolle ")):
             return None
+        import logging
+        logging.getLogger("django.request").warning("Datenbank nicht migriert: %s", exception, exc_info=exception)
         html = (
             "<!doctype html><html lang='de'><meta charset='utf-8'><title>Datenbank nicht aktuell</title>"
             "<body style='font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;line-height:1.5'>"
@@ -45,7 +48,7 @@ class DatabaseNotUpToDateMiddleware:
             "<p>Nach dem letzten Update fehlen neue Felder in der Datenbank. "
             "Bitte im Terminal den Server stoppen (<b>Strg+C</b>) und dann eingeben:</p>"
             "<pre style='background:#f3f3f3;padding:12px;border-radius:6px'>python manage.py migrate\n"
-            "python manage.py setup_roles\npython manage.py runserver</pre>"
+            "python manage.py runserver</pre>"
             "<p>Danach diese Seite neu laden (<b>Strg+Umschalt+R</b>).</p></body></html>"
         )
         return HttpResponse(html, status=503)

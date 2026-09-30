@@ -33,9 +33,35 @@ def test_installation_montage_or_austausch_with_the_ordered_devices():
     assert "austausch" in notice_fields("installation", WED, NINE_TO_ELEVEN, exchange=True).boxes
 
 
-def test_sunday_is_not_in_the_weekday_list_of_the_template():
-    assert notice_fields("reading", datetime.date(2026, 11, 8), None).weekday is None
+def test_sunday_is_added_to_the_weekday_list_of_the_template():
+    sunday = notice_fields("reading", datetime.date(2026, 11, 8), None)
+    assert sunday.weekday_name == "Sonntag"
+    xml = zipfile.ZipFile(BytesIO(build_docx([sunday]))).read("word/document.xml").decode()
+    assert '<w:listEntry w:val="Sonntag"/>' in xml and '<w:result w:val="6"/>' in xml  # not the template's "Mittwoch"
     assert time_text(None) == "" and time_text((datetime.time(8), None)) == "ab 08:00 Uhr"
+
+
+def test_long_address_gets_a_smaller_font_and_word_runs_with_attributes_work():
+    long = notice_fields("reading", WED, NINE_TO_ELEVEN, "1", "Schillerstraße 10, 71093 Weil im Schönbuch-Breitenstein")
+    xml = zipfile.ZipFile(BytesIO(build_docx([long]))).read("word/document.xml").decode()
+    run = xml[xml.index("Weil im Schönbuch") - 300:xml.index("Weil im Schönbuch")]
+    assert re.search(r'<w:sz w:val="(1[4-9]|2[0-2])"/>', run)  # smaller than the template's 24 half points
+    # a template saved by Word has runs like <w:r w:rsidR="00AB12CD">
+    import tempfile, shutil
+    from pathlib import Path
+    from documents.aushang_docx import TEMPLATE
+    folder = Path(tempfile.mkdtemp())
+    source = zipfile.ZipFile(TEMPLATE)
+    copy = folder / "t.dotx"
+    with zipfile.ZipFile(copy, "w") as out:
+        for item in source.infolist():
+            data = source.read(item.filename)
+            if item.filename == "word/document.xml":
+                data = data.decode().replace("<w:r>", '<w:r w:rsidR="00AB12CD">').encode()
+            out.writestr(item, data)
+    xml = zipfile.ZipFile(BytesIO(build_docx([long], template=copy))).read("word/document.xml").decode()
+    assert "Weil im Schönbuch" in xml
+    shutil.rmtree(folder)
 
 
 def test_word_file_fills_the_form_fields_of_the_template():

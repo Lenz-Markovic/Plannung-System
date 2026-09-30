@@ -29,3 +29,16 @@ def test_mein_tag_is_not_a_disposition_default():
     grant_new_defaults()
     assert not Group.objects.get(name=roles.DISPATCHER).permissions.filter(codename="view_own_tours").exists()
     assert Group.objects.get(name=roles.READER).permissions.filter(codename="view_own_tours").exists()
+
+
+def test_setup_roles_does_not_give_back_removed_defaults():
+    import io
+    from django.core.management import call_command
+    grant_new_defaults()
+    group = Group.objects.get(name=roles.DISPATCHER)
+    delete = Permission.objects.get(codename="delete_tour")
+    group.permissions.remove(delete)
+    call_command("setup_roles", stdout=io.StringIO())
+    assert not group.permissions.filter(pk=delete.pk).exists()
+    call_command("setup_roles", "--reset", stdout=io.StringIO())
+    assert group.permissions.filter(pk=delete.pk).exists()

@@ -1,4 +1,4 @@
-{% regroup entries by created_at.date as days_list %}
+{% regroup entries by local_day as days_list %}
 {% for day in days_list %}
   <div class="act-day">{% if day.grouper == today %}Heute{% else %}{{ day.grouper|date:"l, d.m.Y" }}{% endif %}</div>
   <ul class="act-list">

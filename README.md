@@ -210,8 +210,7 @@ The only JavaScript is `static/js/calendar.js` (commented).
   together); the ones that fit into 7,5 h are ticked → "Fahrplan erstellen" opens the
   preview. Also in the person overview.
 - **Weekly hours** in the person overview only with the permission "Wochenstunden je
-  Mitarbeiter sehen" (only Admin by default, changeable in the admin). After updating
-  run `python manage.py setup_roles` once so the Admin role gets it. Daily hours stay
+  Mitarbeiter sehen" (only Admin by default, changeable in the admin). Daily hours stay
   visible for everybody.
 
 ## 🤝 Help at one object
@@ -347,8 +346,6 @@ The only JavaScript is `static/js/calendar.js` (commented).
   price per article number directly in the table (empty = category price again). A
   price change updates all sums at once. Also in ⚙ Verwaltung → Gerätekategorien /
   Artikelpreise. Articles without a price are marked (the sum would be too low).
-- After the update run `python manage.py setup_roles` once, so the Admin role gets the
-  new permission.
 
 ## 📄 Tenant notices (Aushang)
 
@@ -403,12 +400,14 @@ Business rules are pure Python functions in `<app>/rules/` with tests in
 
 ## Roles
 
-Defined in `core/roles.py` (spec section 5). `setup_roles` adds missing
-groups/permissions and keeps changes made in the admin;
+Defined in `core/roles.py` (spec section 5). `migrate` gives the roles every NEW default
+permission by itself (core/role_sync.py, remembered in "Standardrechte (vergeben)"); a
+permission an admin took away stays away. `setup_roles` adds missing groups and defaults
+that were never given and keeps changes made in the admin;
 `setup_roles --reset` restores the defaults exactly. Users of the Admin role
 also need "Mitarbeiter-Status" (is_staff) to open `/admin/`.
 
 ## Switching to PostgreSQL
 
 Set `DATABASE_ENGINE=postgres` and the `POSTGRES_*` values in `.env`, then
-run `python manage.py migrate` and `python manage.py setup_roles` again.
+run `python manage.py migrate` (the roles are set up by it).

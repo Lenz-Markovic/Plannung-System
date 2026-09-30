@@ -15,6 +15,9 @@
   {% endfor %}
 </div>
 
+{% if s.storno %}
+  <div class="pr-status info mt-2">⛔ {{ s.storno|length }} Auftr{{ s.storno|length|pluralize:"ag,äge" }} mit offenem Storno nicht gezählt: {{ s.storno|join:", " }}</div>
+{% endif %}
 {% if s.without_price %}
   <div class="pr-status warn mt-2">⚠ {{ s.without_price|length }} Artikel ohne Preis ({% for r in s.without_price %}{{ r.article }}{% if not forloop.last %}, {% endif %}{% endfor %}) –
     die Summe ist zu niedrig. Preis in der Tabelle eintragen.</div>

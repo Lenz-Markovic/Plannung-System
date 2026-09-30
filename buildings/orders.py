@@ -8,11 +8,12 @@ Prices are only used by the Admin budget view "💶 Material & Kosten" (material
 import django_filters
 from django import forms
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Exists, F, Min, OuterRef, Prefetch, Q
+from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery
 
 from journal.activity import record
 from journal.models import ActivityKind
 from journal.notes import note_annotations
+from planning.queries import current_first
 from planning.visits import needs_revisit_q, visit_annotations
 from conflicts.models import Conflict, Severity
 from conflicts.services import refresh_for
@@ -34,12 +35,12 @@ OPEN_CONFLICT = Q(acknowledged_at__isnull=True, severity__in=[Severity.CRITICAL,
 
 def order_list_queryset():
     """All orders with what one row needs (few queries, whatever the number of rows)."""
-    stops = (TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour__employee")
-             .order_by("tour__date", "start_time"))
+    stops = current_first(TourStop.objects.filter(kind=StopKind.INSTALLATION).select_related("tour__employee"))
+    current = current_first(TourStop.objects.filter(installation_order=OuterRef("pk"), kind=StopKind.INSTALLATION))
     return (
         InstallationOrder.objects.select_related("building")
         .annotate(
-            installation_date=Min("tour_stops__tour__date", filter=Q(tour_stops__kind=StopKind.INSTALLATION)),
+            installation_date=Subquery(current.values("tour__date")[:1]),  # the current appointment
             has_open_conflict=Exists(Conflict.objects.filter(OPEN_CONFLICT, installation_order=OuterRef("pk"))),
             **note_annotations("installation_order"),  # 📝 / ⛔ badges in the row
         )

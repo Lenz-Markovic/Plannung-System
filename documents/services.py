@@ -12,15 +12,15 @@ from buildings.models import BuildingStatus
 from journal.activity import record
 from journal.models import ActivityKind
 from planning.models import StopKind, TourStop
+from planning.queries import current_first
 
 from .models import CostDocumentReceipt
 from .rules import OVERDUE, DeadlineTracking, deadline_info, track_deadline, warning_colour
 
 
 def planned_reading_date(building):
-    """Earliest planned reading day of a building (None if not planned)."""
-    stop = (TourStop.objects.filter(building=building, kind=StopKind.READING)
-            .order_by("tour__date").select_related("tour").first())
+    """The current reading appointment (the next open one; a Nachtermin restarts the deadline). None if not planned."""
+    stop = current_first(TourStop.objects.filter(building=building, kind=StopKind.READING)).select_related("tour").first()
     return stop.tour.date if stop else None
 
 
@@ -92,7 +92,7 @@ def deadline_entries(today=None, refresh=True):
     changed (like prioSync() in the prototype, which ran every 3 seconds).
     """
     today = today or timezone.localdate()
-    reading = TourStop.objects.filter(building=OuterRef("building"), kind=StopKind.READING).order_by("tour__date")
+    reading = current_first(TourStop.objects.filter(building=OuterRef("building"), kind=StopKind.READING))
     receipts = (
         CostDocumentReceipt.objects.select_related("building", "building__property_manager")
         .annotate(planned_date=Subquery(reading.values("tour__date")[:1]),

@@ -27,8 +27,15 @@ def _field_start(xml, name):
     return xml.index(f'<w:name w:val="{name}"/>')
 
 
-def _set_text(xml, name, value):
-    """Replace the shown result of the text field `name` (the runs between 'separate' and its 'end')."""
+RUN_START = re.compile(r"<w:r(?:\s[^>]*)?>")  # "<w:r>" and "<w:r w:rsidR=...>" (a template saved by Word)
+ADDRESS_ROOM = 45  # characters that fit behind "in der Liegenschaft" in 12 pt
+
+
+def _set_text(xml, name, value, shrink_after=None):
+    """Replace the shown result of the text field `name` (the runs between 'separate' and its 'end').
+
+    shrink_after: a longer text gets a smaller font, so it stays on its line (the boxes below keep their place).
+    """
     if not value:
         return xml  # keep the empty placeholder of the template (it keeps the spacing)
     start = _field_start(xml, name)
@@ -43,9 +50,16 @@ def _set_text(xml, name, value):
             depth, pos = depth + 1, nxt_begin + 1
         else:
             depth, pos = depth - 1, nxt_end + 1
-    end_run = xml.rindex("<w:r>", first, pos)
+    starts = [m.start() for m in RUN_START.finditer(xml, first, pos)]
+    end_run = starts[-1]
     rpr = re.findall(r"<w:rPr>.*?</w:rPr>", xml[sep - 400:sep])  # the format of the field
-    run = f'<w:r>{rpr[-1] if rpr else ""}<w:t xml:space="preserve">{escape(value)}</w:t></w:r>'
+    rpr = rpr[-1] if rpr else "<w:rPr></w:rPr>"
+    if shrink_after and len(value) > shrink_after:
+        size = re.search(r'<w:sz w:val="(\d+)"/>', rpr)
+        half_points = int(size.group(1)) if size else 24
+        smaller = max(14, int(half_points * shrink_after / len(value)) // 2 * 2)
+        rpr = re.sub(r'<w:sz(Cs)? w:val="\d+"/>', "", rpr).replace("</w:rPr>", f'<w:sz w:val="{smaller}"/><w:szCs w:val="{smaller}"/></w:rPr>')
+    run = f'<w:r>{rpr}<w:t xml:space="preserve">{escape(value)}</w:t></w:r>'
     return xml[:first] + run + xml[end_run:]
 
 
@@ -56,10 +70,15 @@ def _set_checkbox(xml, name, checked):
     return xml[:start] + part + xml[end:]
 
 
-def _set_dropdown(xml, name, index):
+def _set_dropdown(xml, name, index, label=""):
+    """Select entry `index`; if the template's list is too short (Sunday), `label` is added to it."""
     start = _field_start(xml, name)
     end = xml.index("</w:ddList>", start)
-    part = re.sub(r'<w:result w:val="\d+"/>', f'<w:result w:val="{index}"/>', xml[start:end])
+    part = xml[start:end]
+    if label and part.count("<w:listEntry ") <= index:
+        part += f'<w:listEntry w:val="{escape(label)}"/>'
+        index = part.count("<w:listEntry ") - 1
+    part = re.sub(r'<w:result w:val="\d+"/>', f'<w:result w:val="{index}"/>', part)
     return xml[:start] + part + xml[end:]
 
 
@@ -72,12 +91,12 @@ def _drop_lonely_bookmark_ends(body):
 def fill_body(body, fields):
     """The page body (without sectPr) with the values of one NoticeFields."""
     for attr, name in TEXT_FIELDS.items():
-        body = _set_text(body, name, getattr(fields, attr))
+        body = _set_text(body, name, getattr(fields, attr), shrink_after=ADDRESS_ROOM if attr == "address" else None)
     body = _drop_lonely_bookmark_ends(body)
     for box, name in BOX_FIELDS.items():
         body = _set_checkbox(body, name, box in fields.boxes)
     if fields.weekday is not None:
-        body = _set_dropdown(body, "Dropdown1", fields.weekday)
+        body = _set_dropdown(body, "Dropdown1", fields.weekday, fields.weekday_name)
     return body
 
 
