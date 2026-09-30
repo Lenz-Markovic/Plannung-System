@@ -1,0 +1,89 @@
+{# 📊 everything scoped by the time range - replaced when a filter changes #}
+<div id="ov-body" class="ov-body">
+  <p class="na small">Zeitraum {{ start|date:"d.m.Y" }} – {{ end|date:"d.m.Y" }}{% if art == "reading" %} · nur Ablesung{% elif art == "installation" %} · nur Montage{% endif %}</p>
+
+  <section class="ov-card ov-wide">
+    <div class="ov-card-head">
+      <div><h2>Termine {% if per_week %}pro Woche{% else %}pro Tag{% endif %}</h2>
+        <p class="na small">{{ reported }} gemeldete Termin-Ergebnisse</p></div>
+      <ul class="ov-legend" aria-label="Legende">
+        {% for key, label, n, share in totals %}<li><span class="ov-swatch {{ key }}"></span>{{ label }} <b>{{ n }}</b> <span class="na">({{ share }} %)</span></li>{% endfor %}
+      </ul>
+    </div>
+    {% if reported %}
+      <div class="ov-cols" role="img" aria-label="Säulendiagramm: Termin-Ergebnisse {% if per_week %}pro Woche{% else %}pro Tag{% endif %}">
+        <div class="ov-grid">{% for value, pos in ticks %}<div class="ov-gridline" style="bottom: {{ pos|floatformat:'2u' }}%"><span>{{ value }}</span></div>{% endfor %}</div>
+        <div class="ov-bars">
+          {% for c in columns %}
+            <div class="ov-col" tabindex="0" data-tip="{{ c.bucket.label }}|{% for key, label, n, h in c.segments %}{{ label }}: {{ n }}{% if not forloop.last %};{% endif %}{% empty %}keine Termine{% endfor %}">
+              <div class="ov-stack">{% for key, label, n, h in c.segments %}<span class="ov-seg {{ key }}" style="height: {{ h|floatformat:'2u' }}%"></span>{% endfor %}</div>
+              <span class="ov-xlabel{% if forloop.counter0|divisibleby:label_every %} wide{% endif %}{% if forloop.counter0|divisibleby:label_every_narrow %} narrow{% endif %}">{{ c.bucket.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}<div class="ov-empty">Im Zeitraum wurden noch keine Ergebnisse gemeldet.</div>{% endif %}
+    <details class="ov-table"><summary>Als Tabelle</summary>
+      <table class="table table-sm"><thead><tr><th>{% if per_week %}Woche{% else %}Tag{% endif %}</th><th>✓ fertig</th><th>◐ teilweise</th><th>✗ nicht erledigt</th><th>zusammen</th></tr></thead>
+        <tbody>{% for c in columns %}<tr><td>{{ c.bucket.label }}</td><td>{{ c.bucket.complete }}</td><td>{{ c.bucket.partial }}</td><td>{{ c.bucket.absent }}</td><td><b>{{ c.bucket.total }}</b></td></tr>{% endfor %}</tbody></table>
+    </details>
+  </section>
+
+  <div class="ov-row">
+    <section class="ov-card">
+      <h2>Liegenschaften nach Status</h2>
+      <p class="ov-hero">{{ released_share }} %<span class="ov-hero-note"> freigegeben · {{ buildings_total }} Liegenschaften</span></p>
+      <div class="ov-share" role="img" aria-label="Anteil der Liegenschaften je Status">
+        {% for key, label, n, share in buildings %}<span class="ov-share-seg b-{{ key }}" style="width: {{ share|floatformat:'2u' }}%" tabindex="0" data-tip="{{ label }}|{{ n }} Liegenschaften ({{ share|floatformat:0 }} %)"></span>{% endfor %}
+      </div>
+      <ul class="ov-legend">{% for key, label, n, share in buildings %}<li><span class="ov-swatch b-{{ key }}"></span>{% if key == "released" %}✓{% elif key == "rework" %}▲{% else %}●{% endif %} {{ label }} <b>{{ n }}</b></li>{% endfor %}</ul>
+    </section>
+
+    <section class="ov-card">
+      <h2>Montageaufträge nach Status</h2>
+      <p class="na small">{{ orders_total }} Aufträge</p>
+      <div class="ov-hbars">
+        {% for key, label, n in orders %}
+          <div class="ov-hbar" tabindex="0" data-tip="{{ label }}|{{ n }} Aufträge"><span class="ov-hbar-label">{{ label }}</span>
+            <span class="ov-hbar-track"><span class="ov-hbar-fill" style="width: {% widthratio n orders_max|default:1 100 %}%"></span></span><b class="ov-hbar-value">{{ n }}</b></div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div class="ov-row">
+    <section class="ov-card">
+      <h2>Warum nicht erledigt?</h2>
+      <p class="na small">Gründe bei ✗ nicht erledigt im Zeitraum</p>
+      {% if reasons %}<div class="ov-hbars">
+        {% for label, n, w in reasons %}<div class="ov-hbar" tabindex="0" data-tip="{{ label }}|{{ n }}×"><span class="ov-hbar-label">{{ label }}</span>
+          <span class="ov-hbar-track"><span class="ov-hbar-fill" style="width: {{ w|floatformat:'2u' }}%"></span></span><b class="ov-hbar-value">{{ n }}</b></div>{% endfor %}
+      </div>{% else %}<div class="ov-empty">Kein ✗ im Zeitraum.</div>{% endif %}
+    </section>
+
+    <section class="ov-card">
+      <h2>Wie viele Termine bis fertig?</h2>
+      <p class="na small">{{ attempts_total }} × ✓ fertig – beim wievielten Termin</p>
+      {% if attempts %}<div class="ov-hbars">
+        {% for label, n, w in attempts %}<div class="ov-hbar" tabindex="0" data-tip="{{ label }} Termin|{{ n }}× fertig"><span class="ov-hbar-label">beim {{ label }} Termin</span>
+          <span class="ov-hbar-track"><span class="ov-hbar-fill" style="width: {{ w|floatformat:'2u' }}%"></span></span><b class="ov-hbar-value">{{ n }}</b></div>{% endfor %}
+      </div>{% else %}<div class="ov-empty">Noch kein ✓ im Zeitraum.</div>{% endif %}
+    </section>
+  </div>
+
+  <section class="ov-card ov-wide">
+    <h2>Pro Person</h2>
+    <p class="na small">Stopps in den Fahrplänen des Zeitraums (bis heute) und ihre Ergebnisse</p>
+    {% if people %}
+    <div class="table-responsive"><table class="table table-sm ov-people">
+      <thead><tr><th>Person / Team</th><th class="ov-num">Stopps geplant</th><th>davon gemeldet</th><th class="ov-num">✓ fertig</th><th class="ov-num">◐ teilweise</th><th class="ov-num">✗ nicht erledigt</th><th class="ov-num">Erfolg</th><th class="ov-num">offen</th></tr></thead>
+      <tbody>{% for p in people %}<tr>
+        <td><b>{{ p.people }}</b></td><td class="ov-num">{{ p.planned }}</td>
+        <td><span class="ov-meter" tabindex="0" data-tip="{{ p.people }}|{{ p.reported }} von {{ p.planned }} gemeldet ({{ p.reported_share }} %)"><span style="width: {{ p.reported_share }}%"></span></span> <span class="na small">{{ p.reported_share }} %</span></td>
+        <td class="ov-num">{{ p.complete }}</td><td class="ov-num">{{ p.partial }}</td><td class="ov-num">{{ p.absent }}</td>
+        <td class="ov-num">{% if p.complete or p.partial or p.absent %}{{ p.success }} %{% else %}–{% endif %}</td>
+        <td class="ov-num">{% if p.open %}<span class="ov-status warning">❓ {{ p.open }}</span>{% else %}–{% endif %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="ov-empty">Keine Fahrpläne im Zeitraum.</div>{% endif %}
+  </section>
+</div>

@@ -957,3 +957,25 @@ def where_page(request):
         response["HX-Push-Url"] = clean_url(request)
         return response
     return render(request, "planning/where.html", context)
+
+
+# --- 📊 Übersicht (planning/overview.py) -------------------------------------------------------------
+
+@permission_required("planning.view_tour", raise_exception=True)
+def overview_page(request):
+    """Dashboard: what is open now (tiles) and what happened in the chosen time range (charts)."""
+    from buildings.views import clean_url
+
+    from . import overview
+    from .rules import overview as overview_rules
+
+    today = timezone.localdate()
+    period = overview_rules.chosen_period(request.GET.get("zeitraum", ""))
+    kind = request.GET.get("art", "") if request.GET.get("art", "") in ("reading", "installation") else ""
+    context = {**overview.collect(period, kind, today), "tiles": overview.headline(today), "period": period,
+               "periods": overview_rules.PERIODS, "art": kind, "today": today}
+    if request.htmx_target == "ov-body":
+        response = render(request, "planning/_overview_body.html", context)
+        response["HX-Push-Url"] = clean_url(request)
+        return response
+    return render(request, "planning/overview.html", context)

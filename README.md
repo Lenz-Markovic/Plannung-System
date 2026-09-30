@@ -293,7 +293,7 @@ left with every page, action and quick filter as a button – only what the role
 `static/js/side_menu.js`):
 
 - **Seiten:** Liegenschaften, Montage, Rückmeldungen, Unterlagen, Konflikte (with their
-  red numbers), Kalender, 🛰 Wer ist wo?, Mein Tag.
+  red numbers), Kalender, 🛰 Wer ist wo?, 📊 Übersicht, Mein Tag.
 - **Planen:** 🗺 Fahrplan erstellen (with what is ticked), 🗓 Erste freie Tage (opens the calendar
   with it switched on), 📄 Alle Fahrpläne (Excel).
 - **Quick filters** (one click instead of choosing in the filter fields): Rückmeldungen (prüfen,
@@ -304,6 +304,24 @@ left with every page, action and quick filter as a button – only what the role
 - **Mehr:** 🕘 Verlauf, ⚙ Verwaltung (Admin), 🔔 pop-ups on/off, 🚪 Abmelden.
 - **📌 anheften** (wide screens): the menu stays open at the left on every page. "📌 lösen" brings them back. It is remembered in this browser.
 - The page (and quick filter) you are on is marked blue. Esc or a click next to it closes it.
+
+## 📊 Übersicht (dashboard)
+
+☰ Menü → **📊 Übersicht** (Admin, Leitung, Disposition, Sachbearbeitung) – numbers and charts,
+counted fresh on every load (`planning/rules/overview.py`, `planning/overview.py`):
+
+- **Open now** (tiles, each a link): Rückmeldungen offen, Nachtermin nötig, über der 14-Tage-
+  Frist (+ bald fällig), Konflikte offen, Stopps heute.
+- **Time range** (letzte 7 / 30 / 90 Tage, ganze Saison) and Ablesung / Montage – they scope
+  everything below:
+  - **Termine pro Tag** (per week for long ranges): ✓ fertig / ◐ teilweise / ✗ nicht erledigt
+    stacked, with totals and "Als Tabelle".
+  - **Liegenschaften nach Status** (offen / Nacharbeit / freigegeben, % freigegeben) and
+    **Montageaufträge nach Status**.
+  - **Warum nicht erledigt?** (the reasons of ✗) and **Wie viele Termine bis fertig?**
+    (1. / 2. / 3.+ Termin).
+  - **Pro Person:** planned stops, how many reported, ✓ / ◐ / ✗, success rate, still open.
+- Hover (or Tab to) a bar for its exact numbers.
 
 ## 🛰 Wer ist wo? (map by the Fahrplan)
 

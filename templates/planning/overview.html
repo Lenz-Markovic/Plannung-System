@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Übersicht{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📊 Übersicht</h1>
+  <span class="sub">Was jetzt offen ist und was im gewählten Zeitraum passiert ist</span>
+</header>
+
+<form id="ov-filters" class="ov-filters" hx-get="{% url 'planning:overview' %}" hx-target="#ov-body" hx-swap="outerHTML" hx-trigger="change" hx-indicator="#ov-body">
+  <div class="ov-periods" role="radiogroup" aria-label="Zeitraum">
+    {% for key, label in periods %}<label class="ov-period {% if period == key %}on{% endif %}"><input type="radio" name="zeitraum" value="{{ key }}" {% if period == key %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">{{ label }}</label>{% endfor %}
+  </div>
+  <label class="ov-kind">Art <select name="art"><option value="">alle</option>
+    <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+    <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+</form>
+
+{# what is open NOW - not scoped by the time range #}
+<section class="ov-tiles" aria-label="Jetzt offen">
+  <a class="ov-tile" href="{% url 'planning:followup' %}"><span class="ov-tile-label">Rückmeldungen offen</span>
+    <span class="ov-tile-value">{{ tiles.followup_open }}</span><span class="ov-tile-note">🧾 im Büro zu bearbeiten</span></a>
+  <a class="ov-tile" href="{% url 'buildings:list' %}?nachtermin=noetig"><span class="ov-tile-label">Nachtermin nötig</span>
+    <span class="ov-tile-value">{{ tiles.revisits }}</span><span class="ov-tile-note">🔁 Liegenschaften + Aufträge</span></a>
+  <a class="ov-tile" href="{% url 'documents:list' %}?f=ueber"><span class="ov-tile-label">Über der 14-Tage-Frist</span>
+    <span class="ov-tile-value">{{ tiles.overdue }}</span><span class="ov-tile-note">{% if tiles.overdue %}<span class="ov-status critical">⛔ überfällig</span>{% else %}<span class="ov-status good">✓ keine</span>{% endif %} · {{ tiles.soon }} bald fällig</span></a>
+  <a class="ov-tile" href="{% url 'conflicts:list' %}"><span class="ov-tile-label">Konflikte offen</span>
+    <span class="ov-tile-value">{{ tiles.conflicts }}</span><span class="ov-tile-note">⚠ zu prüfen</span></a>
+  <a class="ov-tile" href="{% url 'planning:where' %}"><span class="ov-tile-label">Stopps heute</span>
+    <span class="ov-tile-value">{{ tiles.planned_today }}</span><span class="ov-tile-note">🛰 wer ist wo?</span></a>
+</section>
+
+{% include "planning/_overview_body.html" %}
+<script src="{% static 'js/chart_tips.js' %}?v={{ STATIC_VERSION }}"></script>
+{% endblock %}
