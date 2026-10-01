@@ -2,7 +2,7 @@
 <article id="gw-{{ b.pk }}" class="gw-row gw-{{ b.gw_state }}">
   <div class="gw-head">
     <div class="gw-obj"><b>AZ {{ b.file_number }}</b> · {{ b.street }}, {{ b.zip_code }} {{ b.city }}
-      <span class="na small">· Stichtag {{ b.stichtag|date:"d.m.Y" }} · {{ b.get_installation_type_display|default:"Funk" }}{% if b.has_gateway %} + Gateway{% endif %}
+      <span class="na small">· Stichtag {{ b.stichtag|date:"d.m.Y" }} · {{ b.get_installation_type_display|default:"Funk" }}{% if b.has_gateway and b.installation_type != "radio_gateway" %} + Gateway{% endif %}
         · {{ b.hkv_count }} HKV{% if b.wmz_count %} · {{ b.wmz_count }} WMZ{% endif %}{% if b.wwz_count %} · {{ b.wwz_count }} WWZ{% endif %}{% if b.kwz_count %} · {{ b.kwz_count }} KWZ{% endif %} · {{ b.apartments }} Whg</span></div>
     <span class="gw-chip gw-{{ b.gw_state }}">{{ b.gw_label }}{% if b.gateway_missing and b.gw_state != "freigegeben" and b.gw_state != "vollstaendig" and b.gw_state != "werte" %} · {{ b.gateway_missing }} fehlen{% endif %}</span>
   </div>
