@@ -67,3 +67,15 @@ def test_route_order_and_times():
     from documents.notice_rules import duration_text
     assert duration_text(95) == "1:35 h" and duration_text(35) == "35 min"
     assert route_times(480, [0, 10, 5], [5, 6, 5]) == [(480, 485), (495, 501), (506, 511)]
+
+
+def test_areas_and_far_away():
+    from documents.notice_rules import area_name, areas, far_away
+    # two houses in Fellbach (1 km apart), a chain to Waiblingen, one far away in Leonberg, one without position
+    points = [(48.81, 9.27), (48.82, 9.27), (48.83, 9.32), (48.80, 9.01), None]
+    groups = areas(points)
+    assert groups[0] == [0, 1, 2] and [3] in groups and [4] in groups
+    assert far_away(points) == {3: round(far_away(points)[3], 1)} and far_away(points)[3] > 15
+    assert far_away([(48.0, 9.0), None]) == {}
+    assert area_name(["Fellbach", "Fellbach", "Waiblingen"]) == "Fellbach / Waiblingen"
+    assert area_name(["A", "B", "B", "C"]) == "B / A …"

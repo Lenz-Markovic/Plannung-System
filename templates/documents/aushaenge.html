@@ -32,6 +32,15 @@
       var n = document.querySelectorAll("input[form=route-form][name=stop]:checked").length;
       document.getElementById("ah-picked").textContent = n + " Termin" + (n === 1 ? "" : "e") + " für die Route angekreuzt";
     }
+    document.addEventListener("click", function (event) {
+      var area = event.target.closest("[data-area]"), clear = event.target.closest("[data-area-clear]");
+      if (!area && !clear) { return; }
+      var ids = area ? area.dataset.area.split(",") : [];
+      document.querySelectorAll("input[form=route-form][name=stop]").forEach(function (b) {
+        if (clear) { b.checked = false; } else if (ids.indexOf(b.value) !== -1) { b.checked = true; }
+      });
+      count();
+    });
     document.addEventListener("change", function (event) {
       var all = event.target.closest("[data-pick-tour]");
       if (all) { document.querySelectorAll('input[data-tour="' + all.dataset.pickTour + '"]').forEach(function (b) { b.checked = all.checked; }); }

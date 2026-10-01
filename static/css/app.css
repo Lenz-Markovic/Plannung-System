@@ -1040,3 +1040,7 @@ a.wk-note:hover { color: var(--accent); }
   .route-map { height: 340px !important; }
 }
 .rt-office td { background: var(--surface-2); }
+.ah-areas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0 10px; padding: 8px 10px; border: 1px solid var(--ring); border-radius: 10px; background: var(--surface); }
+.ah-area { font: inherit; font-size: 12.5px; padding: 3px 10px; border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-wash); color: var(--accent); cursor: pointer; }
+.ah-area:hover { background: var(--accent); color: #fff; }
+.rt-areas { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--warn-wash); color: var(--warn-ink); margin-bottom: 10px; font-size: 13px; }

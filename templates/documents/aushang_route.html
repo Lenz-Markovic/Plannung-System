@@ -25,7 +25,12 @@
 {% else %}
   <p class="small">Start und Ende: <b>🏢 Büro, {{ office.0 }}</b> · Dauer gesamt ca. <b>{{ total }}</b>{% if has_clock %} (zurück ca. {{ end_text }}){% endif %} ·
     {{ total_km|floatformat:1 }} km · Fahrt {{ total_drive }} min · Verteilen ca. {{ total_work }} min (4 min je Aushang, 2 min je Brief)
-    · <span class="na">Fahrzeiten {% if all_tomtom %}von TomTom{% else %}geschätzt{% endif %} · Reihenfolge: immer das nächste Haus, ohne Umwege, zurück ins Büro</span></p>
+    · <span class="na">Fahrzeiten {% if all_tomtom %}von TomTom{% else %}geschätzt{% endif %} ·
+      Reihenfolge: {% if back.order_source == "tomtom" %}<b>von TomTom auf den echten Straßen berechnet</b> (Büro → Häuser → Büro){% else %}nach Luftlinie – immer das nächste Haus, ohne Umwege, zurück ins Büro{% endif %}</span></p>
+  {% if areas|length > 1 %}
+    <div class="rt-areas rt-noprint">⚠ <b>Die Häuser liegen in {{ areas|length }} Gebieten</b> – eine Route je Gebiet fährt deutlich weniger:
+      {% for a in areas %}<a class="btn mini" href="?{% for pk in a.stop_ids %}stop={{ pk }}&{% endfor %}{% for k, v in keep.items %}{{ k }}={{ v|urlencode }}&{% endfor %}" target="_blank">🗺 {{ a.name }} ({{ a.houses }} {{ a.houses|pluralize:"Haus,Häuser" }})</a>{% endfor %}</div>
+  {% endif %}
   <div class="rt-grid">
     <table class="table table-sm rt-table">
       <thead><tr><th>Nr.</th><th>Haus</th><th>{% if has_clock %}an{% else %}nach{% endif %}</th><th>Was</th><th>Fahrt dorthin</th><th>✓</th></tr></thead>
@@ -35,7 +40,8 @@
         {% for s in route %}<tr>
           <td><span class="rt-n">{{ s.n }}</span></td>
           <td><b>{{ s.target.street }}</b><div>{{ s.target.zip_code }} {{ s.target.city }}</div>
-            {% if s.point_source != "tomtom" %}<div class="t-warn small">⚠ Adresse nur ungefähr</div>{% endif %}</td>
+            {% if s.point_source != "tomtom" %}<div class="t-warn small">⚠ Adresse nur ungefähr</div>{% endif %}
+            {% if s.far_km %}<div class="t-crit small">⚠ liegt weit weg (nächstes Haus {{ s.far_km }} km) – lieber in eine andere Route</div>{% endif %}</td>
           <td>{% if has_clock %}{{ s.arrive_text }}{% else %}{{ s.after_text }}{% endif %}</td>
           <td>{% for ref, paper, date, what in s.papers %}<div>{% if paper == "Aushang" %}📄 Aushang{% else %}✉ {{ paper }}{% endif %} <span class="na small">· {{ ref }} · {{ what }} {{ date|date:"d.m." }}</span></div>{% endfor %}</td>
           <td class="small">{{ s.drive_minutes }} min{% if s.drive_km %} · {{ s.drive_km }} km{% endif %}</td>

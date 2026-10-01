@@ -143,6 +143,8 @@ class RouteStop:
     arrive: int = 0
     leave: int = 0
     line: list = field(default_factory=list)     # road points of the drive to this house (TomTom)
+    stop_ids: list = field(default_factory=list)  # the appointments whose papers go to this house
+    far_km: float | None = None      # ⚠ the nearest other house is further away than FAR_KM
 
     @property
     def address(self):
@@ -180,7 +182,8 @@ def office(client=None):
 
     address = f"{settings.OFFICE_STREET}, {settings.OFFICE_ZIP} {settings.OFFICE_CITY}"
     if client is not None:
-        key = "office-point-" + address
+        import hashlib
+        key = "office-point-" + hashlib.sha1(address.encode()).hexdigest()
         point = cache.get(key)
         if point is None:
             try:
@@ -201,6 +204,10 @@ class Leg:
     from_tomtom: bool = False
     line: list = field(default_factory=list)
     arrive: int = 0
+    order_source: str = ""           # "tomtom" (best order on real roads) / "luftlinie"
+
+
+MAX_BEST_ORDER = 50                  # more houses: our own order (TomTom's best order is for normal routes)
 
 
 def _leg(client, a, a_tomtom, b, b_tomtom, departure):
@@ -234,7 +241,8 @@ def route(stop_ids, date=None, start_time=None, client=None):
     for stop in chosen:
         target = stop.building or stop.installation_order.building or stop.installation_order
         key = (type(target).__name__, target.pk)
-        house = houses.setdefault(key, {"target": target, "papers": []})
+        house = houses.setdefault(key, {"target": target, "papers": [], "stops": []})
+        house["stops"].append(stop.pk)
         ref = f"AZ {stop.building.file_number}" if stop.kind == StopKind.READING else f"RE {stop.installation_order.re_number}"
         what = "Ablesung" if stop.kind == StopKind.READING else "Montage"
         for flat in rules.papers(stop.notice_scope, stop.notice_units):
@@ -242,10 +250,12 @@ def route(stop_ids, date=None, start_time=None, client=None):
     found = []
     for house in houses.values():
         point, source, _ = geocoding.position(house["target"], client)
-        found.append(RouteStop(0, house["target"], point, source, house["papers"]))
+        found.append(RouteStop(0, house["target"], point, source, house["papers"], stop_ids=house["stops"]))
     base = office(client)
-    order = rules.route_order([s.point for s in found], base[1], end=base[1])
+    order, order_source = _best_order(found, base, client)
     found = [found[i] for i in order]
+    for i, km in rules.far_away([s.point for s in found]).items():
+        found[i].far_km = km
     # TomTom needs a departure: the chosen day/time, else the next working day at 8:00 (only for the traffic)
     day = date or (datetime.date.today() + datetime.timedelta(days=1))
     clock = start_time or datetime.time(8, 0)
@@ -267,7 +277,48 @@ def route(stop_ids, date=None, start_time=None, client=None):
         here, here_tomtom = stop.point or here, stop.point_source == "tomtom"
     back = _leg(client, here, here_tomtom, base[1], base[2] == "tomtom", departure(t)) if found else Leg()
     back.arrive = t + back.minutes
+    back.order_source = order_source
     return found, back, base
+
+
+def _best_order(found, base, client):
+    """The order of the houses: TomTom's best order on the real roads office -> houses -> office when the
+    key is set (and every house has a TomTom position); else nearest house next + no detours (straight line)."""
+    from planning.tomtom import TomTomError
+
+    points = [s.point for s in found]
+    if (client is not None and base[1] is not None and base[2] == "tomtom" and 2 <= len(found) <= MAX_BEST_ORDER
+            and all(s.point is not None and s.point_source == "tomtom" for s in found)):
+        try:
+            order = client.best_order([base[1], *points, base[1]])
+            if sorted(order) == list(range(len(found))):
+                return order, "tomtom"
+        except (TomTomError, KeyError, TypeError):
+            pass
+    return rules.route_order(points, base[1], end=base[1]), "luftlinie"
+
+
+def route_areas(found):
+    """The houses of a route by area: [{"name", "houses", "stop_ids"}] - more than one = better split."""
+    groups = rules.areas([s.point for s in found])
+    return [{"name": rules.area_name([found[i].target.city for i in g]), "houses": len(g),
+             "stop_ids": [pk for i in g for pk in found[i].stop_ids]} for g in groups]
+
+
+def page_areas(blocks_found):
+    """Areas of the houses with an Aushang on the page (for "☑ alle in diesem Gebiet")."""
+    from planning import geocoding
+
+    houses = {}
+    for block in blocks_found:
+        for item in block.wanted:
+            target = item.stop.building or item.stop.installation_order
+            house = houses.setdefault((type(target).__name__, target.pk), {"target": target, "stops": []})
+            house["stops"].append(item.stop.pk)
+    houses = list(houses.values())
+    points = [geocoding.position(h["target"], None)[0] for h in houses]   # stored positions only - no TomTom calls
+    return [{"name": rules.area_name([houses[i]["target"].city for i in g]), "houses": len(g),
+             "stop_ids": [pk for i in g for pk in houses[i]["stops"]]} for g in rules.areas(points)]
 
 
 def route_map_data(found, back, base):

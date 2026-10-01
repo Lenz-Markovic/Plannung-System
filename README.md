@@ -527,6 +527,14 @@ lists what the office still has to do after the visits (`planning/rules/followup
   **🖨 Route drucken** or **📊 Als Excel** (Nr., Straße, PLZ/Ort, km and minutes to the next stop,
   notes, totals; green = office start, blue = houses, red = back to the office, amber =
   warnings). It is a printed list – no plan in the calendar.
+- **As little driving as possible:**
+  - **Order:** with the TomTom key TomTom calculates the best order on the real roads (office →
+    houses → office); without the key (or more than 50 houses) nearest house next + no detours
+    by straight line. The route says which one was used.
+  - **📍 Gebiete** on the Aushänge page: houses close to each other (within ~8 km in a chain) form
+    one area, e.g. "Fellbach / Waiblingen 5 Häuser ☑" – one click ticks all of them for the route.
+  - On the route: **"⚠ Die Häuser liegen in 3 Gebieten"** with one button per area (a route each),
+    and "⚠ liegt weit weg (nächstes Haus 18 km)" at a house far from all the others.
 
 ## Project layout
 

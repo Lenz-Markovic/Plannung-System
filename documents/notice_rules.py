@@ -163,3 +163,56 @@ def route_times(start_minutes, drives, works):
         times.append((t, t + work))
         t += work
     return times
+
+
+# --- areas: houses close to each other belong into one route ------------------------------------------
+
+AREA_KM = 8          # houses within 8 km of each other (in a chain) are one area
+FAR_KM = 15          # a house whose nearest other house is further away "liegt weit weg"
+
+
+def areas(points, radius=AREA_KM, distance=None):
+    """Group the houses: [[indexes], ...], the biggest area first. Houses without position: own group."""
+    from planning.rules.drive_time import distance_km
+
+    distance = distance or distance_km
+    groups, seen = [], set()
+    for i, p in enumerate(points):
+        if i in seen:
+            continue
+        seen.add(i)
+        group, queue = [i], [i]
+        while queue and p is not None:
+            here = points[queue.pop()]
+            for j, q in enumerate(points):
+                if j not in seen and q is not None and distance(here, q) <= radius:
+                    seen.add(j)
+                    group.append(j)
+                    queue.append(j)
+        groups.append(sorted(group))
+    return sorted(groups, key=lambda g: (-len(g), g[0]))
+
+
+def far_away(points, limit=FAR_KM, distance=None):
+    """{index: km to the nearest other house} for houses further than `limit` from all the others."""
+    from planning.rules.drive_time import distance_km
+
+    distance = distance or distance_km
+    found = {}
+    known = [i for i, p in enumerate(points) if p is not None]
+    if len(known) < 2:
+        return found
+    for i in known:
+        nearest = min(distance(points[i], points[j]) for j in known if j != i)
+        if nearest > limit:
+            found[i] = round(nearest, 1)
+    return found
+
+
+def area_name(cities):
+    """'Fellbach' or 'Fellbach / Waiblingen' (the two most frequent places)."""
+    counts = {}
+    for city in cities:
+        counts[city] = counts.get(city, 0) + 1
+    top = sorted(counts, key=lambda c: (-counts[c], c))[:2]
+    return " / ".join(top) + (" …" if len(counts) > 2 else "")

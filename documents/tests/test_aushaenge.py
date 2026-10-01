@@ -128,3 +128,72 @@ def test_roles(demo):
     assert lead.post(reverse("documents:aushang_wanted", args=[stops[0].pk]), {"on": "1"}).status_code == 403
     assert login(roles.READER, "abl").get(reverse("documents:aushaenge")).status_code == 403
     assert "📄 Aushänge &amp; Aushang-Route" in login(roles.PROCESSING, "sb2").get(reverse("planning:calendar")).content.decode()
+
+
+class FakeTomTom:
+    """Answers like TomTom: every address is found, legs of 10 min / 5 km, best order = reversed."""
+
+    def __init__(self, fail=False):
+        self.fail, self.asked = fail, []
+
+    def geocode(self, address):
+        from planning.tomtom import GeocodeResult
+        return GeocodeResult(latitude=48.80, longitude=9.21, label=address, match_type="Point Address", zip_code="70376")
+
+    def route(self, origin, destination, departure):
+        from planning.tomtom import Leg
+        return Leg(seconds=600, meters=5000, points=[[origin[1], origin[0]], [destination[1], destination[0]]])
+
+    def best_order(self, points):
+        from planning.tomtom import TomTomError
+        self.asked.append(len(points))
+        if self.fail:
+            raise TomTomError("kaputt")
+        return list(reversed(range(len(points) - 2)))
+
+
+def tomtom_houses(stops):
+    """Give the demo buildings TomTom positions (as after a lookup)."""
+    from core.models import GeocodeStatus
+    for s in stops:
+        b = s.building
+        b.latitude, b.longitude = (b.latitude or 48.8), (b.longitude or 9.2)
+        b.geocode_status, b.geocoded_address = GeocodeStatus.OK, b.full_address
+        b.save()
+
+
+def test_tomtom_best_order_on_real_roads_and_fallback(demo):
+    from django.core.cache import cache
+    cache.clear()
+    tour, stops = a_tour()
+    tomtom_houses(stops)
+    ids = [s.pk for s in stops]
+    fake = FakeTomTom()
+    found, back, office = notice_overview.route(ids, client=fake)
+    assert back.order_source == "tomtom" and fake.asked == [len(found) + 2] and office[2] == "tomtom"
+    assert all(s.drive_from_tomtom for s in found) and back.minutes == 10
+    plain, plain_back, _ = notice_overview.route(ids, client=FakeTomTom(fail=True))
+    assert plain_back.order_source == "luftlinie" and len(plain) == len(found)
+
+
+def test_areas_on_the_page_and_far_houses_on_the_route(demo):
+    c = login(roles.DISPATCHER, "dispo3")
+    tour, stops = a_tour()
+    for s in stops:
+        c.post(reverse("documents:aushang_wanted", args=[s.pk]), {"on": "1"})
+    far = stops[-1].building           # one house moved far away (Ulm)
+    far.zip_code, far.city = "89073", "Ulm"
+    far.save()
+    tomtom_houses(stops)
+    far.refresh_from_db()
+    far.latitude, far.longitude = 48.40, 9.99
+    far.save()
+    html = c.get(reverse("documents:aushaenge"), {"f": "alle", "zeitraum": "alle"}).content.decode()
+    assert "📍 Gebiete" in html and "Ulm <b>1</b>" in html and 'data-area="' in html
+    found, back, _ = notice_overview.route([s.pk for s in stops])
+    ulm = next(s for s in found if s.target.pk == far.pk)
+    assert ulm.far_km and ulm.far_km > 15
+    areas = notice_overview.route_areas(found)
+    assert len(areas) >= 2 and any(a["name"] == "Ulm" and a["houses"] == 1 for a in areas)
+    page = c.get(reverse("documents:aushang_route"), {"stop": [s.pk for s in stops]}).content.decode()
+    assert "Gebieten" in page and "liegt weit weg" in page and "🗺 Ulm (1 Haus)" in page

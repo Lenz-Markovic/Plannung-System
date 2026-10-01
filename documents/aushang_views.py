@@ -48,6 +48,7 @@ def aushaenge_page(request):
                             ready=chosen == "bereit")
     context = {"blocks": found, "horizons": HORIZONS, "horizon": horizon, "only_open": chosen == "offen", "q": query,
                "filters": FILTERS, "chosen": chosen, "ready": sum(len(b.printed) for b in found),
+               "areas": overview.page_areas(found),
                "today": today, "scopes": rules.SCOPES, "may_edit": may_edit(request.user),
                "missing": sum(len(b.missing) for b in found)}
     if request.htmx_target == "aushang-blocks":
@@ -131,6 +132,8 @@ def aushang_route(request):
         "total": rules.duration_text(drive + work), "papers": sum(len(s.papers) for s in found),
         "end": back.arrive, "all_tomtom": bool(found) and all(s.drive_from_tomtom for s in found) and back.from_tomtom,
         "map_data": overview.route_map_data(found, back, base), "map_available": bool(found) and bool(current_api_key()),
+        "areas": overview.route_areas(found), "far": [s for s in found if s.far_km],
+        "keep": {k: v for k, v in request.GET.items() if k in ("person", "datum", "ab")},
     }
     context["end_text"] = f"{back.arrive // 60:02d}:{back.arrive % 60:02d}"
     if request.GET.get("format") == "xlsx" and found:

@@ -1,4 +1,12 @@
 <div id="aushang-blocks">
+  {% if areas|length > 1 or areas.0.houses > 1 %}
+    <div class="ah-areas">
+      <span class="small"><b>📍 Gebiete</b> (Häuser nah beieinander – eine Route je Gebiet fährt am wenigsten):</span>
+      {% for a in areas %}<button type="button" class="ah-area" data-area="{{ a.stop_ids|join:',' }}" title="alle Termine in diesem Gebiet für die Route ankreuzen">
+        {{ a.name }} <b>{{ a.houses }}</b> {{ a.houses|pluralize:"Haus,Häuser" }} ☑</button>{% endfor %}
+      <button type="button" class="linkish small" data-area-clear>Auswahl leeren</button>
+    </div>
+  {% endif %}
   <p class="na small">{{ blocks|length }} Fahrpl{{ blocks|length|pluralize:"an,äne" }}{% if missing %} · <b class="t-crit">{{ missing }} noch nicht gedruckt</b>{% endif %}{% if ready %} · <b class="t-good">{{ ready }} gedruckt – bereit zum Verteilen</b>{% endif %}
     · Aushang ans ganze Haus oder Briefe an einzelne Wohnungen (z. B. Nachablesung): beim Termin „✎“.</p>
   {% for b in blocks %}

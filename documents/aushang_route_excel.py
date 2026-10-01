@@ -28,7 +28,8 @@ def route_workbook(context):
     ws["A1"] = title + (f" · {context['person']}" if context.get("person") else "")
     ws["A1"].font = Font(bold=True, size=14)
     ws["A2"] = (f"Start und Ende: Büro, {office[0]} · {len(route)} Häuser · {context['papers']} Aushänge/Briefe · "
-                f"Dauer ca. {context['total']} · Fahrzeiten {'TomTom' if context.get('all_tomtom') else 'geschätzt'}")
+                f"Dauer ca. {context['total']} · Fahrzeiten {'TomTom' if context.get('all_tomtom') else 'geschätzt'} · "
+                f"Reihenfolge {'TomTom (echte Straßen)' if back.order_source == 'tomtom' else 'nach Luftlinie'}")
     ws["A2"].font = Font(italic=True, color="555555")
     head = ["Nr.", "Straße", "PLZ / Ort", "Ankunft" if has_clock else "nach", "Was", "für Termin", "km zum nächsten",
             "Fahrt zum nächsten (min)", "Hinweise", "✓"]
@@ -64,6 +65,8 @@ def route_workbook(context):
             notes.append("Adresse nur ungefähr (PLZ-Mitte)" if s.point else "Adresse ohne Position")
         if not (following.drive_from_tomtom if following else back.from_tomtom):
             notes.append("Fahrzeit geschätzt")
+        if s.far_km:
+            notes.append(f"liegt weit weg (nächstes Haus {s.far_km} km)")
         row([s.n, s.target.street, f"{s.target.zip_code} {s.target.city}", when(s.arrive),
              "; ".join(f"{p[0]}: {p[1]}" for p in s.papers),
              ", ".join(sorted({f"{p[2]:%d.%m.} {p[3]}" for p in s.papers})),
