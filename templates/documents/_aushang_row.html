@@ -6,11 +6,38 @@
   <td class="ah-obj">{% if s.stop.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ s.ref }}</b> · {{ s.address }}</td>
   <td class="ah-time">{% if s.time %}{{ s.time }}{% else %}<span class="na">ohne Uhrzeit</span>{% endif %}
     {% if s.source == "manual" %}<span class="an-src">von Hand</span>{% elif s.source == "estimate" %}<span class="an-src est">geschätzt</span>{% endif %}</td>
-  <td class="ah-what">{% if not s.state %}<span class="na">kein Aushang</span>
-    {% elif s.flats %}✉ <b>{{ s.flats|length }} Brief{{ s.flats|length|pluralize:"e" }}</b>: {{ s.flats|join:", " }}
-    {% else %}📄 Aushang ans Haus{% endif %}</td>
+  <td class="ah-what">
+    {# 1. Zugang: where the reader goes in (suggested from the Liegenschaft, the planner decides) #}
+    {% if s.stop.kind == "reading" %}
+    <form class="ah-access" hx-post="{% url 'documents:aushang_access' s.stop.pk %}" hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML" hx-trigger="change">
+      <select name="access" aria-label="Zugang" {% if not may_edit %}disabled{% endif %}
+              onchange="this.form.querySelector('.ah-units').hidden = this.value !== 'einige'">
+        {% for v, l in access_scopes %}<option value="{{ v }}" {% if s.stop.access_choice == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>{% if not s.stop.access_scope %}<span class="an-src est" title="aus der Ableseart / den Hinweisen erkannt – bitte prüfen">erkannt</span>{% endif %}
+      <input class="ah-units" name="access_units" value="{{ s.stop.access_units }}" maxlength="300" placeholder="Whg 3 (Müller), Whg 7"
+             aria-label="welche Wohnungen" {% if s.stop.access_choice != "einige" %}hidden{% endif %} {% if not may_edit %}disabled{% endif %}>
+    </form>
+    {% endif %}
+    {% if s.stop.visit_mode == "aussen" %}<div class="small">📡 von außen versuchen – ohne Termin</div>{% endif %}
+    {# 2. Ankündigung: what the Terminierung chose - or the suggestion #}
+    <div class="ah-choices" role="group" aria-label="Ankündigung">
+      {% for v, l in choices %}
+        <button type="button" class="ah-choice{% if s.stop.notice_choice == v %} on{% elif s.undecided and s.stop.notice_suggestion == v %} hint{% endif %}"
+                {% if may_edit %}hx-post="{% url 'documents:aushang_choice' s.stop.pk %}" hx-vals='{"choice": "{{ v }}"}'
+                {% if v == "briefe" %}hx-include="#ah-{{ s.stop.pk }} [name=access_units]"{% endif %}
+                hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML"{% else %}disabled{% endif %}
+                title="{% for k, t in choice_titles.items %}{% if k == v %}{{ t }}{% endif %}{% endfor %}{% if s.undecided and s.stop.notice_suggestion == v %} – Vorschlag{% endif %}">{{ l }}</button>
+      {% endfor %}
+    </div>
+    {% if s.flats %}<div class="small">✉ <b>{{ s.flats|length }} Brief{{ s.flats|length|pluralize:"e" }}</b>: {{ s.flats|join:", " }}</div>{% endif %}
+  </td>
   <td class="ah-state">
-    {% if s.state == "printed" %}<span class="t-good"><b>✓ gedruckt – bereit zum Verteilen</b></span>
+    {% if s.undecided %}<span class="t-warn"><b>❓ noch entscheiden</b></span>
+      <div class="na small">Vorschlag: {% for v, l in choices %}{% if v == s.stop.notice_suggestion %}{{ l }}{% endif %}{% endfor %}</div>
+    {% elif s.stop.notice_choice == "telefon" %}<span class="t-good">☎ telefonisch vereinbart</span>
+    {% elif s.stop.notice_choice == "mail" %}<span class="t-good">📧 per Mail vereinbart</span>
+    {% elif s.stop.notice_choice == "keine" %}<span class="na">– keine Ankündigung</span>
+    {% elif s.state == "printed" %}<span class="t-good"><b>✓ gedruckt – bereit zum Verteilen</b></span>
       <div class="na small">{{ s.stop.notice_printed_at|date:"d.m. H:i" }}{% if s.stop.notice_printed_by %} – {{ s.stop.notice_printed_by }}{% endif %}</div>
     {% elif s.state == "outdated" %}<span class="t-crit">⚠ veraltet (Tag/Zeit geändert) – neu drucken</span>
     {% elif s.state == "late" %}<span class="t-crit">🖨 fehlt – schon zu spät</span>
@@ -20,11 +47,8 @@
     {% if may_edit %}
       {% if s.state %}
         {% include "documents/_print_buttons.html" with stops=s.stop|as_list label="🖨" word_label="Word" cls="btn mini" word_cls="btn mini" late=False %}
-        <button class="linkish" hx-post="{% url 'documents:aushang_wanted' s.stop.pk %}" hx-vals='{"on": "0"}' hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML">✕</button>
-      {% else %}
-        <button class="btn mini" hx-post="{% url 'documents:aushang_wanted' s.stop.pk %}" hx-vals='{"on": "1"}' hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML">＋ Aushang</button>
       {% endif %}
-      <details class="an-edit"><summary class="linkish">✎</summary>
+      <details class="an-edit"><summary class="linkish" title="Aushang / Briefe und Zeit von Hand">✎</summary>
         <form hx-post="{% url 'documents:aushang_edit' s.stop.pk %}" hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML" class="an-form">
           <label>Was? <select name="scope">{% for value, label in scopes %}<option value="{{ value }}" {% if s.stop.notice_scope == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
           <label>Welche Wohnungen? (je Wohnung ein Brief) <input name="units" value="{{ s.stop.notice_units }}" maxlength="300" placeholder="z. B. Whg 3 (Müller), Whg 7"></label>

@@ -545,6 +545,35 @@ lists what the office still has to do after the visits (`planning/rules/followup
   - On the route: **"⚠ Die Häuser liegen in 3 Gebieten"** with one button per area (a route each),
     and "⚠ liegt weit weg (nächstes Haus 18 km)" at a house far from all the others.
 
+## Readout gaps closed with the office (Ablauf-Check)
+
+- **No "freigegeben" while flats are open** (`buildings/rules/status.py`): while the last visit was
+  ◐ teilweise / ✗ nicht erledigt and the office has not closed it, the status cannot be released (the
+  option says "– erst Nachtermin", a try shows the reason). Special case: close it in 🧾 Rückmeldungen
+  ("abschließen – kein Nachtermin nötig" with a reason), then release.
+- **Stichtag in planning** (`planning/rules/stichtag.py`): "Fahrplan prüfen" shows the Stichtag per stop and
+  warns when a 1st reading is after it; Nachablesungen (2. Termin …) get no warning. Less than 14 days
+  ahead: "ein Aushang 14 Tage vorher geht nicht mehr". Filter "Stichtag-Frist" in Liegenschaften
+  (⏰ in 4 weeks / ⛔ passed – no appointment yet), also in the ☰ menu.
+- **📡 Gateways** (`/liegenschaften/gateways/`, `buildings/rules/gateway.py`, `buildings/gateway.py`): the
+  office enters "empfangen x von y", what is missing and the devices without radio. 100 % (and the
+  values without radio "erhalten") → ✓ freigeben, no appointment. Gap → tick it and plan it: the stop is
+  **"von außen versuchen"** (`TourStop.visit_mode = "aussen"`): no appointment, no Aushang, only the
+  missing devices (10 min + 30 s per device). Outside not everything → normal 🔁 Nachtermin. Unchecked /
+  complete gateway buildings are not suggested for planning; the plan check warns if one is planned.
+- **Ankündigung + Zugang per stop** (`documents/notice_rules.py`): Zugang 🏠 alle Wohnungen / 🚪 nur diese
+  Wohnungen / 🔑 nicht in die Wohnungen (recognised from the Ableseart, "erkannt", the planner changes
+  it) and Ankündigung 📄 Aushang / ✉ Briefe / ☎ telefonisch / 📧 per Mail / – keine. The system only marks
+  a suggestion (dashed); the Terminierung decides – in "Fahrplan prüfen" and on 📄 Aushänge (new filter
+  "❓ noch entscheiden"). Aushang / Briefe go to printing; Briefe take the flats from Zugang.
+  Mein Tag shows the Zugang. Existing Aushänge count as decided (migration 0015).
+- **🔄 Zwischenablesungen** (`/planung/zwischenablesungen/`, `planning/rules/interim.py`): from the mail of
+  the Hausverwaltung – find the Liegenschaft, date of the Nutzerwechsel, per flat what is needed (HKV,
+  🧪 Ampullen for Verdunster, WWZ, KWZ, WMZ, RWM – only what the house has). "📅 einplanen → prüfen" puts
+  it into that person's day as a short stop (`TourStop.interim`): minutes only for those flats, Briefe +
+  Zugang only to those flats. It never moves (or is moved by) the main readout and makes no Visit /
+  Nachtermin of the building; its result shows on the page (✓ erledigt / ◐ nochmal einplanen).
+
 ## Project layout
 
 | Folder | Contents |

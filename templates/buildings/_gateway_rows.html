@@ -1,0 +1,5 @@
+<div id="gw-rows" class="gw-rows">
+  {% for b in rows %}{% include "buildings/_gateway_row.html" %}{% empty %}
+    <p class="na">Keine Gateways in dieser Auswahl.</p>
+  {% endfor %}
+</div>

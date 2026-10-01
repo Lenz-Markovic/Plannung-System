@@ -108,10 +108,11 @@ def building_row(request, pk):
     return render_row(request, pk, opened=request.GET.get("open") == "1")
 
 
-def render_row(request, pk, opened=False, message=""):
+def render_row(request, pk, opened=False, message="", error=False):
     building = get_object_or_404(with_schedule_details(building_list_queryset()), pk=pk)
     prepare_row(building, timezone.localdate())
-    return render(request, "buildings/_row_toggle.html", {"b": building, "open": opened, "message": message})
+    return render(request, "buildings/_row_toggle.html", {"b": building, "open": opened, "message": message,
+                                                          "error": error})
 
 
 SAVED_MESSAGES = {
@@ -149,7 +150,10 @@ def building_update(request, pk):
             set_received_on(building, datetime.date.fromisoformat(value) if value else None, request.user)
         else:
             return HttpResponseBadRequest("Kein Feld angegeben.")
-    except (ValidationError, ValueError) as error:
+    except ValidationError as error:
+        # the row again with what is really saved (the dropdown jumps back) and the reason
+        return render_row(request, pk, message=" ".join(error.messages), error=True)
+    except ValueError as error:
         return HttpResponseBadRequest(str(error))
 
     field = next(key for key in SAVED_MESSAGES if key in data)

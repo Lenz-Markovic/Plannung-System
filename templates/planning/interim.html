@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Zwischenablesungen{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>🔄 Zwischenablesungen</h1>
+  <span class="sub">Nutzerwechsel – meist per Mail von der Hausverwaltung. Je Wohnung ankreuzen, was nötig ist, dann einplanen (kurzer Stopp mit Brief an diese Wohnungen – die Hauptablesung bleibt unberührt)</span>
+</header>
+
+{% if may_edit %}
+<section class="im-new card-lite">
+  <h2 class="im-h">＋ Neue Zwischenablesung</h2>
+  {% if not building %}
+    <label class="im-search">Liegenschaft aus der Mail suchen
+      <input type="search" name="suche" placeholder="AZ, Straße oder Ort" autocomplete="off"
+             hx-get="{% url 'planning:interim_search' %}" hx-trigger="input changed delay:250ms" hx-target="#im-found"></label>
+    <div id="im-found"></div>
+  {% else %}
+    <form method="post" action="{% url 'planning:interim_create' %}" class="im-form" id="im-form">{% csrf_token %}
+      <input type="hidden" name="building" value="{{ building.pk }}">
+      <div class="im-obj"><b>AZ {{ building.file_number }}</b> · {{ building.street }}, {{ building.zip_code }} {{ building.city }}
+        <span class="na small">· {{ building.apartments }} Whg · {{ building.hkv_count }} HKV{% if building.hkv_family %} ({{ building.hkv_family }}){% endif %}{% if building.wwz_count %} · {{ building.wwz_count }} WWZ{% endif %}{% if building.kwz_count %} · {{ building.kwz_count }} KWZ{% endif %}{% if building.wmz_count %} · {{ building.wmz_count }} WMZ{% endif %}</span>
+        <a class="linkish small" href="{% url 'planning:interim' %}">andere Liegenschaft</a></div>
+      {% if errors %}<div class="alert alert-warning py-2">{% for e in errors %}<div>{{ e }}</div>{% endfor %}</div>{% endif %}
+      <div class="im-top">
+        <label>Nutzerwechsel am <input type="date" name="move_date" value="{{ form.move_date }}" required></label>
+        <label>gemeldet per <select name="source">{% for v, l in sources %}<option value="{{ v }}" {% if form.source == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+        <label class="im-note">Notiz <input type="text" name="note" value="{{ form.note }}" maxlength="300" placeholder="z. B. Mail von Frau Kaya, 01.10.: Auszug Müller, Einzug Schmidt"></label>
+      </div>
+      <table class="table table-sm im-flats">
+        <thead><tr><th>Wohnung</th><th>Nutzer (alt → neu)</th><th>Was ist nötig?</th><th></th></tr></thead>
+        <tbody id="im-rows">
+          {% if typed %}{% for f in typed %}{% include "planning/_interim_flat_row.html" with i=forloop.counter0 unit=f.unit tenant=f.tenant needs=f.needs %}{% endfor %}
+          {% else %}{% include "planning/_interim_flat_row.html" with i=0 needs=defaults %}{% endif %}
+        </tbody>
+      </table>
+      <template id="im-row-template">{% include "planning/_interim_flat_row.html" with i="__i__" needs=defaults %}</template>
+      <div class="im-actions">
+        <button type="button" class="btn mini" data-im-add>＋ weitere Wohnung</button>
+        <span class="na small" id="im-minutes"></span>
+        <button class="btn primary">Speichern</button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+
+<form class="filters an-filters" hx-get="{% url 'planning:interim' %}" hx-target="#im-list" hx-swap="outerHTML" hx-trigger="change">
+  <div class="ov-periods" role="radiogroup" aria-label="Welche Zwischenablesungen">
+    {% for key, label in filters %}<label class="ov-period {% if chosen == key %}on{% endif %}"><input type="radio" name="f" value="{{ key }}" {% if chosen == key %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">{{ label }}</label>{% endfor %}
+  </div>
+</form>
+{% include "planning/_interim_list.html" %}
+
+<script>
+  (function () {
+    var form = document.getElementById("im-form");
+    if (!form) return;
+    var rows = document.getElementById("im-rows"), template = document.getElementById("im-row-template");
+    var minutes = {{ need_minutes|safe }}, flat = {{ flat_minutes }};
+    function count() {   // the same estimate as planning/rules/interim.py
+      var total = 0;
+      rows.querySelectorAll("tr").forEach(function (tr) {
+        var ticked = tr.querySelectorAll("input[type=checkbox]:checked");
+        if (!ticked.length && !tr.querySelector("[name=unit]").value) return;
+        total += flat;
+        ticked.forEach(function (box) { total += minutes[box.value] || 0; });
+      });
+      document.getElementById("im-minutes").textContent = total ? "ca. " + Math.max(10, Math.ceil(total / 10) * 10) + " min vor Ort" : "";
+    }
+    form.querySelector("[data-im-add]").addEventListener("click", function () {
+      var i = rows.querySelectorAll("tr").length;
+      rows.insertAdjacentHTML("beforeend", template.innerHTML.split("__i__").join(i));
+      rows.lastElementChild.querySelector("[name=unit]").focus();
+      count();
+    });
+    rows.addEventListener("click", function (e) {
+      if (e.target.matches("[data-im-remove]") && rows.querySelectorAll("tr").length > 1) {
+        e.target.closest("tr").remove();
+        rows.querySelectorAll("tr").forEach(function (tr, i) {   // keep needs_0, needs_1 ... in order
+          tr.querySelectorAll("input[type=checkbox]").forEach(function (box) { box.name = "needs_" + i; });
+        });
+        count();
+      }
+    });
+    rows.addEventListener("input", count);
+    rows.addEventListener("change", count);
+    count();
+  })();
+</script>
+{% endblock %}

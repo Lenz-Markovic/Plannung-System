@@ -22,11 +22,20 @@ def installation_css(value):
 
 
 @register.simple_tag(takes_context=True)
-def status_choices(context, current):
-    """Status dropdown entries with 'allowed' flags for the logged-in user."""
-    from buildings.rules.status import status_options
+def status_choices(context, building):
+    """Status dropdown entries with 'allowed' flags for the logged-in user (no "freigegeben" while flats are open)."""
+    from buildings.rules.status import release_blocked, status_options
 
-    return status_options(context["request"].user.get_all_permissions(), current)
+    blocked = release_blocked(getattr(building, "last_outcome", ""), getattr(building, "last_closed", None))
+    return status_options(context["request"].user.get_all_permissions(), building.status, blocked)
+
+
+@register.filter
+def release_is_blocked(building):
+    """Flats are still open after the last visit -> "freigegeben" is not possible yet."""
+    from buildings.rules.status import release_blocked
+
+    return release_blocked(getattr(building, "last_outcome", ""), getattr(building, "last_closed", None))
 
 
 STATUS_ICON = {"released": "✓", "open": "●", "rework": "▲"}

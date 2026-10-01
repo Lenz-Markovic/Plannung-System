@@ -7,8 +7,8 @@
       <button type="button" class="linkish small" data-area-clear>Auswahl leeren</button>
     </div>
   {% endif %}
-  <p class="na small">{{ blocks|length }} Fahrpl{{ blocks|length|pluralize:"an,äne" }}{% if missing %} · <b class="t-crit">{{ missing }} noch nicht gedruckt</b>{% endif %}{% if ready %} · <b class="t-good">{{ ready }} gedruckt – bereit zum Verteilen</b>{% endif %}
-    · Aushang ans ganze Haus oder Briefe an einzelne Wohnungen (z. B. Nachablesung): beim Termin „✎“.</p>
+  <p class="na small">{{ blocks|length }} Fahrpl{{ blocks|length|pluralize:"an,äne" }}{% if undecided %} · <b class="t-warn">❓ {{ undecided }} noch entscheiden</b>{% endif %}{% if missing %} · <b class="t-crit">{{ missing }} noch nicht gedruckt</b>{% endif %}{% if ready %} · <b class="t-good">{{ ready }} gedruckt – bereit zum Verteilen</b>{% endif %}
+    · Je Termin: <b>Zugang</b> (wo rein) und <b>Ankündigung</b> wählen – 📄 Aushang / ✉ Briefe werden gedruckt, ☎ / 📧 = schon vereinbart. Der gestrichelte Knopf ist der Vorschlag.</p>
   {% for b in blocks %}
     <section class="ah-block{% if b.missing %} open{% endif %}{% if b.late %} late{% endif %}">
       {% include "documents/_aushang_head.html" %}
@@ -17,6 +17,6 @@
       </tbody></table>
     </section>
   {% empty %}
-    <div class="card-lite fu-empty">{% if only_open %}✓ Alles gedruckt – für diesen Zeitraum fehlt kein Aushang.{% elif chosen == "bereit" %}Nichts gedruckt, das noch verteilt werden müsste.{% else %}Keine Fahrpläne in diesem Zeitraum.{% endif %}</div>
+    <div class="card-lite fu-empty">{% if only_open %}✓ Alles gedruckt – für diesen Zeitraum fehlt kein Aushang.{% elif chosen == "entscheiden" %}✓ Überall entschieden.{% elif chosen == "bereit" %}Nichts gedruckt, das noch verteilt werden müsste.{% else %}Keine Fahrpläne in diesem Zeitraum.{% endif %}</div>
   {% endfor %}
 </div>

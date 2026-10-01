@@ -10,7 +10,9 @@
 
   <nav class="sm-body">
     <div class="sm-group"><div class="sm-title">Seiten</div>
-      {% if perms.buildings.view_building %}<a class="sm-btn" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>{% endif %}
+      {% if perms.buildings.view_building %}<a class="sm-btn" href="{% url 'buildings:list' %}">🏢 Liegenschaften</a>
+        <a class="sm-btn" href="{% url 'buildings:gateways' %}">📡 Gateways (prüfen ohne Termin)</a>{% endif %}
+      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:interim' %}">🔄 Zwischenablesungen (Nutzerwechsel)</a>{% endif %}
       {% if perms.buildings.view_installationorder %}<a class="sm-btn" href="{% url 'orders:list' %}">🔧 Montage</a>{% endif %}
       {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'planning:followup' %}">🧾 Rückmeldungen
         <span id="rm-badge" class="sm-count" hx-get="{% url 'planning:followup_badge' %}"
@@ -53,6 +55,8 @@
       <a class="sm-btn" href="{% url 'buildings:list' %}?status=open">offen</a>
       <a class="sm-btn" href="{% url 'buildings:list' %}?status=rework">▲ Nacharbeit</a>
       <a class="sm-btn" href="{% url 'buildings:list' %}?status=released">✓ freigegeben</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?frist=bald">⏰ Stichtag bald – noch kein Termin</a>
+      <a class="sm-btn" href="{% url 'buildings:list' %}?frist=vorbei">⛔ Stichtag vorbei – noch kein Termin</a>
       <a class="sm-btn" href="{% url 'buildings:list' %}?nachtermin=noetig">🔁 Nachtermin nötig</a>
       <a class="sm-btn" href="{% url 'buildings:list' %}?nachtermin=mehrfach">2 × oder öfter besucht</a>
       <a class="sm-btn" href="{% url 'buildings:list' %}?documents=nein">📄 Unterlagen fehlen noch</a>

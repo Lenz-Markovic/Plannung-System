@@ -31,6 +31,8 @@ from journal import notes
 from journal.activity import day_label, record, streets
 from journal.models import ActivityKind
 
+from documents import notice_rules
+
 from . import dayplan, services, visits
 from .calendar import calendar_events, free_day_events, tour_kind
 from .display import preview_map_data, route_sketch, tour_map_data
@@ -117,7 +119,8 @@ def _render_preview(request, draft, template="planning/_preview.html"):
                                           "suggestions": suggestions, "suggestions_too_long": too_long,
                                           "team_candidates": _team_candidates(draft),
                                           "strategies": STRATEGIES, "sketch": route_sketch(preview.stops),
-                                          "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom})
+                                          "map_data": preview_map_data(preview.stops), "map_available": preview.has_tomtom,
+                                          "notice_choices": notice_rules.CHOICES, "access_scopes": notice_rules.ACCESS_SCOPES})
     response.preview = preview  # for draft_action (notification about the working time)
     return response
 
@@ -167,6 +170,14 @@ def draft_action(request):
                 current, add=int(request.POST.get("pk") or 0) if action == "team_add" else None,
                 remove=int(request.POST.get("pk") or 0) if action == "team_remove" else None,
                 split=(request.POST.get("split") == "1") if action == "team_split" else None)
+        except ValueError as problem:
+            message, error = str(problem), True
+    if action in ("notice", "access"):
+        # 📄 Ankündigung / 🚪 Zugang of one reading - saved with the plan
+        try:
+            message = services.set_draft_notice(
+                current, index, choice=request.POST.get("choice") if action == "notice" else None,
+                access=request.POST.get("access") if action == "access" else None, units=request.POST.get("units", ""))
         except ValueError as problem:
             message, error = str(problem), True
     if action == "add":

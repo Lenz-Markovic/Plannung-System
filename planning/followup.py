@@ -214,13 +214,15 @@ def followup_entries(today, only=None):
 def decorate(entries, user, today=None):
     """Per user: the next step, the main button, hints, what may be clicked."""
     from buildings.rules.status import can_change_status
+    from buildings.services import open_visit
 
     perms = user.get_all_permissions()
     today = today or timezone.localdate()
     for e in entries:
         status = e.building.status if e.building is not None else ""
         reading = e.object_key[0] == "building"
-        e.can_release = reading and status != "released" and can_change_status(perms, status, "released")
+        e.can_release = (reading and status != "released" and can_change_status(perms, status, "released")
+                         and open_visit(e.building) is None)   # never while flats are still open
         e.can_rework = reading and status == "open" and can_change_status(perms, "open", "rework")
         e.can_accept = reading and bool(e.proposal) and can_change_status(perms, status, e.proposal)
         e.step, e.primary = rules.next_step(

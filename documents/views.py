@@ -116,7 +116,9 @@ def warning_status(request, pk):
     try:
         change_status(building, request.POST.get("status", ""), request.user)
     except ValidationError as error:
-        return HttpResponseBadRequest(str(error))
+        response = deadline_warning(request)
+        response.write(render(request, "core/_toast.html", {"message": " ".join(error.messages), "error": True}).content)
+        return response
     response = deadline_warning(request)
     response.write(render(request, "core/_toast.html", {"message": f"Status gespeichert · {building.file_number}"}).content)
     response["HX-Trigger"] = "buildings-changed"
@@ -184,8 +186,13 @@ def receipt_update(request, pk):
                 raise PermissionDenied("Den Unterlagen-Eingang darf deine Rolle nicht ändern.")
             value = request.POST["received_on"].strip()
             set_received_on(building, datetime.date.fromisoformat(value) if value else None, request.user)
-    except (ValidationError, ValueError) as error:
+    except ValueError as error:
         return HttpResponseBadRequest(str(error))
+    except ValidationError as error:   # e.g. flats still open: the card again as saved, with the reason
+        entry = next((e for e in deadline_entries() if e.building.pk == pk), None)
+        response = render(request, "documents/_receipt_entry.html", {"e": entry, "removed_pk": pk})
+        response.write(render(request, "core/_toast.html", {"message": " ".join(error.messages), "error": True}).content)
+        return response
     entry = next((e for e in deadline_entries() if e.building.pk == pk), None)
     response = render(request, "documents/_receipt_entry.html", {"e": entry, "removed_pk": pk})
     response["HX-Trigger"] = "deadlines-changed"

@@ -16,6 +16,7 @@ from planning.models import Employee, StopKind, TourStop
 from .models import Building, BuildingStatus, InstallationOrder, InstallationType, PropertyManager, SourceSystem
 
 NO_PROPERTY_MANAGER = "__none"
+DUE_SOON_DAYS = 28   # "Stichtag bald": plan it now, the Aushang needs 14 days
 
 # URL value -> database field. Anything else in ?sort= is ignored.
 SORT_FIELDS = {
@@ -100,6 +101,10 @@ class BuildingFilter(django_filters.FilterSet):
     documents_to = django_filters.DateFilter(
         label="bis", field_name="cost_documents__received_on", lookup_expr="lte", widget=date_input()
     )
+    frist = django_filters.ChoiceFilter(
+        label="Stichtag-Frist", empty_label="alle", method="filter_due",
+        choices=[("bald", "⏰ Stichtag in 4 Wochen – noch kein Termin"), ("vorbei", "⛔ Stichtag vorbei – noch kein Termin")],
+    )
     nachtermin = django_filters.ChoiceFilter(
         label="Nachtermin", empty_label="alle", method="filter_revisit",
         choices=[("noetig", "🔁 Nachtermin nötig"), ("besucht", "schon besucht"), ("mehrfach", "2 × oder öfter besucht")],
@@ -179,6 +184,19 @@ class BuildingFilter(django_filters.FilterSet):
 
     def filter_documents(self, queryset, name, value):
         return queryset.filter(cost_documents__isnull=(value == "nein"))
+
+    def filter_due(self, queryset, name, value):
+        """Not released and never planned for a reading - with the Stichtag soon (4 weeks) or already passed."""
+        import datetime
+
+        from django.utils import timezone
+
+        today = timezone.localdate()
+        planned = TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING, interim__isnull=True)
+        waiting = queryset.exclude(status=BuildingStatus.RELEASED).filter(~Exists(planned))
+        if value == "bald":
+            return waiting.filter(stichtag__gte=today, stichtag__lte=today + datetime.timedelta(days=DUE_SOON_DAYS))
+        return waiting.filter(stichtag__lt=today)
 
     def filter_revisit(self, queryset, name, value):
         from planning.visits import needs_revisit_q

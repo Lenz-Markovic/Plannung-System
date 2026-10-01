@@ -20,18 +20,22 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import F, Prefetch, Q
+from django.db.models import Exists, F, Prefetch, Q
 from django.utils import timezone
 
 from buildings.models import Building, BuildingStatus, InstallationOrder, OrderStatus
 from buildings.rules.file_numbers import normalize_file_number
+from buildings.gateway import no_visit_ids as gateway_no_visit_ids
+from buildings.gateway import outside_try
+from buildings.rules.gateway import OUTSIDE
 from conflicts.rules import Finding, OtherPlan, PlannedBuilding, planning_findings
 from conflicts.services import installation_findings
 from conflicts.services import refresh_for as refresh_conflicts_for
 from documents.services import refresh_deadline
 
 from . import geocoding
-from .models import Absence, DriveSource, Employee, RoutingSource, StopKind, Tour, TourStatus, TourStop, Visit
+from .models import (Absence, DriveSource, Employee, InterimReading, RoutingSource, StopKind, Tour, TourStatus, TourStop,
+                     Visit)
 from .queries import OPEN_STOP, current_first
 from .rules import autoplan as autoplan_rules
 from .rules.availability import HORIZON_DAYS, first_free_day
@@ -107,15 +111,28 @@ def plan_bar_context(session):
 # Draft
 # =============================================================================
 
+def _main_reading():
+    from django.db.models import OuterRef
+    return TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING, interim__isnull=True)
+
+
 def _stop_key(stop):
     key = (stop["kind"], stop.get("building"), stop.get("order"))
+    if stop.get("interim"):
+        return key + (("interim", stop["interim"]),)   # 🔄 a Zwischenablesung is its own stop
     return key + (stop.get("help_tour"),) if stop["kind"] == StopKind.HELP else key
 
 
 def stop_dict(stop):
-    """A saved TourStop as a draft stop."""
+    """A saved TourStop as a draft stop (with the Ankündigung / Zugang chosen so far)."""
     if stop.kind == StopKind.READING:
-        return {"kind": StopKind.READING, "building": stop.building_id}
+        found = {"kind": StopKind.READING, "building": stop.building_id}
+        if stop.interim_id:
+            found["interim"] = stop.interim_id
+        chosen = {f: getattr(stop, f) for f in DRAFT_NOTICE_FIELDS if getattr(stop, f)}
+        if stop.notice_choice or stop.access_scope or stop.visit_mode:
+            found["notice"] = chosen
+        return found
     if stop.kind == StopKind.HELP:
         return {"kind": StopKind.HELP, "building": stop.building_id, "order": stop.installation_order_id,
                 "help_tour": stop.help_tour_id}
@@ -485,8 +502,8 @@ def free_day_suggestions(employee, date, kind=""):
                                     f"{why} · {order.duration_minutes} min", order.duration_minutes))
     if employee.can_read and kind != "installation":
         revisit_buildings, _ = visit_revisit_ids()  # 🔁 Nachtermin: plannable again
-        unplanned = (Building.objects.filter(Q(tour_stops__isnull=True) | Q(pk__in=revisit_buildings))
-                     .exclude(pk__in=storno_buildings).distinct())
+        unplanned = (Building.objects.filter(~Exists(_main_reading()) | Q(pk__in=revisit_buildings))
+                     .exclude(pk__in=storno_buildings).exclude(pk__in=gateway_no_visit_ids()).distinct())
         assigned = list(unplanned.filter(assigned_reader=employee).order_by("zip_code", "file_number"))
         rest = unplanned.exclude(pk__in=[b.pk for b in assigned]).order_by("zip_code", "file_number")
         nearby = list(rest.filter(region=region)[:30]) if region else []
@@ -566,8 +583,9 @@ def nearby_unplanned(draft, preview, room, limit=6):
     revisit_buildings, revisit_orders = visit_revisit_ids()  # 🔁 Nachtermin: plannable again
     objects = []
     if employee.can_read:
-        unplanned = Building.objects.exclude(tour_stops__kind=StopKind.READING) | Building.objects.filter(pk__in=revisit_buildings)
-        objects += [(StopKind.READING, b) for b in unplanned.exclude(pk__in=storno_buildings).distinct()
+        unplanned = Building.objects.filter(~Exists(_main_reading())) | Building.objects.filter(pk__in=revisit_buildings)
+        objects += [(StopKind.READING, b) for b in unplanned.exclude(pk__in=storno_buildings)
+                    .exclude(pk__in=gateway_no_visit_ids()).distinct()
                     if (StopKind.READING, b.pk, None) not in in_plan]
     if employee.can_install:
         unplanned = (InstallationOrder.objects.exclude(tour_stops__kind=StopKind.INSTALLATION)
@@ -639,6 +657,44 @@ def first_free_days(employees, start):
     return {e: first_free_day(start, busy.get(e.pk, set()), away.get(e.pk, [])) for e in employees}
 
 
+DRAFT_NOTICE_FIELDS = ["notice_choice", "notice_wanted", "notice_scope", "notice_units", "access_scope", "access_units",
+                       "visit_mode"]
+
+
+def set_draft_notice(draft, index, choice=None, access=None, units=""):
+    """In "Fahrplan prüfen": Ankündigung (Aushang / Briefe / telefonisch / per Mail / keine) and Zugang
+    (alle / nur diese Wohnungen / nicht in die Wohnungen) for one reading - saved with the plan."""
+    from documents import notice_rules as nr
+
+    if not (0 <= index < len(draft["stops"])) or draft["stops"][index]["kind"] != StopKind.READING:
+        raise ValueError("Diesen Stopp gibt es nicht mehr.")
+    raw = draft["stops"][index]
+    chosen = dict(raw.get("notice") or {})
+    units = ", ".join(nr.unit_list(units))[:300]
+    if access is not None:
+        if access not in dict(nr.ACCESS_SCOPES):
+            raise ValueError("Unbekannter Zugang.")
+        if access == nr.ACCESS_SOME and not units:
+            raise ValueError("Bitte die Wohnungen eintragen (z. B. Whg 3, Whg 7).")
+        chosen["access_scope"], chosen["access_units"] = access, units if access == nr.ACCESS_SOME else ""
+        if chosen.get("notice_choice") == nr.BY_LETTERS and access == nr.ACCESS_SOME:
+            chosen["notice_units"] = chosen["access_units"]
+        message = f"Zugang: {dict(nr.ACCESS_SCOPES)[access]}" + (f": {units}" if access == nr.ACCESS_SOME else "")
+    else:
+        flats = units or chosen.get("notice_units") or chosen.get("access_units", "")
+        problems = nr.choice_problems(choice, flats)
+        if problems:
+            raise ValueError(problems[0])
+        chosen["notice_choice"], chosen["notice_wanted"] = choice, choice in nr.PRINTED_CHOICES
+        if choice == nr.BY_LETTERS:
+            chosen["notice_scope"], chosen["notice_units"] = nr.SOME_UNITS, flats
+        elif choice == nr.BY_AUSHANG:
+            chosen["notice_scope"] = nr.WHOLE_HOUSE
+        message = f"Ankündigung: {dict(nr.CHOICES)[choice]}"
+    raw["notice"] = chosen
+    return message
+
+
 def remove_stop(draft, index):
     if 0 <= index < len(draft["stops"]) and len(draft["stops"]) > 1:
         del draft["stops"][index]
@@ -677,6 +733,42 @@ class PreviewStop:
     help_tour: object = None                        # kind "help": the plan this person helps with
     help_stop: object = None                        # ... and its stop at this object (times)
     points: list = field(default_factory=list)
+    draft_notice: dict = field(default_factory=dict)   # Ankündigung / Zugang chosen in the plan check
+    gateway_state: str = ""
+    interim: object = None                              # 🔄 Zwischenablesung (InterimReading)
+
+    # the same names as on a saved TourStop, so the templates work for both
+    @property
+    def notice_choice(self):
+        return self.draft_notice.get("notice_choice", "")
+
+    @property
+    def access_scope(self):
+        return self.draft_notice.get("access_scope", "") or ("einige" if self.interim is not None else "")
+
+    @property
+    def access_units(self):
+        return self.draft_notice.get("access_units", "") or (self.interim.units_text if self.interim is not None else "")
+
+    @property
+    def visit_mode(self):
+        from buildings.rules.gateway import GAP, OUTSIDE
+        return self.draft_notice.get("visit_mode") or (OUTSIDE if self.gateway_state == GAP else "")
+
+    @property
+    def access_choice(self):
+        from documents.notice_rules import suggest_access
+        return self.access_scope or suggest_access(bool(self.building and self.building.access_apartment), self.visit_mode)
+
+    @property
+    def notice_suggestion(self):
+        from documents.notice_rules import suggest_notice
+        return suggest_notice(self.access_choice, self.visit_mode)
+
+    @property
+    def notice_choice_shown(self):
+        """What the buttons show: chosen - or for a 🔄 Zwischenablesung the Briefe it gets when saved."""
+        return self.notice_choice or ("briefe" if self.interim is not None else "")
 
 
 @dataclass
@@ -829,18 +921,23 @@ def calculate_preview(draft):
     split = draft.get("split", True)
 
     helpers = _helpers_of(draft.get("tour_id"))   # people from other plans helping at objects of this plan
+    interims = InterimReading.objects.in_bulk([s["interim"] for s in draft["stops"] if s.get("interim")])
     stops, error = [], ""
     for i, raw in enumerate(draft["stops"]):
         target = targets[_stop_key(raw)]
         on_building = isinstance(target, Building)
         building = target if on_building else target.building
         full = target.reading_minutes if on_building else target.duration_minutes
+        interim = interims.get(raw.get("interim")) if raw.get("interim") else None
+        if interim is not None:
+            full = interim.minutes   # only the flats of the Zwischenablesung
         point, source, warnings = geocoding.position(target, client)
         if source == "tomtom" and point is None:
             source = None
         stop = PreviewStop(
             index=i, kind=raw["kind"], building=building, order=None if on_building else target, target=target,
             work_minutes=full, full_minutes=full, point=point, point_source=source, warnings=warnings,
+            draft_notice=dict(raw.get("notice") or {}), interim=interim,
         )
         if raw["kind"] == StopKind.HELP:
             _prepare_help(stop, raw, draft)
@@ -897,16 +994,41 @@ def _stops_in_other_tours(preview, draft, buildings):
     and not the tour that is being moved)."""
     visited = _visited_here(draft)
     buildings = [b for b in buildings if b.pk not in visited]
-    stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings, done_at__isnull=True, outcome="")
+    stops = (TourStop.objects.filter(kind=StopKind.READING, building__in=buildings, done_at__isnull=True, outcome="",
+                                     interim__isnull=True)
              .exclude(tour__employee=preview.employee, tour__date=preview.date))  # a visited stop stays as history
     if draft.get("tour_id"):
         stops = stops.exclude(tour_id=draft["tour_id"])
     return stops.select_related("tour__employee")
 
 
+def _gateway_findings(building, state):
+    """📡 A gateway building normally needs no appointment - say so in the plan check."""
+    from buildings.rules import gateway as gw
+
+    if not state:
+        return []
+    if state == gw.CHECK:
+        return [Finding("warning", "📡 Gateway noch nicht geprüft – vielleicht ist gar kein Termin nötig "
+                                   "(erst unter 📡 Gateways prüfen)")]
+    if state in (gw.COMPLETE, gw.WAIT_VALUES, gw.RELEASED):
+        return [Finding("warning", f"📡 Gateway: {gw.LABELS[state]} – kein Termin nötig")]
+    if state == gw.GAP:
+        what = f": {building.gateway_missing_note}" if building.gateway_missing_note else ""
+        return [Finding("info", f"📡 von außen versuchen – ohne Termin, ohne Aushang, nur die {building.gateway_missing} "
+                                f"fehlenden Geräte{what}")]
+    if state == gw.APPOINTMENT:
+        return [Finding("info", f"📡 von außen nicht alles empfangen – Termin für die {building.gateway_missing} "
+                                "fehlenden Geräte")]
+    return []
+
+
 def _add_findings(preview, draft):
     """Conflicts of every reading stop (conflicts/rules.py)."""
-    reading = [s for s in preview.stops if s.kind == StopKind.READING]
+    for stop in preview.stops:
+        if stop.interim is not None:
+            stop.findings = []   # 🔄 a Zwischenablesung never moves the main readout (and is not moved)
+    reading = [s for s in preview.stops if s.kind == StopKind.READING and s.interim is None]
     others = _stops_in_other_tours(preview, draft, [s.building for s in reading])
     other_plans = {}
     for stop in others:
@@ -924,8 +1046,20 @@ def _add_findings(preview, draft):
                                installation_dates=tuple(sorted(installations.get(s.building.pk, []))))
                for s in reading]
     findings = planning_findings(planned, preview.date, absent=absent)
+    from .rules.stichtag import stichtag_findings
+    from .visits import attach_attempts
+    attach_attempts(reading, preview.date)   # a Nachablesung (2. Termin ...) may be long after the Stichtag
+    today = timezone.localdate()
+    from buildings.gateway import states as gateway_states
+    gateway = gateway_states([s.building for s in reading])
     for stop in reading:
-        stop.findings = findings[stop.index]
+        stop.findings = findings[stop.index] + [
+            Finding(severity, text) for severity, text in
+            stichtag_findings(preview.date, stop.building.stichtag, getattr(stop, "attempt", 1), today)]
+        stop.gateway_state = gateway.get(stop.building.pk, "")
+        from buildings.rules.gateway import GAP, OUTSIDE, PLANNED
+        shown = GAP if stop.gateway_state == PLANNED and stop.draft_notice.get("visit_mode") == OUTSIDE else stop.gateway_state
+        stop.findings += _gateway_findings(stop.building, shown)
 
     # Installation stops: all section-8 rules as if the order were done on this day
     installing = [s for s in preview.stops if s.kind == StopKind.INSTALLATION]
@@ -1010,13 +1144,25 @@ def save_draft(draft, user, confirm):
             notices.update(_notice_of(st))
     tour.stops.all().delete()
     for position, stop in enumerate(preview.stops, start=1):
-        notice = notices.get((stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None), {})
+        notice = dict(notices.get((stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None), {}))
+        notice.update(getattr(stop, "draft_notice", None) or {})   # chosen in the plan check (Ankündigung, Zugang)
+        if stop.interim is not None:
+            # 🔄 Zwischenablesung: Briefe to those flats, only into those flats (what was chosen wins)
+            flats = stop.interim.units_text
+            base = {"access_scope": "einige", "access_units": flats}
+            if not notice.get("notice_choice"):
+                base.update({"notice_choice": "briefe", "notice_wanted": True, "notice_scope": "wohnungen",
+                             "notice_units": flats})
+            notice = {**base, **{k: v for k, v in notice.items() if v not in ("", None)}}
+        if stop.kind == StopKind.READING and stop.interim is None and "visit_mode" not in notice and outside_try(stop.building):
+            notice["visit_mode"] = OUTSIDE   # 📡 gateway gap: from outside, no appointment, only the missing devices
         done = reported.get((stop.kind, stop.building.pk if stop.building else None, stop.order.pk if stop.order else None))
         new_stop = TourStop.objects.create(
             outcome=done.outcome if done else "", done_at=done.done_at if done else None,
             done_by_id=done.done_by_id if done else None, field_note=done.field_note if done else "",
             **notice,
             tour=tour, position=position, kind=stop.kind, building=stop.building, installation_order=stop.order,
+            interim=stop.interim,
             help_tour=stop.help_tour if stop.kind == StopKind.HELP else None,
             start_time=stop.start, end_time=stop.end, work_minutes=stop.work_minutes,
             drive_to_next_seconds=stop.drive_seconds, drive_to_next_minutes=stop.drive_minutes,
@@ -1035,7 +1181,7 @@ def save_draft(draft, user, confirm):
                                              "(die Arbeitszeit am Objekt wird aufgeteilt)")
 
     for stop in preview.stops:
-        if stop.kind == StopKind.READING and stop.building.assigned_reader_id != preview.employee.pk:
+        if stop.kind == StopKind.READING and stop.interim is None and stop.building.assigned_reader_id != preview.employee.pk:
             stop.building.assigned_reader = preview.employee
             stop.building.save()
         if stop.building:
@@ -1118,14 +1264,15 @@ def _lock_tour(draft):
 # The tenant notice of an appointment stays with the object when the plan is saved again, moved
 # or split (a printed Aushang then shows "veraltet"): printed?, for whom, the time by hand.
 NOTICE_KEEP = ["notice_printed_at", "notice_for", "notice_wanted", "notice_printed_by_id", "notice_scope",
-               "notice_units", "notice_from", "notice_to"]
+               "notice_units", "notice_from", "notice_to", "notice_choice", "access_scope", "access_units", "visit_mode"]
 NOTICE_STORED = (Q(notice_wanted=True) | Q(notice_printed_at__isnull=False) | ~Q(notice_units="")
-                 | Q(notice_from__isnull=False) | ~Q(notice_scope="haus"))
+                 | Q(notice_from__isnull=False) | ~Q(notice_scope="haus") | ~Q(notice_choice="")
+                 | ~Q(access_scope="") | ~Q(visit_mode=""))
 
 
 def _has_notice_data(stop):
     return bool(stop.notice_wanted or stop.notice_printed_at or stop.notice_units or stop.notice_from
-                or stop.notice_scope != "haus")
+                or stop.notice_scope != "haus" or stop.notice_choice or stop.access_scope or stop.visit_mode)
 
 
 def _notice_of(stop):
@@ -1165,7 +1312,7 @@ def _move_buildings_out_of_other_tours(preview, draft, user=None):
     from journal.activity import day_label, record, streets
     from journal.models import ActivityKind
 
-    buildings = [s.building for s in preview.stops if s.kind == StopKind.READING]
+    buildings = [s.building for s in preview.stops if s.kind == StopKind.READING and s.interim is None]   # not a 🔄 Zwischenablesung
     old_stops = _stops_in_other_tours(preview, draft, buildings)
     changed_tours, carried = {}, {}
     for stop in old_stops:
@@ -1287,8 +1434,9 @@ def autoplan_jobs(kind):
             if core:
                 installs[core] = max(installs.get(core, stop.tour.date), stop.tour.date)
         # not planned, and not "freigegeben" (released = already done)
-        unplanned = Building.objects.exclude(tour_stops__kind=StopKind.READING) | Building.objects.filter(pk__in=revisit_buildings)
-        for b in unplanned.exclude(status=BuildingStatus.RELEASED).exclude(pk__in=_storno()[0]).distinct():
+        unplanned = Building.objects.filter(~Exists(_main_reading())) | Building.objects.filter(pk__in=revisit_buildings)
+        for b in (unplanned.exclude(status=BuildingStatus.RELEASED).exclude(pk__in=_storno()[0])
+                  .exclude(pk__in=gateway_no_visit_ids()).distinct()):
             jobs.append(autoplan_rules.Job(
                 key=(StopKind.READING, b.pk), kind="reading", minutes=b.reading_minutes,
                 point=geocoding.position(b, None)[0], region=b.region, person=b.assigned_reader_id,

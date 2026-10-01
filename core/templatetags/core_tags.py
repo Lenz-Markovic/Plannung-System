@@ -130,3 +130,11 @@ def row_money(row, groups):
 def as_list(value):
     """{% include ... with stops=s|as_list %} - one object as a list."""
     return [value]
+
+
+@register.filter
+def need_label(code):
+    """🔄 Zwischenablesung: 'ampullen' -> '🧪 Ampullen tauschen'."""
+    from planning.rules.interim import NEED_LABELS
+
+    return NEED_LABELS.get(code, code)

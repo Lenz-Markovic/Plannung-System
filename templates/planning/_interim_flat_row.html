@@ -1,0 +1,6 @@
+<tr>
+  <td><input name="unit" value="{{ unit|default:'' }}" maxlength="60" placeholder="Whg 3 / NE003" aria-label="Wohnung" size="10"></td>
+  <td><input name="tenant" value="{{ tenant|default:'' }}" maxlength="120" placeholder="Müller → Schmidt" aria-label="Nutzer"></td>
+  <td class="im-needs">{% for code, label in offered %}<label class="im-need"><input type="checkbox" name="needs_{{ i }}" value="{{ code }}" {% if code in needs %}checked{% endif %}> {{ label }}</label>{% endfor %}</td>
+  <td><button type="button" class="linkish" data-im-remove title="Zeile entfernen">✕</button></td>
+</tr>

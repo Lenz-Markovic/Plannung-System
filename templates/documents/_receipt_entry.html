@@ -18,7 +18,7 @@
     </label>
     <label>Status
       {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
-        {% status_choices b.status as options %}
+        {% status_choices b as options %}
         <select name="status" hx-post="{% url 'documents:update' b.pk %}" hx-trigger="change" hx-target="#receipt-{{ b.pk }}" hx-swap="outerHTML">
           {% for value, label, allowed in options %}<option value="{{ value }}" {% if value == b.status %}selected{% endif %} {% if not allowed %}disabled{% endif %}>{{ value|status_icon }} {{ label }}</option>{% endfor %}
         </select>

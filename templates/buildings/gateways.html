@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Gateways{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📡 Gateways</h1>
+  <span class="sub">Funk mit Gateway: das Büro prüft, was empfangen wurde. 100 % = freigeben ohne Termin · Lücke = erst von außen versuchen (ohne Termin, nur die fehlenden Geräte) · danach erst ein Termin</span>
+  {% if perms.planning.add_tour %}{% include "planning/_plan_bar.html" %}{% endif %}
+</header>
+
+<form id="gw-filters" class="filters an-filters" hx-get="{% url 'buildings:gateways' %}" hx-target="#gw-rows" hx-swap="outerHTML"
+      hx-trigger="change, input changed delay:300ms from:[name=q]">
+  <div class="ov-periods" role="radiogroup" aria-label="Welche Gateways">
+    {% for key, label, n in filters %}<label class="ov-period {% if chosen == key %}on{% endif %}"><input type="radio" name="f" value="{{ key }}" {% if chosen == key %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">{{ label }} <b>{{ n }}</b></label>{% endfor %}
+  </div>
+  <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="AZ, Straße, Ort"></label>
+</form>
+
+<ol class="gw-steps">
+  <li><b>Prüfen:</b> empfangen / gesamt eintragen, was fehlt (Wohnung / Gerät).</li>
+  <li><b>100 %</b> (und Werte ohne Funk erhalten) → <b>✓ freigeben</b> – kein Termin.</li>
+  <li><b>Lücke</b> → ankreuzen und planen: <b>von außen versuchen</b> – ohne Termin, ohne Aushang, nur die fehlenden Geräte.</li>
+  <li>Von außen nicht alles → 🔁 <b>Termin</b> für die fehlenden Geräte (mit Aushang / Brief, wie die Terminierung entscheidet).</li>
+  <li>Geräte <b>ohne Funk</b>: Werte werden uns zugeschickt – „angefordert“ / „erhalten“, dafür fährt niemand hin.</li>
+</ol>
+
+{% include "buildings/_gateway_rows.html" %}
+{% endblock %}

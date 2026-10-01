@@ -18,7 +18,8 @@ from . import notice_rules as rules
 from . import notices
 
 VIEW = "planning.view_tour"
-FILTERS = [("offen", "🖨 noch zu drucken"), ("bereit", "🚗 gedruckt – bereit zum Verteilen"), ("alle", "alle Fahrpläne")]
+FILTERS = [("offen", "🖨 noch zu drucken"), ("entscheiden", "❓ noch entscheiden"),
+           ("bereit", "🚗 gedruckt – bereit zum Verteilen"), ("alle", "alle Fahrpläne")]
 HORIZONS = [("14", "nächste 2 Wochen"), ("28", "nächste 4 Wochen"), ("56", "nächste 8 Wochen"), ("alle", "alle geplanten")]
 
 
@@ -45,12 +46,13 @@ def aushaenge_page(request):
     chosen = request.GET.get("f", "offen") if request.GET.get("f", "offen") in dict(FILTERS) else "offen"
     query = request.GET.get("q", "").strip()
     found = overview.blocks(today, None if horizon == "alle" else int(horizon), chosen == "offen", query,
-                            ready=chosen == "bereit")
+                            ready=chosen == "bereit", undecided=chosen == "entscheiden")
     context = {"blocks": found, "horizons": HORIZONS, "horizon": horizon, "only_open": chosen == "offen", "q": query,
                "filters": FILTERS, "chosen": chosen, "ready": sum(len(b.printed) for b in found),
                "areas": overview.page_areas(found),
                "today": today, "scopes": rules.SCOPES, "may_edit": may_edit(request.user),
-               "missing": sum(len(b.missing) for b in found)}
+               "missing": sum(len(b.missing) for b in found), "undecided": sum(len(b.undecided) for b in found),
+               "choices": rules.CHOICES, "choice_titles": rules.CHOICE_TITLES, "access_scopes": rules.ACCESS_SCOPES}
     if request.htmx_target == "aushang-blocks":
         response = render(request, "documents/_aushaenge_blocks.html", context)
         response["HX-Push-Url"] = clean_url(request)
@@ -69,7 +71,8 @@ def _stop(pk):
 def _row(request, stop, message="", error=False):
     today = timezone.localdate()
     html = render_to_string("documents/_aushang_row.html", {
-        "s": overview.notice_stop(stop, today), "scopes": rules.SCOPES, "may_edit": True}, request=request)
+        "s": overview.notice_stop(stop, today), "scopes": rules.SCOPES, "may_edit": True, "choices": rules.CHOICES,
+        "choice_titles": rules.CHOICE_TITLES, "access_scopes": rules.ACCESS_SCOPES}, request=request)
     block = overview.block_of(stop.tour, today)
     if block is not None:  # the counts in the head of the Fahrplan change, too
         html += render_to_string("documents/_aushang_head.html", {"b": block, "today": today, "oob": True}, request=request)
@@ -92,6 +95,40 @@ def aushang_wanted(request, pk):
            f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
            order=stop.installation_order)
     return _row(request, stop, "Aushang nötig" if on else "Kein Aushang")
+
+
+def _refused(request, stop, error):
+    response = _row(request, stop, " ".join(error.messages), error=True)
+    response["HX-Reswap"] = "none"   # the row stays as it was, only the reason shows
+    return response
+
+
+@require_POST
+@edit_required
+def aushang_choice(request, pk):
+    """Ankündigung: 📄 Aushang / ✉ Briefe / ☎ telefonisch / 📧 per Mail / – keine (the Terminierung decides)."""
+    from django.core.exceptions import ValidationError
+
+    stop = _stop(pk)
+    try:
+        notices.set_choice(stop, request.user, request.POST.get("choice", ""), request.POST.get("units"))
+    except ValidationError as error:
+        return _refused(request, stop, error)
+    return _row(request, stop, f"Ankündigung: {dict(rules.CHOICES)[stop.notice_choice]}")
+
+
+@require_POST
+@edit_required
+def aushang_access(request, pk):
+    """Zugang: in alle Wohnungen / nur in diese Wohnungen / nicht in die Wohnungen."""
+    from django.core.exceptions import ValidationError
+
+    stop = _stop(pk)
+    try:
+        notices.set_access(stop, request.user, request.POST.get("access", ""), request.POST.get("access_units", ""))
+    except ValidationError as error:
+        return _refused(request, stop, error)
+    return _row(request, stop, f"Zugang: {stop.access_text}")
 
 
 @require_POST

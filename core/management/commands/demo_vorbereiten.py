@@ -56,6 +56,8 @@ class Command(BaseCommand):
         say("2/4 Demodaten neu einlesen (dauert etwas) …")
         Activity.objects.all().delete()   # the Verlauf starts empty, too
         Note.objects.all().delete()
+        from planning.models import InterimReading
+        InterimReading.objects.all().delete()
         call_command("import_prototype", flush=True, stdout=quiet)
         weeks = self._shift()
         if weeks:
@@ -67,6 +69,8 @@ class Command(BaseCommand):
         reported = self._results()
         wanted, printed, letters = self._notices(office)
         self._notes(office)
+        self._gateways(office)
+        self._interim(office)
         say(self.style.SUCCESS(
             f"Fertig: {reported} Ergebnisse gemeldet, {wanted} Aushänge nötig (davon {printed} gedruckt, "
             f"{letters} als Briefe), {len(NOTES)} Notizen.\n"
@@ -118,6 +122,30 @@ class Command(BaseCommand):
         printed = [s for s in stops[::2] if s is not letters]   # every second one, the Briefe stay "still to print"
         notices.mark_printed(printed, office)
         return len(stops), len(printed), 1 if letters is not None else 0
+
+    def _gateways(self, office):
+        """📡 two checked gateways: one 100 % (freigeben without appointment), one with a gap (try from outside)."""
+        from buildings.gateway import gateway_buildings, save_check
+        from buildings.models import BuildingStatus
+
+        found = list(gateway_buildings().filter(installation_type="radio_gateway").exclude(status=BuildingStatus.RELEASED)
+                     .filter(tour_stops__isnull=True).order_by("file_number")[:2])
+        for b, gap in zip(found, (0, 3)):
+            total = b.hkv_count + b.wmz_count + b.wwz_count + b.kwz_count
+            save_check(b, office, total=total, received=total - gap,
+                       missing_note="NE002 1 HKV, NE005 WWZ + KWZ" if gap else "")
+
+    def _interim(self, office):
+        """🔄 one Zwischenablesung from a mail of the Hausverwaltung (Verdunster: Ampullen)."""
+        from buildings.models import Building
+        from planning.interim import create
+
+        b = (Building.objects.filter(hkv_family="Verdunster").order_by("file_number").first()
+             or Building.objects.order_by("file_number").first())
+        create(office, b, timezone.localdate() + datetime.timedelta(days=12), "mail_hv",
+               [{"unit": "Whg 3", "tenant": "Müller → Schmidt", "needs": ["hkv", "ampullen", "wwz"]},
+                {"unit": "Whg 5", "tenant": "Kaya (Auszug)", "needs": ["hkv", "ampullen"]}],
+               "Mail der Hausverwaltung: Auszug zum Monatsende")
 
     def _notes(self, office):
         today = timezone.localdate()

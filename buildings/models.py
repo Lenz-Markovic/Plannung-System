@@ -140,6 +140,17 @@ class Building(TimeStampedModel, GeocodedAddress):
     key_hint = models.CharField("Hinweis Schlüssel", max_length=200, blank=True)
     announcement_hint = models.CharField("Hinweis Anmeldung", max_length=200, blank=True)
 
+    # --- 📡 gateway check by the office (buildings/rules/gateway.py) ---------------------
+    gateway_checked_on = models.DateField("Gateway geprüft am", null=True, blank=True)
+    gateway_checked_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="Gateway geprüft von", null=True,
+                                           blank=True, on_delete=models.SET_NULL, related_name="+")
+    gateway_total = models.PositiveIntegerField("Funk-Geräte gesamt", null=True, blank=True)
+    gateway_received = models.PositiveIntegerField("davon empfangen", null=True, blank=True)
+    gateway_missing_note = models.CharField("was fehlt (Wohnung / Gerät)", max_length=300, blank=True)
+    gateway_manual_devices = models.PositiveIntegerField("Geräte ohne Funk", default=0)
+    gateway_manual_state = models.CharField("Werte ohne Funk", max_length=12, blank=True, choices=[
+        ("", "–"), ("angefordert", "angefordert"), ("erhalten", "erhalten")])
+
     # Original record from the import, so nothing gets lost.
     raw_data = models.JSONField("Rohdaten", default=dict, blank=True)
 
@@ -169,8 +180,26 @@ class Building(TimeStampedModel, GeocodedAddress):
         super().save(*args, **kwargs)
 
     @property
+    def is_gateway(self):
+        from .rules.gateway import is_gateway
+
+        return is_gateway(self.installation_type, self.has_gateway)
+
+    @property
+    def gateway_missing(self):
+        """Radio devices the gateway did not receive (0 if not checked)."""
+        from .rules.gateway import missing
+
+        return missing(self.gateway_total, self.gateway_received) if self.gateway_checked_on else 0
+
+    @property
     def reading_minutes(self):
-        """Effective reading time: a manual value beats the calculated one."""
+        """Effective reading time: a manual value beats the calculated one.
+        A checked gateway building only needs time for the devices the gateway did not receive."""
+        if self.is_gateway and self.gateway_missing and not self.reading_minutes_manual:
+            from .rules.gateway import gap_minutes
+
+            return gap_minutes(self.gateway_missing)
         return self.reading_minutes_manual or self.reading_minutes_calculated
 
     @property

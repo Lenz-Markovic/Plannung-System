@@ -216,3 +216,54 @@ def area_name(cities):
         counts[city] = counts.get(city, 0) + 1
     top = sorted(counts, key=lambda c: (-counts[c], c))[:2]
     return " / ".join(top) + (" …" if len(counts) > 2 else "")
+
+
+# --- Ankündigung and Zugang per stop (the Terminierung decides, the system only suggests) ---------------
+
+UNDECIDED, BY_AUSHANG, BY_LETTERS, BY_PHONE, BY_MAIL, NOT_NEEDED = "", "aushang", "briefe", "telefon", "mail", "keine"
+CHOICES = [
+    (BY_AUSHANG, "📄 Aushang"),
+    (BY_LETTERS, "✉ Briefe"),
+    (BY_PHONE, "☎ telefonisch"),
+    (BY_MAIL, "📧 per Mail"),
+    (NOT_NEEDED, "– keine"),
+]
+CHOICE_TITLES = {
+    BY_AUSHANG: "Aushang ans ganze Haus (14 Tage vorher)",
+    BY_LETTERS: "Briefe an einzelne Wohnungen",
+    BY_PHONE: "Termin telefonisch vereinbart – kein Aushang",
+    BY_MAIL: "Termin per Mail vereinbart – kein Aushang",
+    NOT_NEEDED: "keine Ankündigung nötig (z. B. Funk von außen, Keller mit Schlüssel)",
+}
+PRINTED_CHOICES = (BY_AUSHANG, BY_LETTERS)   # these need paper (print + hand out)
+
+ACCESS_ALL, ACCESS_SOME, ACCESS_NONE = "alle", "einige", "keine"
+ACCESS_SCOPES = [
+    (ACCESS_ALL, "🏠 in alle Wohnungen"),
+    (ACCESS_SOME, "🚪 nur in diese Wohnungen"),
+    (ACCESS_NONE, "🔑 nicht in die Wohnungen"),
+]
+
+
+def suggest_access(access_apartment, visit_mode=""):
+    """Where the reader has to go in - from the Ableseart / notes (buildings/rules/access.py)."""
+    if visit_mode == "aussen":
+        return ACCESS_NONE
+    return ACCESS_ALL if access_apartment else ACCESS_NONE
+
+
+def suggest_notice(access_scope, visit_mode=""):
+    """What the Terminierung probably needs: only a suggestion, they decide (a Termin by phone needs no Aushang)."""
+    if visit_mode == "aussen" or access_scope == ACCESS_NONE:
+        return NOT_NEEDED
+    if access_scope == ACCESS_SOME:
+        return BY_LETTERS
+    return BY_AUSHANG
+
+
+def choice_problems(choice, units):
+    if choice not in dict(CHOICES):
+        return ["Unbekannte Ankündigung."]
+    if choice == BY_LETTERS and not unit_list(units):
+        return ["Für Briefe bitte die Wohnungen eintragen (z. B. Whg 3 Müller, Whg 7)."]
+    return []

@@ -41,6 +41,11 @@ class NoticeStop:
     def open(self):
         return self.state in (rules.MISSING, rules.LATE, OUTDATED)
 
+    @property
+    def undecided(self):
+        """The Terminierung has not chosen yet (Aushang / Briefe / telefonisch / per Mail / keine)."""
+        return not self.stop.notice_choice and not self.stop.done_at
+
 
 @dataclass
 class Block:
@@ -65,6 +70,10 @@ class Block:
         return any(s.state == rules.LATE for s in self.stops)
 
     @property
+    def undecided(self):
+        return [s for s in self.stops if s.undecided]
+
+    @property
     def wanted_stops(self):
         return [s.stop for s in self.wanted]
 
@@ -77,7 +86,7 @@ class Block:
         return sum(len(s.flats) or 1 for s in self.wanted)
 
 
-def blocks(today, horizon=28, only_open=False, query="", tour=None, ready=False):
+def blocks(today, horizon=28, only_open=False, query="", tour=None, ready=False, undecided=False):
     """One block per coming Fahrplan with every appointment and its Aushang: wanted?, printed?"""
     tours = (Tour.objects.filter(date__gte=today).select_related("employee").prefetch_related("team")
              .order_by("date", "employee__short_name"))
@@ -110,6 +119,8 @@ def blocks(today, horizon=28, only_open=False, query="", tour=None, ready=False)
         if only_open and not block.missing:
             continue
         if ready and not block.printed:     # 🚗 printed = ready to be handed out (no fixed day for that)
+            continue
+        if undecided and not block.undecided:   # ❓ the Terminierung still has to choose
             continue
         found.append(block)
     return found

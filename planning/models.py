@@ -198,6 +198,42 @@ class DriveSource(models.TextChoices):
     TOMTOM = "tomtom", "TomTom"
 
 
+class InterimReading(TimeStampedModel):
+    """🔄 Zwischenablesung (Nutzerwechsel): mostly announced by the Hausverwaltung by mail.
+    flats: [{"unit": "Whg 3", "tenant": "Müller → Schmidt", "needs": ["hkv", "ampullen", "wwz"]}]
+    (planning/rules/interim.py). Planned as a short reading stop (TourStop.interim) with Briefe."""
+
+    building = models.ForeignKey("buildings.Building", verbose_name="Liegenschaft", on_delete=models.PROTECT,
+                                 related_name="interim_readings")
+    move_date = models.DateField("Nutzerwechsel am")
+    source = models.CharField("gemeldet per", max_length=12, default="mail_hv", choices=[
+        ("mail_hv", "Mail der Hausverwaltung"), ("telefon", "Anruf"), ("brief", "Brief"), ("sonstiges", "sonstiges")])
+    reported_on = models.DateField("gemeldet am", default=timezone.localdate)
+    flats = models.JSONField("Wohnungen", default=list)
+    note = models.TextField("Notiz", blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="angelegt von", null=True, blank=True,
+                                   on_delete=models.SET_NULL, related_name="+")
+    cancelled_at = models.DateTimeField("storniert am", null=True, blank=True)
+
+    class Meta:
+        ordering = ["move_date", "pk"]
+        verbose_name = "Zwischenablesung"
+        verbose_name_plural = "Zwischenablesungen"
+
+    def __str__(self):
+        return f"Zwischenablesung {self.building.file_number} {self.move_date:%d.%m.%Y}"
+
+    @property
+    def minutes(self):
+        from .rules.interim import minutes
+        return minutes(self.flats)
+
+    @property
+    def units_text(self):
+        from .rules.interim import units_text
+        return units_text(self.flats)
+
+
 class TourStop(TimeStampedModel):
     """One stop in a tour: a reading (building) or an installation (order)."""
 
@@ -249,6 +285,19 @@ class TourStop(TimeStampedModel):
     # the time on the notice typed in by hand (else from the plan, or estimated)
     notice_from = models.TimeField("Zeitfenster von (von Hand)", null=True, blank=True)
     notice_to = models.TimeField("Zeitfenster bis (von Hand)", null=True, blank=True)
+    # Ankündigung chosen by the Terminierung ("" = not decided yet, the system shows a suggestion)
+    notice_choice = models.CharField("Ankündigung", max_length=10, blank=True, choices=[
+        ("aushang", "Aushang"), ("briefe", "Briefe"), ("telefon", "telefonisch"), ("mail", "per Mail"),
+        ("keine", "keine")])
+    # Zugang: where the reader goes in ("" = as suggested from the Liegenschaft)
+    access_scope = models.CharField("Zugang", max_length=10, blank=True, choices=[
+        ("alle", "alle Wohnungen"), ("einige", "nur diese Wohnungen"), ("keine", "nicht in die Wohnungen")])
+    access_units = models.CharField("Zugang: Wohnungen", max_length=300, blank=True)
+    # 📡 "aussen": try from outside without an appointment (gateway gap, only the missing devices)
+    visit_mode = models.CharField("Besuch", max_length=10, blank=True, choices=[("aussen", "von außen, ohne Termin")])
+    # 🔄 a Zwischenablesung (Nutzerwechsel) instead of the main readout of the building
+    interim = models.ForeignKey(InterimReading, verbose_name="Zwischenablesung", null=True, blank=True,
+                                on_delete=models.SET_NULL, related_name="stops")
     # Ergebnis from "Mein Tag" (planning/rules/visits.py): complete / partial / absent, "" = not reported yet
     outcome = models.CharField("Ergebnis", max_length=20, blank=True, choices=[
         ("complete", "fertig (100 %)"), ("partial", "teilweise erledigt"), ("absent", "nicht erledigt")])
@@ -257,6 +306,30 @@ class TourStop(TimeStampedModel):
         settings.AUTH_USER_MODEL, verbose_name="erledigt von", null=True, blank=True,
         on_delete=models.SET_NULL, related_name="+",
     )
+
+    # --- Zugang and Ankündigung: chosen, or else the suggestion (documents/notice_rules.py) ----------
+    @property
+    def access_choice(self):
+        from documents.notice_rules import suggest_access
+
+        if self.access_scope:
+            return self.access_scope
+        if self.kind == StopKind.INSTALLATION:
+            return "alle"   # a Montage goes into the flats
+        return suggest_access(bool(self.building and self.building.access_apartment), self.visit_mode)
+
+    @property
+    def access_text(self):
+        from documents.notice_rules import ACCESS_SCOPES, ACCESS_SOME
+
+        text = dict(ACCESS_SCOPES)[self.access_choice]
+        return f"{text}: {self.access_units}" if self.access_choice == ACCESS_SOME and self.access_units else text
+
+    @property
+    def notice_suggestion(self):
+        from documents.notice_rules import suggest_notice
+
+        return suggest_notice(self.access_choice, self.visit_mode)
 
     history = HistoricalRecords()
 
@@ -312,6 +385,7 @@ class Visit(models.Model):
                                     on_delete=models.SET_NULL, related_name="+")
     reported_at = models.DateTimeField("gemeldet am", default=timezone.now)  # set by report(); office saves never move it
     entered_by_office = models.BooleanField("im Büro nachgetragen", default=False)
+    visit_mode = models.CharField("Besuch", max_length=10, blank=True)   # "aussen": tried from outside
     # the office is done with this Rückmeldung: for ✓ it means "geprüft", for ◐/✗ "kein Nachtermin nötig"
     # (planning/followup.py). Anything that reads closed_at must also look at the outcome.
     closed_at = models.DateTimeField("abgeschlossen am", null=True, blank=True)

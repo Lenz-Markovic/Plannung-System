@@ -1,0 +1,2 @@
+{% for b in found %}<a class="im-hit" href="{% url 'planning:interim' %}?liegenschaft={{ b.pk }}"><b>AZ {{ b.file_number }}</b> · {{ b.street }}, {{ b.zip_code }} {{ b.city }} <span class="na small">{{ b.apartments }} Whg</span></a>
+{% empty %}{% if request.GET.suche %}<p class="na small">Nichts gefunden.</p>{% endif %}{% endfor %}

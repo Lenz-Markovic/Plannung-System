@@ -72,15 +72,15 @@ def report(stop, user, outcome, todo="", reason="", on_behalf=False):
     stop.outcome, stop.done_at, stop.done_by = outcome, timezone.now(), user
     stop.save(update_fields=["outcome", "done_at", "done_by", "updated_at"])
     _update_tour_status(stop.tour)
-    if stop.kind == StopKind.HELP:
-        return None  # the helped plan has the visit
+    if stop.kind == StopKind.HELP or stop.interim_id:
+        return None  # the helped plan has the visit / a Zwischenablesung keeps its result on the stop
     building, order = _target(stop)
     visit, _ = Visit.objects.update_or_create(stop=stop, defaults={
         "building": building, "installation_order": order, "kind": stop.kind, "date": stop.tour.date,
         "tour": stop.tour, "people": stop.tour.people_label,
         "outcome": outcome, "reason": reason if outcome == ABSENT else "",
         "todo": todo.strip() if outcome != COMPLETE else "", "note": stop.field_note, "reported_by": user,
-        "reported_at": timezone.now(), "entered_by_office": on_behalf,
+        "reported_at": timezone.now(), "entered_by_office": on_behalf, "visit_mode": stop.visit_mode,
     })
     others = list(_visits_of(building, order).order_by("date", "pk"))
     visit.attempt = attempt_in_series([_info(v) for v in _earlier(others, visit.date, visit)])

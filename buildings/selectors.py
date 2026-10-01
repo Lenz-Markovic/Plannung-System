@@ -32,7 +32,8 @@ def building_list_queryset():
     installation_date earliest planned installation of one of its orders
     effective_minutes reading time (manual beats calculated)
     """
-    reading_stops = current_first(TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING))
+    reading_stops = current_first(TourStop.objects.filter(building=OuterRef("pk"), kind=StopKind.READING,
+                                                          interim__isnull=True))   # not a 🔄 Zwischenablesung
     installation_stops = current_first(TourStop.objects.filter(
         installation_order__building=OuterRef("pk"), kind=StopKind.INSTALLATION))
     return (

@@ -15,7 +15,7 @@ from journal.models import ActivityKind
 
 from .models import BuildingStatus, PropertyManager
 from .rules.access import detect_access
-from .rules.status import can_change_status
+from .rules.status import can_change_status, release_blocked, release_blocked_message
 
 
 def apply_access(building):
@@ -30,6 +30,14 @@ def apply_access(building):
     return access
 
 
+def open_visit(building):
+    """The last reading visit if it left flats open and the office did not close it - else None."""
+    from planning.models import Visit
+
+    last = Visit.objects.filter(building=building).order_by("-date", "-pk").first()
+    return last if last is not None and release_blocked(last.outcome, last.closed_at) else None
+
+
 def change_status(building, new_status, user):
     if new_status not in BuildingStatus.values:
         raise ValidationError(f"Unbekannter Status: {new_status}")
@@ -37,6 +45,10 @@ def change_status(building, new_status, user):
         raise PermissionDenied("Diesen Status darf deine Rolle nicht setzen.")
     if building.status == new_status:
         return building
+    if new_status == BuildingStatus.RELEASED:
+        last = open_visit(building)
+        if last is not None:
+            raise ValidationError(release_blocked_message(last.todo))
     old = building.get_status_display()
     building.status = new_status
     building.status_changed_at = timezone.now()

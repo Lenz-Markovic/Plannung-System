@@ -1,0 +1,31 @@
+<div id="im-list" class="im-list">
+  {% for item in items %}
+    <article class="im-card im-{{ item.state }}">
+      <div class="im-card-head">
+        <div><b>🔄 AZ {{ item.building.file_number }}</b> · {{ item.building.street }}, {{ item.building.zip_code }} {{ item.building.city }}
+          <div class="na small">Nutzerwechsel <b>{{ item.move_date|date:"D d.m.Y" }}</b> ({{ item.due }}) · gemeldet {{ item.reported_on|date:"d.m." }} per {{ item.get_source_display }}{% if item.created_by %} · {{ item.created_by }}{% endif %} · ca. {{ item.minutes }} min</div></div>
+        <span class="im-chip im-{{ item.state }}">{{ item.state_label }}{% if item.state == "geplant" and item.stop %}: {{ item.stop.tour.employee }} {{ item.stop.tour.date|date:"D d.m." }}{% endif %}</span>
+      </div>
+      <table class="table table-sm im-flats-view"><tbody>
+        {% for f in item.flat_rows %}<tr><td><b>{{ f.unit }}</b></td><td>{{ f.tenant }}</td><td>{% for l in f.labels %}<span class="chip">{{ l }}</span> {% endfor %}</td></tr>{% endfor %}
+      </tbody></table>
+      {% if item.note %}<div class="small">📝 {{ item.note }}</div>{% endif %}
+      {% if item.state == "teilweise" and item.stop %}<div class="small t-warn">Beim letzten Termin ({{ item.stop.tour.date|date:"d.m." }}, {{ item.stop.tour.employee }}) nicht alles erledigt{% if item.stop.field_note %}: {{ item.stop.field_note }}{% endif %}.</div>{% endif %}
+      {% if may_edit and item.state != "erledigt" and item.state != "storniert" %}
+        <div class="im-card-actions">
+          {% if perms.planning.add_tour and item.state != "geplant" %}
+            <form class="im-plan" hx-post="{% url 'planning:interim_plan' item.pk %}">
+              <select name="employee" aria-label="Wer liest ab?">{% for p in people %}<option value="{{ p.pk }}" {% if p.pk == item.building.assigned_reader_id %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+              <input type="date" name="date" value="{{ item.day|date:'Y-m-d' }}" aria-label="Tag">
+              <button class="btn mini primary">📅 einplanen → prüfen</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{% url 'planning:interim_cancel' item.pk %}">{% csrf_token %}<input type="hidden" name="f" value="{{ chosen }}">
+            <button class="linkish small" title="Nutzerwechsel fällt aus">✕ stornieren</button></form>
+        </div>
+      {% endif %}
+    </article>
+  {% empty %}
+    <div class="card-lite fu-empty">{% if chosen == "offen" %}✓ Keine Zwischenablesung zu planen.{% else %}Keine Zwischenablesungen.{% endif %}</div>
+  {% endfor %}
+</div>

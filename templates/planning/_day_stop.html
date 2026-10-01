@@ -16,7 +16,14 @@
     <div class="day-attempt">🔁 <b>{{ s.attempt }}. Termin (Nachtermin)</b>{% if s.last_visit %} – beim letzten Mal
       ({{ s.last_visit.date|date:"d.m." }}, {{ s.last_visit.people }}): {% if s.last_visit.outcome == "partial" %}◐ teilweise{% else %}✗ nicht erledigt{% endif %}{% if s.last_visit.todo %} · <b>noch zu tun: {{ s.last_visit.todo }}</b>{% endif %}{% endif %}</div>
   {% endif %}
-  {% if b %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+  {% if s.visit_mode == "aussen" %}<div class="day-outside">📡 <b>Von außen versuchen – ohne Termin, nicht klingeln.</b>
+    Nur die {{ b.gateway_missing }} Geräte, die das Gateway nicht empfangen hat{% if b.gateway_missing_note %}: <b>{{ b.gateway_missing_note }}</b>{% endif %}.
+    Alles empfangen → ✓ fertig · nicht alles → ◐ teilweise (dann macht das Büro einen Termin).</div>{% endif %}
+  {% if s.interim %}<div class="day-interim">🔄 <b>Zwischenablesung – Nutzerwechsel {{ s.interim.move_date|date:"d.m.Y" }}</b>, nur diese Wohnungen:
+    {% for f in s.interim.flats %}<div>· <b>{{ f.unit }}</b>{% if f.tenant %} ({{ f.tenant }}){% endif %}: {% for n in f.needs %}{{ n|need_label }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endfor %}
+    <span class="small">Ablesebeleg vom Mieter unterschreiben lassen.</span></div>{% endif %}
+  {% if s.kind == "reading" %}<div class="day-access">Zugang: <b>{{ s.access_text }}</b></div>{% endif %}
+  {% if b and s.visit_mode != "aussen" %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
   {% if s.kind == "help" %}<div class="day-hint"><b>🤝 Hilfe bei {{ s.help_tour.people_label|default:"?" }}</b> – gemeinsam an diesem Objekt</div>{% endif %}
   {% if o %}<div class="day-hint">{{ o.summary }}</div>{% endif %}
   {% if b %}

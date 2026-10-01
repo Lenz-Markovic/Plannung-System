@@ -66,7 +66,7 @@
           <span class="pr-adr">
             <span class="art-tag {{ s.kind }}">{% if s.kind == "installation" %}🔧 Montage{% elif s.kind == "help" %}🤝 Hilfe bei {{ s.help_tour.people_label|default:"?" }}{% else %}📖 Ablesung{% endif %}</span>
             <b>{{ s.target.street }}</b>
-            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.full_minutes != s.work_minutes %} <span title="volle Arbeitszeit für eine Person">({{ s.full_minutes }} min ÷ {{ s.people }})</span>{% endif %}</span>
+            <span class="o">{{ s.target.zip_code }} {{ s.target.city }} · {% if s.building %}AZ {{ s.building.file_number }}{% if not s.interim %} · <span title="Stichtag der Abrechnung">Stichtag {{ s.building.stichtag|date:"d.m.Y" }}</span>{% endif %}{% else %}{{ s.order.re_number }}{% endif %} · {{ s.work_minutes }} min{% if s.full_minutes != s.work_minutes %} <span title="volle Arbeitszeit für eine Person">({{ s.full_minutes }} min ÷ {{ s.people }})</span>{% endif %}</span>
             {% if s.order %}<br><span class="o">Montage {{ s.order.re_number }}: {{ s.order.summary }}</span>{% endif %}
           </span>
           <span class="pr-knopf">
@@ -80,12 +80,37 @@
         </div>
         {% for h in s.helpers %}<div class="pr-hinw help-line">🤝 Helfer: <b>{{ h.tour.employee }}</b>{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %} (eigener Plan) – die Arbeitszeit hier ist aufgeteilt</div>{% endfor %}
         {% if s.kind == "help" and s.help_stop %}<div class="pr-hinw help-line">🤝 {% if s.help_stop.start_time %}{{ s.help_tour.people_label }} ist dort {{ s.help_stop.start_time|time:"H:i" }}–{{ s.help_stop.end_time|time:"H:i" }}{% else %}Im Plan von {{ s.help_tour.people_label }} sind noch keine Uhrzeiten gerechnet – Zeiten bitte absprechen{% endif %}</div>{% endif %}
-        {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="pr-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+        {% if s.building and s.visit_mode != "aussen" and not s.interim %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="pr-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+        {% if s.interim %}<div class="pr-hinw day-interim">🔄 <b>Zwischenablesung</b> (Nutzerwechsel {{ s.interim.move_date|date:"d.m.Y" }}) – nur:
+          {% for f in s.interim.flats %}<b>{{ f.unit }}</b>{% if f.tenant %} ({{ f.tenant }}){% endif %}{% if not forloop.last %}, {% endif %}{% endfor %} · nicht die ganze Liegenschaft</div>{% endif %}
+        {% if s.kind == "reading" %}
+          {# 🚪 Zugang + 📄 Ankündigung: suggested from the Liegenschaft, the Terminierung decides (saved with the plan) #}
+          <div class="pr-notice">
+            <form id="pn-{{ s.index }}" class="ah-access" hx-post="{% url 'planning:draft_action' %}" hx-target="#preview" hx-trigger="change"
+                  hx-vals='{"action": "access", "index": {{ s.index }}}'>
+              <span class="small">Zugang</span>
+              <select name="access" aria-label="Zugang" onchange="this.form.querySelector('.ah-units').hidden = this.value !== 'einige'">
+                {% for v, l in access_scopes %}<option value="{{ v }}" {% if s.access_choice == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+              </select>{% if not s.access_scope %}<span class="an-src est" title="aus der Ableseart / den Hinweisen erkannt – bitte prüfen">erkannt</span>{% endif %}
+              <input class="ah-units" name="units" value="{{ s.access_units }}" maxlength="300" placeholder="Whg 3 (Müller), Whg 7"
+                     aria-label="welche Wohnungen" {% if s.access_choice != "einige" %}hidden{% endif %}>
+            </form>
+            <div class="ah-choices" role="group" aria-label="Ankündigung"><span class="small">Ankündigung</span>
+              {% for v, l in notice_choices %}
+                <button type="button" class="ah-choice{% if s.notice_choice_shown == v %} on{% elif not s.notice_choice_shown and s.notice_suggestion == v %} hint{% endif %}"
+                        hx-post="{% url 'planning:draft_action' %}" hx-vals='{"action": "notice", "index": {{ s.index }}, "choice": "{{ v }}"}'
+                        {% if v == "briefe" %}hx-include="#pn-{{ s.index }} [name=units]"{% endif %} hx-target="#preview"
+                        title="{% if not s.notice_choice and s.notice_suggestion == v %}Vorschlag{% endif %}">{{ l }}</button>
+              {% endfor %}
+              {% if not s.notice_choice_shown %}<span class="na small">❓ noch offen – geht auch später unter 📄 Aushänge</span>{% endif %}
+            </div>
+          </div>
+        {% endif %}
         {% if s.attempt > 1 %}<div class="pr-hinw attempt-line">🔁 <b>{{ s.attempt }}. Termin (Nachtermin)</b>{% if s.last_visit %} – zuletzt {{ s.last_visit.date|date:"d.m." }} {{ s.last_visit.people }}: {% if s.last_visit.outcome == "partial" %}◐ teilweise{% elif s.last_visit.outcome == "absent" %}✗ nicht erledigt{% else %}✓ fertig{% endif %}{% if s.last_visit.todo %} · <b>noch zu tun: {{ s.last_visit.todo }}</b>{% endif %}{% endif %}</div>{% endif %}
         {% for n in s.notes %}<div class="stop-note {{ n.kind }}">{{ n.icon }} <b>{{ n.get_kind_display }}</b>: {{ n.text|truncatechars:220 }} <span class="na">– {{ n.author|default:"?" }}, {{ n.created_at|date:"d.m. H:i" }}</span></div>{% endfor %}
         {% if perms.journal.view_note and s.kind != "help" %}<button type="button" class="linkish small" title="Notizen der Terminierung ansehen oder eine neue schreiben"
           hx-get="{% if s.order %}{% url 'journal:notes' 'auftrag' s.order.pk %}{% else %}{% url 'journal:notes' 'liegenschaft' s.building.pk %}{% endif %}?dialog=1" hx-target="#modal">📝 Notizen{% if s.notes %} ({{ s.notes|length }}){% endif %} · ＋ neue</button>{% endif %}
-        {% for f in s.findings %}<div class="kf-{{ f.severity }}">{% if f.severity == "critical" %}⛔{% else %}⚠{% endif %} {{ f.message }}</div>{% endfor %}
+        {% for f in s.findings %}<div class="kf-{{ f.severity }}">{% if f.severity == "critical" %}⛔{% elif f.severity == "info" %}ℹ{% else %}⚠{% endif %} {{ f.message }}</div>{% endfor %}
         {% for w in s.warnings %}<div class="pr-warn">⚠ {{ w }}</div>{% endfor %}
         {% if s.point_source == "zip" %}<div class="pr-warn">⚠ Position nur ungefähr (PLZ-Mitte).</div>{% elif not s.point %}<div class="pr-warn">⚠ Adresse ohne Position – Fahrzeit grob geschätzt.</div>{% endif %}
         {% if s.building.remark %}<div class="pr-hinw">{{ s.building.remark }}</div>{% endif %}

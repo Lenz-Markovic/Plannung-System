@@ -57,11 +57,11 @@
   {# ---- editable cells: each element saves itself via HTMX and gets the new row back ---- #}
   <td>
     {% if perms.buildings.set_status_open_rework or perms.buildings.release_building %}
-      {% status_choices b.status as options %}
+      {% status_choices b as options %}
       <select class="st {{ b.status }}" name="status" aria-label="Status ändern"
               hx-post="{% url 'buildings:update' b.pk %}" hx-trigger="change" hx-target="#row-{{ b.pk }}" hx-swap="outerHTML">
         {% for value, label, allowed in options %}
-          <option value="{{ value }}" {% if value == b.status %}selected{% endif %} {% if not allowed %}disabled{% endif %}>{{ value|status_icon }} {{ label }}</option>
+          <option value="{{ value }}" {% if value == b.status %}selected{% endif %} {% if not allowed %}disabled{% endif %}>{{ value|status_icon }} {{ label }}{% if not allowed and value == "released" and b|release_is_blocked %} – erst Nachtermin{% endif %}</option>
         {% endfor %}
       </select>
     {% else %}

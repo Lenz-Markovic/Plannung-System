@@ -1,0 +1,37 @@
+{# One gateway building: what was received, what is next. #}
+<article id="gw-{{ b.pk }}" class="gw-row gw-{{ b.gw_state }}">
+  <div class="gw-head">
+    <div class="gw-obj"><b>AZ {{ b.file_number }}</b> · {{ b.street }}, {{ b.zip_code }} {{ b.city }}
+      <span class="na small">· Stichtag {{ b.stichtag|date:"d.m.Y" }} · {{ b.get_installation_type_display|default:"Funk" }}{% if b.has_gateway %} + Gateway{% endif %}
+        · {{ b.hkv_count }} HKV{% if b.wmz_count %} · {{ b.wmz_count }} WMZ{% endif %}{% if b.wwz_count %} · {{ b.wwz_count }} WWZ{% endif %}{% if b.kwz_count %} · {{ b.kwz_count }} KWZ{% endif %} · {{ b.apartments }} Whg</span></div>
+    <span class="gw-chip gw-{{ b.gw_state }}">{{ b.gw_label }}{% if b.gateway_missing and b.gw_state != "freigegeben" and b.gw_state != "vollstaendig" and b.gw_state != "werte" %} · {{ b.gateway_missing }} fehlen{% endif %}</span>
+  </div>
+
+  <form class="gw-form" hx-post="{% url 'buildings:gateway_save' b.pk %}" hx-target="#gw-{{ b.pk }}" hx-swap="outerHTML">
+    <label>empfangen <input type="number" name="received" min="0" inputmode="numeric" value="{{ b.gateway_received|default_if_none:'' }}" aria-label="empfangen"></label>
+    <label>von <input type="number" name="total" min="0" inputmode="numeric" value="{{ b.gw_total_hint }}" aria-label="gesamt" title="Funk-Geräte gesamt (Vorschlag aus den Gerätezahlen – bitte prüfen)"></label>
+    <label class="gw-missing">was fehlt <input type="text" name="missing" maxlength="300" value="{{ b.gateway_missing_note }}" placeholder="z. B. NE003 2 HKV, NE007 WWZ"></label>
+    <label>ohne Funk <input type="number" name="manual" min="0" inputmode="numeric" value="{{ b.gateway_manual_devices }}" title="Geräte ohne Funk: die Werte werden uns zugeschickt"></label>
+    <label>Werte <select name="manual_state">{% for v, l in manual_states %}<option value="{{ v }}" {% if b.gateway_manual_state == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></label>
+    <button class="btn mini">Speichern</button>
+  </form>
+
+  <div class="gw-next">
+    {% if b.gw_state == "pruefen" %}<span class="na">Noch nicht geprüft – erst prüfen, dann entscheidet sich, ob ein Termin nötig ist.</span>
+    {% elif b.gw_state == "vollstaendig" %}
+      {% if perms.buildings.release_building %}<button class="btn mini primary" hx-post="{% url 'buildings:gateway_release' b.pk %}" hx-target="#gw-{{ b.pk }}" hx-swap="outerHTML">✓ freigeben – kein Termin</button>
+      {% else %}<span>✓ alles da – die Sachbearbeitung gibt frei (kein Termin).</span>{% endif %}
+    {% elif b.gw_state == "luecke" %}
+      {% if perms.planning.add_tour %}<label class="gw-pick"><input type="checkbox" name="checked" {% if b.gw_ticked %}checked{% endif %}
+        hx-post="{% url 'planning:select' %}" hx-vals='{"building": "{{ b.pk }}"}' hx-target="#plan-bar" hx-swap="outerHTML">
+        für „von außen versuchen“ ankreuzen</label>{% endif %}
+      <span class="na">ohne Termin · ohne Aushang · ca. {{ b.gw_minutes }} min für {{ b.gateway_missing }} Geräte{% if b.gateway_missing_note %}: {{ b.gateway_missing_note }}{% endif %}</span>
+    {% elif b.gw_state == "termin" %}
+      <span>Von außen nicht alles empfangen → unter <a href="{% url 'planning:followup' %}?f=nachtermin&amp;q={{ b.file_number }}">🧾 Rückmeldungen</a> Nachtermin vormerken (mit Aushang / Brief).</span>
+    {% elif b.gw_state == "werte" %}<span>Funk vollständig. Warten auf die Werte der {{ b.gateway_manual_devices }} Geräte ohne Funk – wenn sie da sind: „erhalten“.</span>
+    {% elif b.gw_state == "geplant" %}<span>🚗 Ist geplant – siehe <a href="{% url 'planning:calendar' %}">📅 Kalender</a>.</span>
+    {% elif b.gw_state == "freigegeben" %}<span class="na">✓ freigegeben.</span>{% endif %}
+    {% if b.gateway_checked_on %}<span class="na small">geprüft {{ b.gateway_checked_on|date:"d.m.Y" }}{% if b.gateway_checked_by %} von {{ b.gateway_checked_by.get_full_name|default:b.gateway_checked_by.username }}{% endif %}</span>{% endif %}
+  </div>
+</article>
+{% if message %}{% include "core/_toast.html" %}{% endif %}
