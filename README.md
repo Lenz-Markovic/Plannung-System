@@ -19,6 +19,15 @@ python manage.py create_demo_users --password "Test-Passwort-2026"   # optional,
 python manage.py import_prototype    # demo data from docs/prototype/
 ```
 
+## Demo for a presentation
+
+`python manage.py demo_vorbereiten --password "Test-Passwort-2026"` (Windows: double-click
+`demo_vorbereiten_windows.bat`) deletes the demo data and sets it up fresh: test users per role, the
+prototype import with the plans moved by whole weeks so the readings start about a week before today,
+a day plan for `ableser_demo`, reported results (Rückmeldungen, Nachtermine), Aushänge to print / printed /
+Briefe, notes. Only local. The guide for the developer (German, with screenshots) is
+`docs/uebergabe/UEBERGABE.md`.
+
 ## Daily use
 
 ```bash

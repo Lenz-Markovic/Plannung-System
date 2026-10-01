@@ -1,0 +1,347 @@
+<title>Planungssystem Prototyp-Übergabe</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a working handover file - narrow reading column, every page of the app as a screenshot row (picture + what it does), tables for the facts. */
+:root {
+  --bg: #f6f7f9;          /* paper with a slight blue bias */
+  --surface: #ffffff;
+  --ink: #141a24;
+  --ink-2: #4a5568;
+  --line: #d9dee7;
+  --accent: #1f4e8c;      /* the blue of the company Aushang template */
+  --accent-wash: #e6eef8;
+  --demo: #9b2c2c;        /* the red DEMO stripe of the app */
+  --good: #1d7a35;
+  --warn: #8a5a00;
+  --warn-wash: #fbf0d9;
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #171e28; --ink: #e9edf3; --ink-2: #a9b3c2; --line: #2a3442;
+    --accent: #7fb0ec; --accent-wash: #1c2a3d; --demo: #e07a7a; --good: #6fcf8a; --warn: #f0c26a; --warn-wash: #2e2614;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #171e28; --ink: #e9edf3; --ink-2: #a9b3c2; --line: #2a3442;
+  --accent: #7fb0ec; --accent-wash: #1c2a3d; --demo: #e07a7a; --good: #6fcf8a; --warn: #f0c26a; --warn-wash: #2e2614;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--f-body); margin: 0; }
+.wrap { max-width: 1060px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+h1, h2, h3 { font-family: var(--f-display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(1.9rem, 4.5vw, 2.7rem); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.55rem; font-weight: 700; margin-bottom: 14px; }
+h3 { font-size: 1.12rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code, .mono { font-family: var(--f-mono); font-size: 0.86em; }
+code { background: var(--accent-wash); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+  overflow-x: auto; font: 0.86rem/1.55 var(--f-mono); margin: 0; }
+.eyebrow { font: 600 0.74rem var(--f-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--demo); }
+
+header { display: grid; gap: 14px; padding-bottom: 26px; border-bottom: 2px solid var(--ink); }
+header .lead { font-size: 1.12rem; color: var(--ink-2); }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 4px; }
+.facts div { display: grid; }
+.facts b { font: 700 1.5rem var(--f-display); font-variant-numeric: tabular-nums; }
+.facts span { font-size: 0.86rem; color: var(--ink-2); }
+
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-block: 14px; font-size: 0.93rem; border-bottom: 1px solid var(--line); }
+nav.toc a { text-decoration: none; }
+nav.toc a:hover { text-decoration: underline; }
+
+section { padding-top: 40px; display: grid; gap: 14px; }
+.note { background: var(--warn-wash); color: var(--ink); border-radius: 8px; padding: 12px 16px; }
+.note b { color: var(--warn); }
+.isnot { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.isnot > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; }
+.isnot h3 { font-size: 0.98rem; }
+.isnot .yes h3 { color: var(--good); }
+.isnot .no h3 { color: var(--demo); }
+
+.table { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.94rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font: 600 0.76rem var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); background: var(--accent-wash); }
+td.n { font-family: var(--f-mono); color: var(--ink-2); font-variant-numeric: tabular-nums; width: 2.5em; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.cols > div { display: grid; gap: 10px; min-width: 0; align-content: start; }
+
+.screen { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 22px; align-items: start;
+  padding-block: 22px; border-top: 1px solid var(--line); }
+.screen:first-of-type { border-top: 0; }
+.screen figure { margin: 0; display: grid; gap: 10px; }
+.screen img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.screen .text { display: grid; gap: 8px; min-width: 0; }
+.screen .who { font: 600 0.74rem var(--f-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.screen.phone { grid-template-columns: minmax(0, 240px) minmax(0, 1fr); }
+.screen ul { margin: 0; padding-left: 1.1em; display: grid; gap: 4px; max-width: 64ch; }
+@media (max-width: 760px) {
+  .screen, .screen.phone { grid-template-columns: minmax(0, 1fr); }
+  .screen.phone figure { max-width: 260px; }
+}
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.88rem; color: var(--ink-2); }
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">Prototyp · Demodaten frei erfunden</span>
+  <h1>Planungssystem für Ablesung, Montage und Aushänge</h1>
+  <p class="lead">Unsere Abläufe als klickbarer Prototyp: wie wir Ablesungen und Montagen planen, Ergebnisse aus dem Außendienst bearbeiten und Aushänge drucken und verteilen. Er dient als „lebende Anforderung“ für das echte System.</p>
+  <div class="facts">
+    <div><b>240</b><span>Liegenschaften (Demo)</span></div>
+    <div><b>70</b><span>Montageaufträge</span></div>
+    <div><b>11</b><span>Ableser / Monteure</span></div>
+    <div><b>5</b><span>Rollen</span></div>
+    <div><b>488</b><span>automatische Tests</span></div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Inhalt">
+  <a href="#start">Vorführung starten</a>
+  <a href="#rundgang">Rundgang</a>
+  <a href="#seiten">Die Seiten</a>
+  <a href="#regeln">Regeln</a>
+  <a href="#technik">Technik</a>
+  <a href="#fehlt">Was fürs echte System fehlt</a>
+</nav>
+
+<section>
+  <div class="isnot">
+    <div class="yes"><h3>Was der Prototyp ist</h3><p>Lauffähig und getestet: Django, rund 20.000 Zeilen, jede Fachregel als eigene Funktion mit Tests. Alle Seiten funktionieren mit Demodaten.</p></div>
+    <div class="no"><h3>Was er nicht ist</h3><p>Nicht an unsere bestehende Software angebunden, nicht auf einem Server, keine echten Mieter- oder Kundendaten.</p></div>
+  </div>
+</section>
+
+<section id="start">
+  <h2>Vorführung starten</h2>
+  <div class="cols">
+    <div>
+      <h3>Windows</h3>
+      <p>1. Python 3.12 installieren (z. B. aus dem Microsoft Store).<br>
+         2. <code>start_windows.bat</code> doppelklicken. Beim ersten Mal wird alles eingerichtet, dann öffnet sich der Browser.<br>
+         3. Vor jeder Vorführung <code>demo_vorbereiten_windows.bat</code> doppelklicken. Das setzt die Demodaten frisch auf, mit Beispielen auf jeder Seite und Fahrplänen passend zum heutigen Tag.</p>
+    </div>
+    <div>
+      <h3>Linux, Mac, GitHub Codespaces</h3>
+<pre>python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env    # DJANGO_DEBUG=True
+python manage.py demo_vorbereiten \
+  --password "Test-Passwort-2026"
+python manage.py runserver</pre>
+    </div>
+  </div>
+  <h3>Anmelden: ein Test-Benutzer je Rolle, Passwort <code>Test-Passwort-2026</code></h3>
+  <div class="table"><table>
+    <thead><tr><th>Benutzer</th><th>Rolle</th><th>sieht und darf</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">dispo_demo</td><td>Disposition / Terminierung</td><td>alles planen: Fahrpläne, Wochenplanung, Aushänge, Rückmeldungen</td></tr>
+      <tr><td class="mono">sachbearbeitung_demo</td><td>Sachbearbeitung</td><td>Rückmeldungen bearbeiten, Unterlagen, Aushänge, Notizen</td></tr>
+      <tr><td class="mono">ableser_demo</td><td>Ableser/Monteur</td><td>nur „Mein Tag“: der eigene Fahrplan auf dem Handy</td></tr>
+      <tr><td class="mono">leitung_demo</td><td>Leitung</td><td>alles ansehen, Übersicht und Zahlen, nichts ändern</td></tr>
+      <tr><td class="mono">admin_demo</td><td>Admin</td><td>alles, dazu Verwaltung von Personen, Rollen und Preisen</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note"><b>Ohne TomTom-Schlüssel</b> läuft alles mit geschätzten Fahrzeiten nach Luftlinie. Die Karten brauchen den Schlüssel.</p>
+</section>
+
+<section id="rundgang">
+  <h2>Rundgang in etwa 15 Minuten</h2>
+  <div class="table"><table>
+    <thead><tr><th>#</th><th>Anmelden als</th><th>Was zeigen</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td class="mono">dispo_demo</td><td>☰ Menü oben links: alle Seiten und Schnellfilter als Knöpfe</td></tr>
+      <tr><td class="n">2</td><td></td><td>Liegenschaften: Filter, Kacheln, Status direkt in der Tabelle ändern</td></tr>
+      <tr><td class="n">3</td><td></td><td>Liegenschaften ankreuzen, „Fahrplan erstellen“: Vorschau mit Zeiten und Warnungen, dann „Bist du sicher?“</td></tr>
+      <tr><td class="n">4</td><td></td><td>Kalender: Pläne je Person, auf einen anderen Tag ziehen, Stopps im Seitenpanel</td></tr>
+      <tr><td class="n">5</td><td></td><td>Wochenplanung: die Woche für alle von Hand verteilen, nichts automatisch</td></tr>
+      <tr><td class="n">6</td><td class="mono">ableser_demo</td><td>Mein Tag in Handy-Breite: Stopp für Stopp fertig, teilweise oder nicht erledigt melden, Problem melden</td></tr>
+      <tr><td class="n">7</td><td class="mono">dispo_demo</td><td>Rückmeldungen: was nach den Terminen im Büro zu tun ist, Nachtermin vormerken</td></tr>
+      <tr><td class="n">8</td><td></td><td>Wer ist wo?: wo jeder laut Fahrplan gerade sein sollte, mit Schieberegler für die Uhrzeit</td></tr>
+      <tr><td class="n">9</td><td></td><td>Aushänge: je Fahrplan, was noch zu drucken ist, drucken, dann die Aushang-Route</td></tr>
+      <tr><td class="n">10</td><td></td><td>Konflikte, Unterlagen mit 14-Tage-Frist, Übersicht mit Excel</td></tr>
+      <tr><td class="n">11</td><td></td><td>Verlauf: wer hat wann was geändert</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="seiten">
+  <h2>Die Seiten</h2>
+
+  <div class="screen">
+    <figure><img src="bilder/01_liegenschaften.png" alt="Liegenschaften-Dashboard mit Filtern, Kacheln und Tabelle" loading="lazy"></figure>
+    <div class="text"><span class="who">Büro</span><h3>Liegenschaften</h3>
+      <p>Alle Objekte mit Technik, Geräten, Ableseart, Status (offen, Nacharbeit, freigegeben), Stichtag, Hausverwaltung und Unterlagen. Filter und Sortierung laufen auf dem Server und stehen in der Adresse, so lässt sich jede Ansicht als Link teilen.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/02_menue.png" alt="Seitenmenü mit allen Seiten und Schnellfiltern" loading="lazy"></figure>
+    <div class="text"><span class="who">Alle Rollen</span><h3>Menü</h3>
+      <p>Alle Seiten, Aktionen und Schnellfilter, je nach Rolle. Zähler zeigen offene Rückmeldungen, Unterlagen und Konflikte. Auf breiten Bildschirmen lässt sich das Menü anheften.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/03_montage.png" alt="Liste der Montageaufträge" loading="lazy"></figure>
+    <div class="text"><span class="who">Büro</span><h3>Montage</h3>
+      <p>Montageaufträge mit RE-Nummer, Positionen, Status, Wunschtermin und Konflikten. Ankreuzen und als Fahrplan planen. Für den Admin zusätzlich Material und Kosten.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/04_kalender.png" alt="Monatskalender mit Fahrplänen je Person" loading="lazy">
+      <img src="bilder/05_fahrplan.png" alt="Kalender mit geöffnetem Fahrplan im Seitenpanel" loading="lazy"></figure>
+    <div class="text"><span class="who">Disposition</span><h3>Kalender und Fahrplan</h3>
+      <p>Ein Fahrplan ist eine Person (oder ein Team) an einem Tag, mit Stopps in Reihenfolge, Fahrzeiten und Netto-Arbeitszeit.</p>
+      <ul>
+        <li>Arbeitstag 6 bis 7,5 Stunden netto, darüber und darunter fragt das System nach.</li>
+        <li>Zustände: vorläufig, bestätigt, erledigt.</li>
+        <li>Verschieben per Ziehen, danach neu rechnen.</li>
+        <li>Je Stopp: Notizen, Aushang, Helfer, Ergebnis.</li>
+      </ul></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/06_wochenplanung.png" alt="Wochenplanung: Personen mal Tage" loading="lazy"></figure>
+    <div class="text"><span class="who">Disposition</span><h3>Wochenplanung</h3>
+      <p>Links alles, was noch nicht geplant ist, auch Nachtermine. Rechts Personen mal Tage. Bewusst von Hand: das System schlägt vor und warnt, entscheidet aber nicht.</p></div>
+  </div>
+
+  <div class="screen phone">
+    <figure><img src="bilder/15_mein_tag.png" alt="Mein Tag auf dem Handy" loading="lazy"></figure>
+    <div class="text"><span class="who">Ableser / Monteur</span><h3>Mein Tag</h3>
+      <p>Der eigene Fahrplan auf dem Handy: Adresse mit Navigation, Zugang und Schlüssel, Geräte, Notiz vor Ort und das Ergebnis (fertig, teilweise, nicht erledigt). Das Büro sieht jede Meldung sofort.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/07_rueckmeldungen.png" alt="Rückmeldungen aus dem Außendienst" loading="lazy"></figure>
+    <div class="text"><span class="who">Büro</span><h3>Rückmeldungen</h3>
+      <p>Die Arbeitsliste nach den Terminen, Tag für Tag:</p>
+      <ul>
+        <li>im Büro prüfen</li>
+        <li>Nachtermin nötig</li>
+        <li>keine Rückmeldung: nachfragen und nachtragen</li>
+        <li>Probleme vor Ort</li>
+      </ul>
+      <p>Jedes Objekt behält alle Besuche: 1. Termin, 2. Termin und so weiter.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/08_wer_ist_wo.png" alt="Karte: wer ist laut Fahrplan wo" loading="lazy"></figure>
+    <div class="text"><span class="who">Disposition</span><h3>Wer ist wo?</h3>
+      <p>Kein GPS. Die Karte zeigt, wo jeder laut Fahrplan zu einer Uhrzeit sein sollte: vor Ort, unterwegs oder Feierabend. Auf dem Bild fehlen die Kartenkacheln, weil die Aufnahme ohne TomTom-Schlüssel entstand.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/09_uebersicht.png" alt="Übersicht mit Kennzahlen und Diagrammen" loading="lazy"></figure>
+    <div class="text"><span class="who">Leitung</span><h3>Übersicht</h3>
+      <p>Zahlen und Diagramme für einen Zeitraum und je Stichtag (Abrechnungsperiode): Ergebnisse pro Tag, Status der Liegenschaften und Aufträge. Alles auch als Excel.</p></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/10_aushaenge.png" alt="Aushänge je Fahrplan: noch zu drucken" loading="lazy">
+      <img src="bilder/11_aushang_route.png" alt="Aushang-Route ab und bis Büro" loading="lazy">
+      <img src="bilder/12_aushang_druck.png" alt="Aushang auf der Firmen-Vorlage" loading="lazy"></figure>
+    <div class="text"><span class="who">Terminierung</span><h3>Aushänge und Aushang-Route</h3>
+      <ul>
+        <li>Je Fahrplan: wo ein Aushang nötig ist, was noch zu drucken und was gedruckt und bereit zum Verteilen ist. Frist: 14 Tage vor dem Termin.</li>
+        <li>Aushang ans ganze Haus oder Briefe an einzelne Wohnungen (Nachablesung, Nachmontage). Zeitfenster aus dem Fahrplan oder von Hand.</li>
+        <li>Druck auf der Firmen-Vorlage, auch als Word.</li>
+        <li>Route ab und bis Büro (Zuckerfabrik 14, Stuttgart): 4 Minuten je Aushang, 2 je Brief, kürzeste Reihenfolge, mit TomTom auf echten Straßen.</li>
+        <li>Gebiete und die Warnung „liegt weit weg“. Drucken oder als Excel.</li>
+        <li>Tag und Uhrzeit bleiben frei, die Fahrer sind flexibel.</li>
+      </ul></div>
+  </div>
+
+  <div class="screen">
+    <figure><img src="bilder/13_konflikte.png" alt="Konflikte zwischen Ablesung und Montage" loading="lazy">
+      <img src="bilder/14_unterlagen.png" alt="Unterlagen mit 14-Tage-Frist" loading="lazy"></figure>
+    <div class="text"><span class="who">Büro</span><h3>Konflikte und Unterlagen</h3>
+      <p>Konflikte zwischen Ablesung und Montage, zum Beispiel Montage nach der Ablesung, am selben Tag oder 1 bis 7 Tage vorher, oder eine Funk-Umrüstung bei manueller Ableseart.</p>
+      <p>Unterlagen: Kostenbelege der Hausverwaltung mit 14-Tage-Frist.</p></div>
+  </div>
+</section>
+
+<section id="regeln">
+  <h2>Die Fachregeln</h2>
+  <p>Jede Regel steht als reine Python-Funktion mit Tests in <code>*/rules/*.py</code>. Das ist die genaueste Beschreibung, wie wir arbeiten.</p>
+  <div class="table"><table>
+    <thead><tr><th>Datei</th><th>Regel</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">planning/rules/working_time.py</td><td>Arbeitstag 6 bis 7,5 h netto, Fragen bei zu viel oder zu wenig</td></tr>
+      <tr><td class="mono">planning/rules/drive_time.py, ordering.py</td><td>Fahrzeiten, Reihenfolge der Stopps</td></tr>
+      <tr><td class="mono">planning/rules/availability.py</td><td>Abwesenheit, erster freier Tag</td></tr>
+      <tr><td class="mono">planning/rules/visits.py, followup.py</td><td>Ergebnis, Nachtermin, Versuche, Rückmeldungen</td></tr>
+      <tr><td class="mono">planning/rules/week.py, whereabouts.py, overview.py</td><td>Wochenplanung, Wer ist wo?, Übersicht</td></tr>
+      <tr><td class="mono">buildings/rules/reading_time.py, installation_time.py</td><td>Dauer je Ablesung und Montage</td></tr>
+      <tr><td class="mono">buildings/rules/access.py, status.py, material.py</td><td>Zugang nötig, Status, Material und Kosten</td></tr>
+      <tr><td class="mono">conflicts/rules.py</td><td>Konflikte Ablesung und Montage</td></tr>
+      <tr><td class="mono">documents/notice_rules.py</td><td>Aushang: 14-Tage-Frist, Zeitfenster, Briefe, Route, Gebiete</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note"><b>Automatisch planen</b> (<code>planning/rules/autoplan.py</code>) ist eingebaut, aber ausgeschaltet. Gewünscht ist Planung von Hand.</p>
+</section>
+
+<section id="technik">
+  <h2>Technik</h2>
+  <div class="cols">
+    <div>
+      <h3>Aufbau</h3>
+      <ul>
+        <li>Python 3.12, Django 5, SQLite (PostgreSQL per <code>.env</code> umschaltbar)</li>
+        <li>Django-Templates, HTMX 2, Bootstrap 5, FullCalendar, TomTom Maps SDK</li>
+        <li>Excel mit openpyxl, Aushänge auf der Word-Vorlage der Firma</li>
+        <li>Änderungen protokolliert mit django-simple-history</li>
+        <li>Tests: <code>pytest</code>, 488 Tests in etwa einer Minute</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Apps und Datenmodell</h3>
+      <ul>
+        <li><code>core</code>: Rollen, Login, Menü</li>
+        <li><code>buildings</code>: Building, PropertyManager, InstallationOrder mit Positionen, Import</li>
+        <li><code>planning</code>: Employee, Absence, Tour (Person und Tag), TourStop, Visit, TomTom</li>
+        <li><code>conflicts</code>, <code>documents</code> (Unterlagen, Aushänge), <code>journal</code> (Notizen, Verlauf)</li>
+      </ul>
+    </div>
+  </div>
+  <p>Der TomTom-Schlüssel steht nur in <code>.env</code> auf dem Server. Alle TomTom-Aufrufe (Routing, Adresssuche, Kartenkacheln) gehen über unser Backend, nie direkt aus dem Browser. Rollen und Rechte stehen in <code>core/roles.py</code>. Die ausführliche Beschreibung je Funktion steht in der <code>README.md</code>.</p>
+</section>
+
+<section id="fehlt">
+  <h2>Was fürs echte System fehlt</h2>
+  <div class="table"><table>
+    <thead><tr><th>Thema</th><th>Stand im Prototyp</th><th>Für den Betrieb</th></tr></thead>
+    <tbody>
+      <tr><td><b>Daten</b></td><td>Demodaten aus zwei HTML-Dateien</td><td>Anbindung oder Import aus unserer bestehenden Software (Liegenschaften, Mieter, Geräte, Aufträge). Die größte offene Frage.</td></tr>
+      <tr><td><b>Server</b></td><td>läuft lokal</td><td>Hosting in Deutschland, HTTPS, Updates, Überwachung</td></tr>
+      <tr><td><b>Datenbank</b></td><td>SQLite</td><td>PostgreSQL, tägliche Sicherung, Wiederherstellung getestet</td></tr>
+      <tr><td><b>Anmeldung</b></td><td>Django-Benutzer</td><td>eventuell Firmen-Login (Microsoft / SSO), Passwort-Regeln</td></tr>
+      <tr><td><b>Fremde Server</b></td><td>Bootstrap, HTMX, Kalender und Karte per CDN</td><td>Dateien selbst ausliefern (DSGVO)</td></tr>
+      <tr><td><b>TomTom</b></td><td>ohne oder mit Test-Schlüssel</td><td>Vertrag oder Lizenz für den Firmeneinsatz</td></tr>
+      <tr><td><b>Datenschutz</b></td><td>erfundene Daten</td><td>Mieterdaten sind personenbezogen: AV-Vertrag, Verarbeitungsverzeichnis, Löschfristen</td></tr>
+      <tr><td><b>Mein Tag</b></td><td>Web-Seite</td><td>offline-fähig? eigene App? Fotos?</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Fragen fürs Gespräch</h3>
+  <ul>
+    <li>Wird der Prototyp weiterentwickelt, oder wird neu gebaut und Regeln und Tests werden übernommen?</li>
+    <li>Wie kommen die Daten aus unserer Software hinein und die Ergebnisse wieder zurück?</li>
+    <li>Wer betreibt und pflegt das System?</li>
+  </ul>
+</section>
+
+<footer>Der Code liegt im Repository <span class="mono">lenz-markovic/plannung-system</span>, Branch <span class="mono">claude/planning-system-prototype-hyz09x</span>. Diese Übersicht liegt dort auch unter <span class="mono">docs/uebergabe/</span>.</footer>
+</div>
