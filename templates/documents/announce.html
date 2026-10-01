@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load core_tags %}
+{% block title %}Aushänge & Ankündigungen{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📄 Aushänge &amp; Ankündigungen</h1>
+  <span class="sub">Wie die Mieter jedes kommenden Termins Bescheid bekommen – und die Fahrten zum Aufhängen</span>
+  <span class="spacer"></span>
+  {% if perms.planning.add_tour %}{% include "documents/_notice_plan_bar.html" %}{% endif %}
+</header>
+
+<form id="announce-filters" class="filters an-filters" hx-get="{% url 'documents:announce' %}" hx-target="#announce-list" hx-swap="outerHTML"
+      hx-trigger="change, input changed delay:300ms from:[name=q]">
+  <div class="ov-periods" role="radiogroup" aria-label="Was">
+    {% for key, label in filters %}<label class="ov-period {% if chosen == key %}on{% endif %}"><input type="radio" name="f" value="{{ key }}" {% if chosen == key %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">{{ label }} <b data-count="{{ key }}">{{ counts|get_item:key }}</b></label>{% endfor %}
+  </div>
+  <label class="ov-kind">Zeitraum <select name="zeitraum">{% for key, label in horizons %}<option value="{{ key }}" {% if horizon == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label class="ov-kind">Art <select name="art"><option value="">alle</option>
+    <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
+    <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+  <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="AZ, RE, Straße, Ort, Person"></label>
+</form>
+
+{% include "documents/_announce_list.html" %}
+{% endblock %}

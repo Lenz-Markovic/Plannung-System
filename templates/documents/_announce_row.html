@@ -1,0 +1,50 @@
+{# one coming appointment: when, where, how the tenants are told, what is still to do #}
+<tr id="an-{{ r.stop.pk }}" class="an-row {{ r.state }}{% if r.late %} late{% endif %}">
+  <td class="an-pick">{% if r.can_trip and perms.planning.add_tour %}
+    <input type="checkbox" name="checked" {% if r.selected %}checked{% endif %} aria-label="für die Aushang-Fahrt"
+           hx-post="{% url 'documents:notice_select' %}" hx-vals='{"building": "{{ r.key.0|default_if_none:'' }}", "order": "{{ r.key.1|default_if_none:'' }}"}'
+           hx-target="#notice-plan-bar" hx-swap="outerHTML">{% endif %}</td>
+  <td class="an-when"><b>{{ r.date|date:"D d.m.Y" }}</b>
+    <div>{% if r.time_text %}{{ r.time_text }}{% else %}<span class="na">ohne Uhrzeit</span>{% endif %}
+      {% if r.window_source == "manual" %}<span class="an-src">von Hand</span>{% elif r.window_source == "estimate" %}<span class="an-src est">geschätzt</span>{% endif %}</div>
+    <div class="na small">👤 {{ r.tour.people_label }}{% if r.tour.status == "provisional" %} · ⏳ vorläufig{% endif %}</div></td>
+  <td class="an-obj">{% if r.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ r.ref }}</b><div>{{ r.address }}</div>
+    {% if r.manager %}<div class="na small">HV: {{ r.manager.name }}</div>{% endif %}</td>
+  <td class="an-how">
+    {% if r.channel_label %}<b>{{ r.channel_label }}</b>{% else %}<span class="t-warn">❔ noch nicht entschieden</span>{% endif %}
+    <div class="na small">{% if r.units %}{{ r.units }}{% else %}für das ganze Haus{% endif %}</div>
+    {% if may_edit %}
+      <details class="an-edit"><summary class="linkish">✎ ändern</summary>
+        <form hx-post="{% url 'documents:announce_save' r.stop.pk %}" hx-target="#an-{{ r.stop.pk }}" hx-swap="outerHTML" class="an-form">
+          <label>Wie? <select name="channel"><option value="">– noch offen –</option>
+            {% for value, label in channels %}<option value="{{ value }}" {% if r.stop.notice_channel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <label>Für wen? <select name="scope">{% for value, label in scopes %}<option value="{{ value }}" {% if r.stop.notice_scope == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <label>Welche Wohnungen? <input name="units" value="{{ r.stop.notice_units }}" maxlength="300" placeholder="z. B. Whg 3 (Müller), Whg 7 – bei Nachablesung / Nachmontage"></label>
+          <span class="an-times"><label>Zeit von <input name="von" value="{{ r.stop.notice_from|time:'H:i' }}" placeholder="{{ r.window.0|time:'H:i'|default:'08:00' }}" size="5"></label>
+            <label>bis <input name="bis" value="{{ r.stop.notice_to|time:'H:i' }}" placeholder="{{ r.window.1|time:'H:i'|default:'12:00' }}" size="5"></label></span>
+          <span class="na small">Zeit leer lassen = aus dem Fahrplan.</span>
+          <button class="btn mini primary">Speichern</button>
+        </form>
+      </details>
+    {% endif %}
+  </td>
+  <td class="an-state"><span class="an-badge {{ r.state }}">{{ r.label }}</span>
+    {% if r.late %}<div class="t-crit small">⏰ Frist war am {{ r.deadline|date:"d.m." }}</div>{% elif r.state != "done" %}<div class="na small">Frist: {{ r.deadline|date:"d.m.Y" }}</div>{% endif %}
+    {% if r.stop.notice_printed_at %}<div class="na small">🖨 gedruckt {{ r.stop.notice_printed_at|date:"d.m. H:i" }}{% if r.stop.notice_printed_by %} von {{ r.stop.notice_printed_by }}{% endif %}{% if r.notice.state == "outdated" %} · <span class="t-crit">⚠ veraltet – neu drucken</span>{% endif %}</div>{% endif %}
+    {% if r.trip %}<div class="small">🚗 Fahrt {{ r.trip.tour.date|date:"D d.m." }} · {{ r.trip.tour.employee }}{% if r.trip.done_at %}{% if r.trip.outcome == "absent" %} · <span class="t-crit">✗ nicht aufgehängt</span>{% else %} · ✓{% endif %}{% endif %}
+      {% if r.trip_hint %}<div class="t-warn">⚠ {{ r.trip_hint }}</div>{% endif %}</div>{% endif %}
+    {% if r.stop.notice_sent_at %}<div class="small t-good">✓ {{ r.sent_label }} {{ r.stop.notice_sent_at|date:"d.m. H:i" }}{% if r.stop.notice_sent_by %} – {{ r.stop.notice_sent_by }}{% endif %}</div>{% endif %}
+  </td>
+  <td class="an-actions">
+    {% if r.stop.notice_channel == "aushang" or r.stop.notice_channel == "brief" or r.stop.notice_channel == "aushang_hv" %}
+      <a class="btn mini" href="{% url 'documents:notice_page' %}?stop={{ r.stop.pk }}" target="_blank" title="Aushang / Brief mit Termin, Zeit und Wohnungen">🖨 drucken</a>{% endif %}
+    {% if may_edit %}
+      {% if r.stop.notice_sent_at %}
+        <button class="btn mini" hx-post="{% url 'documents:announce_sent' r.stop.pk %}" hx-vals='{"done": "0"}' hx-target="#an-{{ r.stop.pk }}" hx-swap="outerHTML">↺</button>
+      {% elif r.stop.notice_channel %}
+        <button class="btn mini {% if r.state == 'send' %}primary{% endif %}" hx-post="{% url 'documents:announce_sent' r.stop.pk %}" hx-vals='{"done": "1"}'
+                hx-target="#an-{{ r.stop.pk }}" hx-swap="outerHTML">✓ {{ r.sent_label }}</button>
+      {% endif %}
+    {% endif %}
+  </td>
+</tr>

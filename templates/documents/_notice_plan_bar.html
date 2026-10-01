@@ -1,0 +1,6 @@
+{# "🗺 Aushang-Fahrt planen (n)": the ticked appointments go into the normal plan dialog #}
+<span id="notice-plan-bar" class="plan-bar">
+  <button class="btn primary" {% if not notice_count %}disabled{% endif %} hx-get="{% url 'planning:dialog' %}" hx-target="#modal"
+          title="Die angekreuzten Aushänge einer Person für einen Tag einplanen (wie eine Ableseroute)">🗺 Aushang-Fahrt planen{% if notice_count %} <b>({{ notice_count }})</b>{% endif %}</button>
+  {% if notice_count %}<button class="btn mini" hx-post="{% url 'documents:notice_select_clear' %}">Auswahl leeren</button>{% endif %}
+</span>

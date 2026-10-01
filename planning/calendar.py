@@ -44,7 +44,8 @@ KIND_ICONS = {"reading": "📖", "installation": "🔧", "mixed": "📖🔧"}
 
 def tour_kind(stops):
     """'reading', 'installation' or 'mixed' (both in one plan). Help stops count as what they help with."""
-    kinds = {(StopKind.INSTALLATION if s.installation_order_id else StopKind.READING) if s.kind == StopKind.HELP else s.kind
+    kinds = {(StopKind.INSTALLATION if s.installation_order_id else StopKind.READING)
+             if s.kind in (StopKind.HELP, StopKind.NOTICE) else s.kind
              for s in stops}
     if kinds == {StopKind.INSTALLATION}:
         return "installation"
@@ -60,7 +61,7 @@ def _tooltip(tour, stops):
         lines.append("⏱ mehr als 7,5 h" if tour.time_state == "over" else "⏱ weniger als 6 h")
     for stop in stops:
         target = stop.building or stop.installation_order
-        icon = {"installation": "🔧", "help": "🤝"}.get(stop.kind, "📖")
+        icon = {"installation": "🔧", "help": "🤝", "notice": "📄"}.get(stop.kind, "📖")
         when = f"{stop.start_time:%H:%M} " if stop.start_time else ""
         lines.append(f"{when}{icon} {target.street}, {target.city}" if target else f"{when}{icon}")
     return "\n".join(lines)

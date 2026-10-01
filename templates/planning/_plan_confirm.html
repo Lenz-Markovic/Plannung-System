@@ -34,7 +34,7 @@
       <h4 class="pp-h">{% if o.enough %}Vorschlag: einen Stopp tauschen oder herausnehmen – dann passt der Tag{% else %}Die größten Stopps (einer allein reicht nicht){% endif %}</h4>
       {% for t in o.trim %}
         <div class="tq-row">
-          <div><span class="art-tag {{ t.stop.kind }}">{% if t.stop.kind == "installation" %}🔧{% elif t.stop.kind == "help" %}🤝{% else %}📖{% endif %}</span>
+          <div><span class="art-tag {{ t.stop.kind }}">{% if t.stop.kind == "installation" %}🔧{% elif t.stop.kind == "help" %}🤝{% elif t.stop.kind == "notice" %}📄{% else %}📖{% endif %}</span>
             statt <b>{{ t.stop.target.street }}</b>, {{ t.stop.target.city }} <span class="na small">({{ t.stop.work_minutes }} min · spart ca. {{ t.saves }} min)</span></div>
           <div class="tq-actions">
             {% for c in t.swaps %}

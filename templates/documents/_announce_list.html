@@ -1,0 +1,14 @@
+{% load core_tags %}
+<div id="announce-list">
+  <div class="an-head na small">
+    {{ rows|length }} Termin{{ rows|length|pluralize:"e" }}{% if late %} · <span class="t-crit"><b>{{ late }}</b> über der 14-Tage-Frist und noch nicht angekündigt</span>{% endif %}
+    {% if to_print %} · <a class="btn mini" href="{% url 'documents:notice_page' %}?{% for r in to_print %}stop={{ r.stop.pk }}{% if not forloop.last %}&{% endif %}{% endfor %}" target="_blank">🖨 alle {{ to_print|length }} „noch drucken“ öffnen</a>{% endif %}
+  </div>
+  <div class="table-responsive"><table class="table table-sm an-table">
+    <thead><tr><th class="an-pick" title="für die Aushang-Fahrt ankreuzen">🚗</th><th>Termin</th><th>Objekt</th><th>Ankündigung</th><th>Stand</th><th></th></tr></thead>
+    <tbody>{% for r in rows %}{% include "documents/_announce_row.html" %}{% empty %}
+      <tr><td colspan="6" class="na p-4 text-center">Keine Termine für diese Auswahl.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="na small">🚗 = für eine <b>Aushang-Fahrt</b> ankreuzen (nur bei „📄 Aushang durch uns“) → oben „🗺 Aushang-Fahrt planen“: wie eine Ableseroute, mit Karte und TomTom-Zeiten.
+    Die Zeit auf dem Aushang kommt aus dem Fahrplan – oder von Hand (✎). <i>geschätzt</i> = der Plan hat noch keine gerechneten Uhrzeiten.</p>
+</div>

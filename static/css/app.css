@@ -996,3 +996,31 @@ a.wk-note:hover { color: var(--accent); }
   position: sticky; bottom: 0; background: var(--surface); }
 @media (max-width: 900px) { .wk-grid { grid-template-columns: 1fr; } .wk-pool { position: static; } .wk-pool-list { max-height: 40vh; } }
 .ov-excel { margin-left: auto; }
+.art-tag.notice { background: var(--good-wash); color: #0a6b0a; }
+
+/* ---- 📄 Aushänge & Ankündigungen ------------------------------------------------------------- */
+.an-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.an-filters input[type=search] { font: inherit; padding: 3px 8px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.an-head { margin: 10px 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.an-table { font-size: 13px; background: var(--surface); border: 1px solid var(--ring); }
+.an-table td { vertical-align: top; }
+.an-pick { width: 34px; text-align: center; }
+.an-row.late { background: var(--crit-wash); }
+.an-row.done { opacity: .75; }
+.an-src { font-size: 11px; padding: 0 6px; border-radius: 999px; background: var(--accent-wash); color: var(--accent); margin-left: 4px; }
+.an-src.est { background: var(--warn-wash); color: var(--warn-ink); }
+.an-badge { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--warn-wash); color: var(--warn-ink); white-space: nowrap; }
+.an-badge.open { background: var(--crit-wash); color: var(--critical); }
+.an-badge.trip_planned { background: var(--accent-wash); color: var(--accent); }
+.an-badge.done { background: var(--good-wash); color: #0a6b0a; }
+.an-edit summary { list-style: none; cursor: pointer; font-size: 12.5px; }
+.an-edit summary::-webkit-details-marker { display: none; }
+.an-form { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; max-width: 360px; font-size: 12.5px; }
+.an-form label { display: flex; flex-direction: column; gap: 2px; }
+.an-form input, .an-form select { font: inherit; padding: 3px 6px; border: 1px solid var(--ring); border-radius: 6px; background: var(--surface); color: inherit; }
+.an-times { display: flex; gap: 8px; }
+.an-actions { white-space: nowrap; }
+.an-actions .btn { margin-bottom: 3px; }
+.t-good { color: #0a7a0a; }
+.day-notice { background: var(--good-wash); border-radius: 6px; padding: 4px 8px; }
+.announce-line { font-size: 12px; }
