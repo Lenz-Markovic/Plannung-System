@@ -16,7 +16,7 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 from core.models import GeocodedAddress, TimeStampedModel
-from documents.notice_rules import CHANNELS, SCOPES, WHOLE_HOUSE
+from documents.notice_rules import SCOPES, WHOLE_HOUSE
 
 from .rules.working_time import MAX_NET_MINUTES, MIN_NET_MINUTES
 
@@ -32,8 +32,6 @@ class Employee(TimeStampedModel, GeocodedAddress):
     short_name = models.CharField("Kurzname", max_length=50, unique=True)
     can_read = models.BooleanField("Ableser", default=True)
     can_install = models.BooleanField("Monteur", default=False)
-    # 📄 hangs the tenant notices (Aushang-Fahrten) - planned like readings and installations
-    can_notice = models.BooleanField("Aushänge", default=False, help_text="fährt Aushänge aus (📄 Aushang-Fahrten)")
     calendar_color = models.CharField("Kalenderfarbe", max_length=7, default="#0d6efd")
     max_daily_minutes = models.PositiveSmallIntegerField("max. Netto-Arbeitszeit/Tag (min)", default=450)
     default_start_time = models.TimeField("übliche Startzeit", default=datetime.time(8, 0))
@@ -192,8 +190,6 @@ class StopKind(models.TextChoices):
     INSTALLATION = "installation", "Montage"
     # A person with an own plan helps at ONE object of another plan (same building / order)
     HELP = "help", "Hilfe bei Objekt"
-    # 📄 Aushang-Fahrt: hang the printed notice of a coming appointment at the house (no Termin-Ergebnis)
-    NOTICE = "notice", "Aushang aufhängen"
 
 
 class DriveSource(models.TextChoices):
@@ -246,17 +242,13 @@ class TourStop(TimeStampedModel):
                                           blank=True, on_delete=models.SET_NULL, related_name="+")
     notice_for = models.CharField("Aushang für", max_length=120, blank=True,
                                   help_text="z. B. „Dienstag, 03.11.2026, zwischen 09:00 und 11:00 Uhr“")
-    # How the tenants are told about THIS appointment (documents/notice_rules.py: CHANNELS)
-    notice_channel = models.CharField("Ankündigung", max_length=20, blank=True, choices=CHANNELS)
-    notice_scope = models.CharField("Ankündigung für", max_length=10, choices=SCOPES, default=WHOLE_HOUSE)
-    notice_units = models.CharField("nur Wohnungen", max_length=300, blank=True,
-                                    help_text="z. B. „Whg 3 (Müller), Whg 7“ – bei Nachablesung / Nachmontage")
+    # whole house (one Aushang) or single flats (one Brief per flat, e.g. for a Nachablesung / Nachmontage)
+    notice_scope = models.CharField("Aushang / Briefe", max_length=10, choices=SCOPES, default=WHOLE_HOUSE)
+    notice_units = models.CharField("Wohnungen", max_length=300, blank=True,
+                                    help_text="z. B. „Whg 3 (Müller), Whg 7“ – je Wohnung ein Brief")
+    # the time on the notice typed in by hand (else from the plan, or estimated)
     notice_from = models.TimeField("Zeitfenster von (von Hand)", null=True, blank=True)
     notice_to = models.TimeField("Zeitfenster bis (von Hand)", null=True, blank=True)
-    notice_sent_at = models.DateTimeField("angekündigt am", null=True, blank=True,
-                                          help_text="aufgehängt / Brief verschickt / Mail an HV verschickt …")
-    notice_sent_by = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name="angekündigt von", null=True, blank=True,
-                                       on_delete=models.SET_NULL, related_name="+")
     # Ergebnis from "Mein Tag" (planning/rules/visits.py): complete / partial / absent, "" = not reported yet
     outcome = models.CharField("Ergebnis", max_length=20, blank=True, choices=[
         ("complete", "fertig (100 %)"), ("partial", "teilweise erledigt"), ("absent", "nicht erledigt")])
@@ -279,7 +271,6 @@ class TourStop(TimeStampedModel):
                     Q(kind="reading", building__isnull=False, installation_order__isnull=True)
                     | Q(kind="installation", installation_order__isnull=False)
                     | Q(kind="help", building__isnull=False) | Q(kind="help", installation_order__isnull=False)
-                    | Q(kind="notice", building__isnull=False) | Q(kind="notice", installation_order__isnull=False)
                 ),
                 name="stop_kind_matches_reference",
             ),

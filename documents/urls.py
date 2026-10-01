@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import announce_views, views
+from . import aushang_views, views
 
 app_name = "documents"
 
@@ -12,11 +12,10 @@ urlpatterns = [
     path("aushang/", views.notice_page, name="notice_page"),
     path("aushang/auswahl/", views.notice_toggle, name="notice_toggle"),
     path("aushang/sicher/", views.notice_confirm, name="notice_confirm"),
-    path("ankuendigung/", announce_views.announce_page, name="announce"),
-    path("ankuendigung/<int:pk>/speichern/", announce_views.announce_save, name="announce_save"),
-    path("ankuendigung/<int:pk>/erledigt/", announce_views.announce_sent, name="announce_sent"),
-    path("ankuendigung/fahrt/auswahl/", announce_views.notice_select, name="notice_select"),
-    path("ankuendigung/fahrt/leeren/", announce_views.notice_select_clear, name="notice_select_clear"),
+    path("aushaenge/", aushang_views.aushaenge_page, name="aushaenge"),
+    path("aushaenge/<int:pk>/aushang/", aushang_views.aushang_wanted, name="aushang_wanted"),
+    path("aushaenge/<int:pk>/aendern/", aushang_views.aushang_edit, name="aushang_edit"),
+    path("aushaenge/route/", aushang_views.aushang_route, name="aushang_route"),
     path("warnung/spaeter/", views.warning_snooze, name="warning_snooze"),
     path("warnung/<int:pk>/status/", views.warning_status, name="warning_status"),
     path("warnung/<int:pk>/ansehen/", views.warning_show_in_list, name="warning_show"),

@@ -250,7 +250,6 @@ def _import_employees(data, result):
                 "short_name": name,
                 "can_read": name in data.readers,
                 "can_install": name in data.installers,
-                "can_notice": name in data.readers[:2],  # demo: two people also hang the Aushänge
                 "calendar_color": calendar_color(name),
             },
         )

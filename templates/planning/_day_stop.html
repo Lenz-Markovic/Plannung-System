@@ -1,13 +1,13 @@
 {# One stop of "Mein Tag". Buttons save via HTMX and return this card again. #}
 {% load core_tags %}
-{% with b=s.building o=s.installation_order notice=s.notice_info %}
+{% with b=s.building o=s.installation_order %}
 <article id="stop-{{ s.pk }}" class="day-stop {% if s.done_at %}done {{ s.outcome }}{% endif %}">
   <div class="day-stop-head">
     <span class="day-time">{{ s.start_time|time:"H:i"|default:"–" }}<small>{{ s.end_time|time:"H:i" }}</small></span>
     <div class="flex-grow-1">
       <a class="day-address" href="{{ navigation_url }}" target="_blank" rel="noopener" title="Navigation starten">
-        {% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% elif s.kind == "notice" %}📄 {% endif %}{{ address }} <span aria-hidden="true">🧭</span></a>
-      <div class="na small">{% if b and notice %}AZ {{ b.file_number }}{% elif b %}AZ {{ b.file_number }} · {{ b.reading_type|default:"–" }}{% endif %}{% if o %} · Montage {{ o.re_number }}{% endif %} · {{ s.work_minutes }} min</div>
+        {% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% endif %}{{ address }} <span aria-hidden="true">🧭</span></a>
+      <div class="na small">{% if b %}AZ {{ b.file_number }} · {{ b.reading_type|default:'–' }}{% endif %}{% if o %} · Montage {{ o.re_number }}{% endif %} · {{ s.work_minutes }} min</div>
     </div>
     {% if s.done_at %}<span class="day-check {{ s.outcome }}" title="gemeldet {{ s.done_at|date:'H:i' }}">{% if s.outcome == "partial" %}◐{% elif s.outcome == "absent" %}✗{% else %}✓{% endif %}</span>{% endif %}
   </div>
@@ -16,13 +16,10 @@
     <div class="day-attempt">🔁 <b>{{ s.attempt }}. Termin (Nachtermin)</b>{% if s.last_visit %} – beim letzten Mal
       ({{ s.last_visit.date|date:"d.m." }}, {{ s.last_visit.people }}): {% if s.last_visit.outcome == "partial" %}◐ teilweise{% else %}✗ nicht erledigt{% endif %}{% if s.last_visit.todo %} · <b>noch zu tun: {{ s.last_visit.todo }}</b>{% endif %}{% endif %}</div>
   {% endif %}
-  {% if b and not notice %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
+  {% if b %}{% with z=b.access %}{% if z.apartment or z.room %}<div class="pr-zg ms-0 {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
   {% if s.kind == "help" %}<div class="day-hint"><b>🤝 Hilfe bei {{ s.help_tour.people_label|default:"?" }}</b> – gemeinsam an diesem Objekt</div>{% endif %}
-  {% if notice %}
-    <div class="day-hint day-notice"><b>📄 Aushang aufhängen</b>{% if notice.appointment %} für {{ notice.what }} am <b>{{ notice.date|date:"l, d.m.Y" }}</b>{% if notice.time %}, {{ notice.time }}{% endif %}{% else %} – der Termin dazu ist nicht mehr geplant, bitte im Büro nachfragen{% endif %}</div>
-    {% if notice.units %}<div class="day-hint"><b>{{ notice.units }}</b> – in den Briefkasten / an die Tür, nicht ins Treppenhaus</div>{% endif %}
-  {% elif o %}<div class="day-hint">{{ o.summary }}</div>{% endif %}
-  {% if b and not notice %}
+  {% if o %}<div class="day-hint">{{ o.summary }}</div>{% endif %}
+  {% if b %}
     <div class="day-devices">{% if b.hkv_count %}<span class="chip">{{ b.hkv_count }} HKV</span>{% endif %}{% if b.wmz_count %}<span class="chip heat">{{ b.wmz_count }} WMZ</span>{% endif %}{% if b.wwz_count %}<span class="chip water">{{ b.wwz_count }} WWZ</span>{% endif %}{% if b.kwz_count %}<span class="chip water">{{ b.kwz_count }} KWZ</span>{% endif %}{% if b.has_rwm %}<span class="chip safety">{% if b.rwm_count %}{{ b.rwm_count }} {% endif %}RWM</span>{% endif %}</div>
     {% if b.remark %}<div class="day-hint">{{ b.remark|phone_links }}</div>{% endif %}
     {% if b.note %}<div class="day-hint"><b>Büro:</b> {{ b.note|phone_links }}</div>{% endif %}
@@ -42,11 +39,11 @@
     {# Ergebnis: ✓ fertig · ◐ teilweise · ✗ nicht erledigt - the last two need "was ist noch zu tun?" #}
     {% if s.done_at %}
       <div class="day-result {{ s.outcome }}">
-        <b>{% if s.kind == "notice" %}{% if s.outcome == "absent" %}✗ Aushang nicht aufgehängt{% else %}✓ Aushang aufgehängt{% endif %}{% elif s.outcome == "complete" or not s.outcome %}✓ fertig (100 %){% elif s.outcome == "partial" %}◐ teilweise erledigt{% else %}✗ nicht erledigt{% endif %}</b>
+        <b>{% if s.outcome == "complete" or not s.outcome %}✓ fertig (100 %){% elif s.outcome == "partial" %}◐ teilweise erledigt{% else %}✗ nicht erledigt{% endif %}</b>
         {% if s.visit %}<span class="na small">· {{ s.visit.attempt }}. Termin</span>{% endif %}
         {% if s.visit.reason %}<div>Grund: {{ reasons_dict|get_item:s.visit.reason }}</div>{% endif %}
         {% if s.visit.todo %}<div>Noch zu tun: <b>{{ s.visit.todo }}</b></div>{% endif %}
-        <div class="na small">gemeldet {{ s.done_at|date:"H:i" }}{% if s.done_by %} von {{ s.done_by }}{% endif %}{% if s.kind != "notice" %}{% if s.outcome == "partial" or s.outcome == "absent" %} · das Büro plant einen Nachtermin{% endif %}{% endif %}</div>
+        <div class="na small">gemeldet {{ s.done_at|date:"H:i" }}{% if s.done_by %} von {{ s.done_by }}{% endif %}{% if s.outcome == "partial" or s.outcome == "absent" %} · das Büro plant einen Nachtermin{% endif %}</div>
       </div>
     {% endif %}
     <div class="day-actions">
@@ -57,9 +54,9 @@
                 hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">↺ Ergebnis ändern</button>
       {% else %}
         <button class="btn day-done" hx-post="{% url 'planning:stop_done' s.pk %}" hx-vals='{"done": "1"}' hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
-                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">{% if s.kind == "notice" %}✓ aufgehängt{% else %}✓ fertig (100 %){% endif %}</button>
+                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">✓ fertig (100 %)</button>
       {% endif %}
-      {% if b and not notice and perms.buildings.propose_status %}
+      {% if b and perms.buildings.propose_status %}
         {# Readers may only suggest a status; the office decides. #}
         <select class="day-propose" name="status" hx-post="{% url 'planning:stop_propose' s.pk %}" hx-trigger="change" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML" aria-label="Status vorschlagen">
           <option value="" disabled selected>Status vorschlagen …</option>
@@ -68,19 +65,7 @@
         </select>
       {% endif %}
     </div>
-    {% if not s.done_at and s.kind == "notice" %}
-      <div class="day-more">
-        <details><summary class="btn day-absent">✗ nicht möglich</summary>
-          <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"
-                hx-include="#fn-{{ s.pk }}" hx-sync="closest article:replace">
-            <input type="hidden" name="outcome" value="absent"><input type="hidden" name="reason" value="no_access">
-            <label class="small">Was war los? (Pflicht)</label>
-            <textarea name="todo" rows="2" required placeholder="z. B. Haustür zu, kein Briefkasten, Hausmeister nicht da"></textarea>
-            <button class="btn primary">Melden – das Büro kümmert sich</button>
-          </form>
-        </details>
-      </div>
-    {% elif not s.done_at and s.kind != "help" %}
+    {% if not s.done_at and s.kind != "help" %}
       <div class="day-more">
         <details><summary class="btn day-partial">◐ teilweise erledigt</summary>
           <form hx-post="{% url 'planning:stop_report' s.pk %}" hx-target="#stop-{{ s.pk }}" hx-swap="outerHTML"

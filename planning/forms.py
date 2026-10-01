@@ -16,12 +16,6 @@ def next_working_day(today=None):
     return day
 
 
-def role_label(e):
-    """'Kaiser (📖 🔧 📄)': what this person does."""
-    roles = " ".join(r for r, on in (("📖", e.can_read), ("🔧", e.can_install), ("📄", e.can_notice)) if on)
-    return f"{e} ({roles})" if roles else str(e)
-
-
 class PlanForm(forms.Form):
     """The dialog "Fahrplan planen" (same fields as in the prototype).
 
@@ -37,23 +31,13 @@ class PlanForm(forms.Form):
     break_minutes = forms.TypedChoiceField(label="Pause", choices=BREAK_CHOICES, coerce=int, initial=30)
     strategy = forms.ChoiceField(label="Reihenfolge", choices=list(STRATEGIES.items()), initial="far")
 
-    def __init__(self, *args, readings=True, installations=False, notices=False, **kwargs):
+    def __init__(self, *args, readings=True, installations=False, **kwargs):
         super().__init__(*args, **kwargs)
         if "date" not in self.initial:
             self.fields["date"].initial = next_working_day()
         employee = self.fields["employee"]
         active = Employee.objects.filter(active=True)
-        if notices and not installations and not readings:
-            # 📄 only Aushang-Fahrten: the people who hang the Aushänge (nobody marked yet: everybody)
-            notice_people = active.filter(can_notice=True)
-            employee.label = "Person (Aushänge)"
-            employee.queryset = notice_people if notice_people.exists() else active
-            employee.label_from_instance = role_label
-        elif notices and readings and not installations:
-            employee.label = "Person (Ableser / Aushänge)"
-            employee.queryset = active.filter(Q(can_read=True) | Q(can_notice=True))
-            employee.label_from_instance = role_label
-        elif installations and readings:
+        if installations and readings:
             employee.label = "Person (Ableser / Monteur)"
             employee.queryset = active.filter(Q(can_read=True) | Q(can_install=True))
             employee.label_from_instance = lambda e: f"{e} ({'Ableser + Monteur' if e.can_read and e.can_install else 'Monteur' if e.can_install else 'Ableser'})"

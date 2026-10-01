@@ -56,7 +56,7 @@ def collect(period, kind, today, stichtag=None):
     visits = _stichtag_filter(_kind_filter(Visit.objects.filter(date__gte=start, date__lte=end), kind), stichtag)
     rows = list(visits.values_list("date", "outcome", "reason", "attempt", "people"))
     stops = _stichtag_filter(_kind_filter(TourStop.objects.filter(tour__date__gte=start, tour__date__lte=end)
-                                          .exclude(kind__in=[StopKind.HELP, StopKind.NOTICE]), kind), stichtag).select_related("tour__employee").prefetch_related("tour__team")
+                                          .exclude(kind=StopKind.HELP), kind), stichtag).select_related("tour__employee").prefetch_related("tour__team")
 
     per_bucket = rules.visits_per_bucket(start, end, [(r[0], r[1]) for r in rows])
     top, ticks = rules.nice_max(max((b.total for b in per_bucket), default=0))
@@ -109,5 +109,5 @@ def headline(today):
         "revisits": len(buildings) + len(orders),
         "overdue": deadlines["overdue"], "soon": deadlines["soon"],
         "conflicts": open_conflicts(),
-        "planned_today": TourStop.objects.filter(tour__date=today).exclude(kind__in=[StopKind.HELP, StopKind.NOTICE]).count(),
+        "planned_today": TourStop.objects.filter(tour__date=today).exclude(kind=StopKind.HELP).count(),
     }

@@ -8,7 +8,7 @@
       <span class="where-dot" style="background: {{ p.colour }}"></span>
       <span class="where-main">
         <span class="where-line1"><b>{{ p.people }}</b> <span class="where-state {{ p.where.state }}">{{ p.label }}</span>
-          <span class="na small">{% if p.kind == "installation" %}🔧{% elif p.kind == "mixed" %}📖🔧{% elif p.kind == "notice" %}📄{% else %}📖{% endif %}
+          <span class="na small">{% if p.kind == "installation" %}🔧{% elif p.kind == "mixed" %}📖🔧{% else %}📖{% endif %}
             {% if p.tour.status == "provisional" %}· ⏳ vorläufig{% endif %}{% if p.estimated %} · <span title="Der Plan hat keine gespeicherten Uhrzeiten – gerechnet aus Beginn, Arbeitszeit und ca. 15 min Fahrt">Zeiten geschätzt</span>{% endif %}</span></span>
         <span class="where-line2">{{ p.text }}</span>
         <span class="where-line3 na small">{{ p.reported }}/{{ p.stops|length }} gemeldet{% if p.last_report %} · letzte Meldung {{ p.last_report|time:"H:i" }}{% endif %}</span>

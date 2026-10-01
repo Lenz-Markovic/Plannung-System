@@ -70,15 +70,13 @@ class Cell:
 
 
 def _targets(days):
-    buildings = Building.objects.in_bulk([s["building"] for d in days for s in d["stops"] if s.get("building")])
+    buildings = Building.objects.in_bulk([s["building"] for d in days for s in d["stops"] if s["kind"] == StopKind.READING])
     orders = InstallationOrder.objects.select_related("building").in_bulk(
-        [s["order"] for d in days for s in d["stops"] if s.get("order")])
+        [s["order"] for d in days for s in d["stops"] if s["kind"] == StopKind.INSTALLATION])
     return buildings, orders
 
 
 def _describe(item, buildings, orders, windows, date):
-    if item["kind"] == StopKind.NOTICE:
-        return _describe_notice(item, buildings, orders, windows, date)
     target = buildings.get(item.get("building")) if item["kind"] == StopKind.READING else orders.get(item.get("order"))
     if target is None:
         return None
@@ -92,30 +90,12 @@ def _describe(item, buildings, orders, windows, date):
     }
 
 
-def _describe_notice(item, buildings, orders, windows, date):
-    """📄 Aushang-Fahrt in a day: the house, and whether it hangs 14 days before the appointment."""
-    from documents.notice_rules import DEFAULT_TRIP_MINUTES, trip_hint
-
-    target = buildings.get(item.get("building")) if item.get("building") else orders.get(item.get("order"))
-    if target is None:
-        return None
-    appointment = windows.get(rules.item_key(item), (None, None))[1]
-    return {
-        "value": rules.item_value(item), "kind": StopKind.NOTICE,
-        "ref": f"AZ {target.file_number}" if item.get("building") else f"RE {target.re_number}",
-        "street": target.street, "city": target.city, "minutes": DEFAULT_TRIP_MINUTES,
-        "hint": trip_hint(date, appointment) if appointment else "", "appointment": appointment,
-    }
-
-
 def people_for(kind):
     people = Employee.objects.filter(active=True)
     if kind == "reading":
         people = people.filter(can_read=True)
     elif kind == "installation":
         people = people.filter(can_install=True)
-    elif kind == "notice":
-        people = people.filter(can_notice=True)
     return list(people.order_by("short_name"))
 
 
@@ -152,12 +132,12 @@ def board(monday, kind, days, windows):
     return rows
 
 
-def pool(kind, query, days, ticked_buildings, ticked_orders, ticked_notices=()):
+def pool(kind, query, days, ticked_buildings, ticked_orders):
     """ "Noch nicht geplant": open objects without an appointment (and 🔁 Nachtermine) that are not
     in this week's draft. Returns (shown items, how many in all, windows {key: (earliest, latest)})."""
     from .visits import revisit_ids
 
-    jobs = services.autoplan_jobs(kind) if kind != "notice" else []  # what is still open (it does NOT plan anything)
+    jobs = services.autoplan_jobs(kind)   # the same "what is still open" list (it does NOT plan anything)
     windows = {job.key: (job.earliest, job.latest) for job in jobs}
     in_week = {rules.item_key(s) for d in days for s in d["stops"]}
     jobs = [job for job in jobs if job.key not in in_week]
@@ -186,38 +166,8 @@ def pool(kind, query, days, ticked_buildings, ticked_orders, ticked_notices=()):
         if words and not all(w in " ".join([ref, target.street, item["zip"], target.city, person]).lower() for w in words):
             continue
         items.append(item)
-    if kind in ("", "notice"):
-        items += _notice_pool(in_week, words, ticked_notices, windows)
     items.sort(key=rules.pool_sort_key)
     return items[:POOL_LIMIT], len(items), windows
-
-
-def _notice_pool(in_week, words, ticked, windows):
-    """📄 appointments whose Aushang we hang ourselves and that have no Aushang-Fahrt yet."""
-    from django.utils import timezone
-
-    from documents.notice_rules import DEFAULT_TRIP_MINUTES, notice_deadline
-    from documents.notices import announcement_rows
-
-    found = []
-    for row in announcement_rows(timezone.localdate()):
-        if not row.can_trip:
-            continue
-        building_id, order_id = row.key
-        item = services.notice_stop(building_id, order_id)
-        key = rules.item_key(item)
-        windows[key] = (None, row.date)          # the appointment the notice is for
-        if key in in_week:
-            continue
-        target = row.stop.building or row.stop.installation_order
-        entry = {"value": rules.item_value(item), "kind": StopKind.NOTICE, "ref": row.ref, "street": target.street,
-                 "zip": target.zip_code or "", "city": target.city, "minutes": DEFAULT_TRIP_MINUTES, "person": "",
-                 "ticked": (building_id, order_id) in ticked, "revisit": False, "earliest": None,
-                 "latest": notice_deadline(row.date), "appointment": row.date, "units": row.units}
-        if words and not all(w in " ".join([row.ref, target.street, entry["zip"], target.city]).lower() for w in words):
-            continue
-        found.append(entry)
-    return found
 
 
 def cell_problem(employee, date, monday):

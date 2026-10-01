@@ -28,7 +28,6 @@ from buildings.rules.file_numbers import normalize_file_number
 from conflicts.rules import Finding, OtherPlan, PlannedBuilding, planning_findings
 from conflicts.services import installation_findings
 from conflicts.services import refresh_for as refresh_conflicts_for
-from documents.notice_rules import DEFAULT_TRIP_MINUTES
 from documents.services import refresh_deadline
 
 from . import geocoding
@@ -45,7 +44,6 @@ from .tomtom import TomTomError, get_client, local_datetime
 SELECTION_KEY = "plan_selection"
 DRAFT_KEY = "plan_draft"
 ORDER_SELECTION_KEY = "order_selection"
-NOTICE_SELECTION_KEY = "notice_selection"   # 📄 appointments whose Aushang is to be hung: [building id, order id]
 
 
 class ConcurrentChange(Exception):
@@ -90,25 +88,6 @@ def clear_order_selection(session):
     session[ORDER_SELECTION_KEY] = []
 
 
-# ... and for 📄 Aushang-Fahrten (ticked on the Aushänge page): (building id, order id) of the appointment
-
-def get_notice_selection(session):
-    return [tuple(pair) for pair in session.get(NOTICE_SELECTION_KEY, [])]
-
-
-def toggle_notice_selection(session, building_id, order_id, selected):
-    key = (building_id or None, order_id or None)
-    pairs = [p for p in get_notice_selection(session) if p != key]
-    if selected:
-        pairs.append(key)
-    session[NOTICE_SELECTION_KEY] = [list(p) for p in pairs]
-    return pairs
-
-
-def clear_notice_selection(session):
-    session[NOTICE_SELECTION_KEY] = []
-
-
 def order_bar_context(session):
     """Numbers for the "Montage planen (n)" button."""
     ids = get_order_selection(session)
@@ -140,21 +119,13 @@ def stop_dict(stop):
     if stop.kind == StopKind.HELP:
         return {"kind": StopKind.HELP, "building": stop.building_id, "order": stop.installation_order_id,
                 "help_tour": stop.help_tour_id}
-    if stop.kind == StopKind.NOTICE:
-        return notice_stop(stop.building_id, stop.installation_order_id)
     return {"kind": StopKind.INSTALLATION, "order": stop.installation_order_id, "building": stop.building_id}
 
 
-def notice_stop(building_id, order_id=None):
-    """📄 Aushang-Fahrt: hang the notice of an appointment (a reading: building; a Montage: its order)."""
-    return {"kind": StopKind.NOTICE, "building": building_id if not order_id else None, "order": order_id or None}
-
-
-def create_draft(building_ids, employee, date, start, break_minutes, strategy, order_ids=(), notices=()):
+def create_draft(building_ids, employee, date, start, break_minutes, strategy, order_ids=()):
     """New draft for one person and day. Existing stops of that day stay in it.
 
-    building_ids become readings, order_ids installations (Montage),
-    notices (building id, order id) pairs 📄 Aushang-Fahrten.
+    building_ids become readings, order_ids installations (Montage).
     """
     tour = Tour.objects.filter(employee=employee, date=date).first()
     stops = []
@@ -168,11 +139,6 @@ def create_draft(building_ids, employee, date, start, break_minutes, strategy, o
             existing.add(_stop_key(new))
     for order in InstallationOrder.objects.filter(pk__in=order_ids).order_by("re_number"):
         new = {"kind": StopKind.INSTALLATION, "order": order.pk, "building": order.building_id}
-        if _stop_key(new) not in existing:
-            stops.append(new)
-            existing.add(_stop_key(new))
-    for building_id, order_id in notices:
-        new = notice_stop(building_id, order_id)
         if _stop_key(new) not in existing:
             stops.append(new)
             existing.add(_stop_key(new))
@@ -816,7 +782,7 @@ def _load_targets(stops):
     orders = InstallationOrder.objects.in_bulk(order_ids)
     targets = {}
     for stop in stops:
-        if stop["kind"] == StopKind.READING or (stop["kind"] in (StopKind.HELP, StopKind.NOTICE) and not stop.get("order")):
+        if stop["kind"] == StopKind.READING or (stop["kind"] == StopKind.HELP and not stop.get("order")):
             targets[_stop_key(stop)] = buildings[stop["building"]]
         else:
             targets[_stop_key(stop)] = orders[stop["order"]]
@@ -869,8 +835,6 @@ def calculate_preview(draft):
         on_building = isinstance(target, Building)
         building = target if on_building else target.building
         full = target.reading_minutes if on_building else target.duration_minutes
-        if raw["kind"] == StopKind.NOTICE:
-            full = DEFAULT_TRIP_MINUTES  # hang the notice: a few minutes, whatever the work at the appointment is
         point, source, warnings = geocoding.position(target, client)
         if source == "tomtom" and point is None:
             source = None
@@ -977,8 +941,6 @@ def _add_findings(preview, draft):
             stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Ableser eingetragen"))
         if stop.kind == StopKind.INSTALLATION and not preview.employee.can_install:
             stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Monteur eingetragen"))
-        if stop.kind == StopKind.NOTICE and not preview.employee.can_notice and not preview.employee.can_read:
-            stop.findings.append(Finding("hint", f"{preview.employee} ist nicht für Aushänge eingetragen"))
 
 
 def _add_commute(preview, client):
@@ -1076,17 +1038,15 @@ def save_draft(draft, user, confirm):
         if stop.kind == StopKind.READING and stop.building.assigned_reader_id != preview.employee.pk:
             stop.building.assigned_reader = preview.employee
             stop.building.save()
-        if stop.building and stop.kind != StopKind.NOTICE:
+        if stop.building:
             refresh_deadline(stop.building)  # new appointment -> new 14-day deadline
     # A planned order is "Verplant" now (the office can still change the status by hand)
-    for order in InstallationOrder.objects.filter(pk__in=[s.order.pk for s in preview.stops
-                                                          if s.order and s.kind == StopKind.INSTALLATION],
+    for order in InstallationOrder.objects.filter(pk__in=[s.order.pk for s in preview.stops if s.order],
                                                   status__in=[OrderStatus.OPEN, OrderStatus.WORK_CARD]):
         order.status = OrderStatus.PLANNED
         order.save()  # save() (not update) so the change history records it
     # new dates -> check reading vs. installation again (conflicts/services.py)
-    appointments = [s for s in preview.stops if s.kind != StopKind.NOTICE]
-    refresh_conflicts_for([s.building.pk for s in appointments if s.building], [s.order.pk for s in appointments if s.order])
+    refresh_conflicts_for([s.building.pk for s in preview.stops if s.building], [s.order.pk for s in preview.stops if s.order])
     return tour
 
 
@@ -1155,17 +1115,17 @@ def _lock_tour(draft):
     return None
 
 
-# Everything about the tenant notice / Ankündigung of an appointment: it stays with the object
-# when the plan is saved again, moved or split (a printed Aushang then shows "veraltet").
-NOTICE_KEEP = ["notice_printed_at", "notice_for", "notice_wanted", "notice_printed_by_id", "notice_channel",
-               "notice_scope", "notice_units", "notice_from", "notice_to", "notice_sent_at", "notice_sent_by_id"]
-NOTICE_STORED = (Q(notice_wanted=True) | Q(notice_printed_at__isnull=False) | ~Q(notice_channel="")
-                 | Q(notice_sent_at__isnull=False) | ~Q(notice_units="") | Q(notice_from__isnull=False))
+# The tenant notice of an appointment stays with the object when the plan is saved again, moved
+# or split (a printed Aushang then shows "veraltet"): printed?, for whom, the time by hand.
+NOTICE_KEEP = ["notice_printed_at", "notice_for", "notice_wanted", "notice_printed_by_id", "notice_scope",
+               "notice_units", "notice_from", "notice_to"]
+NOTICE_STORED = (Q(notice_wanted=True) | Q(notice_printed_at__isnull=False) | ~Q(notice_units="")
+                 | Q(notice_from__isnull=False) | ~Q(notice_scope="haus"))
 
 
 def _has_notice_data(stop):
-    return bool(stop.notice_wanted or stop.notice_printed_at or stop.notice_channel or stop.notice_sent_at
-                or stop.notice_units or stop.notice_from)
+    return bool(stop.notice_wanted or stop.notice_printed_at or stop.notice_units or stop.notice_from
+                or stop.notice_scope != "haus")
 
 
 def _notice_of(stop):
@@ -1372,22 +1332,12 @@ def autoplan(employees, start, end, kind=""):
 
 def autoplan_recount(day):
     """Work and estimated drive of a proposed day again (after a stop was removed)."""
-    buildings = Building.objects.in_bulk([s["building"] for s in day["stops"] if s.get("building")])
-    orders = InstallationOrder.objects.in_bulk([s["order"] for s in day["stops"] if s.get("order")])
-    found = []
-    for s in day["stops"]:
-        if s["kind"] == StopKind.NOTICE:   # 📄 Aushang-Fahrt: a few minutes at the house
-            found.append((buildings.get(s.get("building")) or orders.get(s.get("order")), DEFAULT_TRIP_MINUTES))
-        elif s["kind"] == StopKind.READING:
-            target = buildings.get(s.get("building"))
-            found.append((target, target.reading_minutes if target else 0))
-        else:
-            target = orders.get(s.get("order"))
-            found.append((target, target.duration_minutes if target else 0))
-    found = [(t, m) for t, m in found if t is not None]
-    targets = [t for t, _ in found]
+    buildings = Building.objects.in_bulk([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING])
+    orders = InstallationOrder.objects.in_bulk([s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
+    targets = [buildings.get(s.get("building")) if s["kind"] == StopKind.READING else orders.get(s.get("order")) for s in day["stops"]]
+    targets = [t for t in targets if t is not None]
     points = [geocoding.position(t, None)[0] for t in targets]
-    day["work"] = sum(m for _, m in found)
+    day["work"] = sum(t.reading_minutes if isinstance(t, Building) else t.duration_minutes for t in targets)
     day["drive"] = sum(autoplan_rules.estimated_drive(a, b) for a, b in zip(points, points[1:]))
     return day
 
@@ -1397,8 +1347,7 @@ def autoplan_draft(day):
     employee = Employee.objects.get(pk=day["employee"])
     return create_draft([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING], employee,
                         datetime.date.fromisoformat(day["date"]), employee.default_start_time, 30, "far",
-                        order_ids=[s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION],
-                        notices=[(s.get("building"), s.get("order")) for s in day["stops"] if s["kind"] == StopKind.NOTICE])
+                        order_ids=[s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
 
 
 def autoplan_save_all(proposal, user):

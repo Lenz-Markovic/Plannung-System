@@ -32,8 +32,7 @@ def notice_window(start, end):
 
 
 def notice_text(date, window):
-    """What the notice says about the date: 'Dienstag, 03.11.2026, zwischen 09:00 und 11:00 Uhr'
-    (only a start: 'ab 09:00 Uhr')."""
+    """What the notice says about the date: 'Dienstag, 03.11.2026, zwischen 09:00 und 11:00 Uhr'."""
     days = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"]
     text = f"{days[date.weekday()]}, {date:%d.%m.%Y}"
     if window and window[0] and window[1]:
@@ -61,78 +60,32 @@ def notice_state(date, window, printed_for, today):
     return NoticeState(LATE if today > deadline else MISSING, deadline, text)
 
 
-# --- how the tenants are told (Ankündigung) --------------------------------------------------------
-# Only "Aushang durch uns" needs a trip to the house (📄 Aushang-Fahrt, planned like a reading).
+# --- for whom: the whole house (Aushang) or single flats (one Brief per flat) -------------------------
 
-AUSHANG, BRIEF, MAIL_HV, AUSHANG_HV, PHONE, OTHER = "aushang", "brief", "mail_hv", "aushang_hv", "telefon", "sonstiges"
-CHANNELS = [
-    (AUSHANG, "📄 Aushang durch uns"),
-    (BRIEF, "✉ Brief von uns"),
-    (MAIL_HV, "📧 Mail an Hausverwaltung"),
-    (AUSHANG_HV, "🏢 Aushang durch Hausverwaltung"),
-    (PHONE, "📞 telefonisch mit Mieter"),
-    (OTHER, "Sonstiges"),
-]
-CHANNEL_LABELS = dict(CHANNELS)
-SENT_LABELS = {  # what "✓ erledigt" means for each way
-    AUSHANG: "aufgehängt", BRIEF: "Brief verschickt", MAIL_HV: "Mail verschickt",
-    AUSHANG_HV: "an Hausverwaltung geschickt", PHONE: "Mieter informiert", OTHER: "erledigt",
-}
 WHOLE_HOUSE, SOME_UNITS = "haus", "wohnungen"
-SCOPES = [(WHOLE_HOUSE, "ganzes Haus"), (SOME_UNITS, "nur bestimmte Wohnungen")]
-
-# announcement states (one per appointment)
-A_OPEN = "open"               # nobody decided yet how the tenants are told
-A_PRINT = "print"             # Aushang/Brief: not printed yet
-A_TRIP = "trip"               # Aushang durch uns: printed, no trip to the house planned
-A_TRIP_PLANNED = "trip_planned"
-A_SEND = "send"               # Brief / Mail / HV / phone: still to send
-A_DONE = "done"               # aufgehängt / verschickt / informiert
-A_LABELS = {
-    A_OPEN: "❔ Ankündigung offen", A_PRINT: "🖨 noch drucken", A_TRIP: "🚗 Aushang-Fahrt planen",
-    A_TRIP_PLANNED: "📅 Aushang-Fahrt geplant", A_SEND: "✉ noch verschicken", A_DONE: "✓ angekündigt",
-}
-A_OPEN_STATES = frozenset({A_OPEN, A_PRINT, A_TRIP, A_SEND})
-PRINTED_CHANNELS = frozenset({AUSHANG, BRIEF, AUSHANG_HV})   # a paper is made from the template
-DEFAULT_TRIP_MINUTES = 10     # hanging one notice
+SCOPES = [(WHOLE_HOUSE, "📄 Aushang ans ganze Haus"), (SOME_UNITS, "✉ Briefe an einzelne Wohnungen")]
 
 
-def announce_state(channel, printed, sent, trip_planned):
-    """What is still to do so the tenants know about the appointment."""
-    if sent:
-        return A_DONE
-    if not channel:
-        return A_OPEN
-    if channel in PRINTED_CHANNELS and not printed:
-        return A_PRINT
-    if channel == AUSHANG:
-        return A_TRIP_PLANNED if trip_planned else A_TRIP
-    return A_SEND
-
-
-def needs_trip(channel):
-    return channel == AUSHANG
-
-
-def trip_hint(trip_date, appointment_date):
-    """'' when the trip is in time; else why not (the notice should hang 14 days before)."""
-    if trip_date is None or appointment_date is None:
-        return ""
-    if trip_date >= appointment_date:
-        return "die Aushang-Fahrt ist erst am Termintag oder danach"
-    if trip_date > notice_deadline(appointment_date):
-        return f"Aushang hängt nur {(appointment_date - trip_date).days} Tage vorher (Frist: {NOTICE_DAYS} Tage)"
-    return ""
+def unit_list(units):
+    """'Whg 3 (Müller), Whg 7;Whg 9' -> ['Whg 3 (Müller)', 'Whg 7', 'Whg 9'] - one Brief each."""
+    parts = [" ".join(p.split()) for p in (units or "").replace(";", ",").replace("\n", ",").split(",")]
+    return [p for p in parts if p]
 
 
 def units_text(scope, units):
-    """Line on the paper when it is only for some flats: 'Nur für: Whg 3 (Müller), Whg 7'."""
-    units = " ".join((units or "").split())
-    return f"Nur für: {units}" if scope == SOME_UNITS and units else ""
+    """Line on the paper for single flats: 'Nur für: Whg 3 (Müller), Whg 7'."""
+    flats = unit_list(units)
+    return f"Nur für: {', '.join(flats)}" if scope == SOME_UNITS and flats else ""
+
+
+def papers(scope, units):
+    """What to print for one appointment: [''] = one Aushang for the house; or one Brief per flat."""
+    flats = unit_list(units)
+    return flats if scope == SOME_UNITS and flats else [""]
 
 
 def effective_window(manual_from, manual_to, start, end):
-    """(from, to, source): the window typed in by the office wins, else from the plan times."""
+    """(window, source): typed in by the office ("manual") wins, else from the plan times ("plan")."""
     if manual_from:
         return (manual_from, manual_to), "manual"
     window = notice_window(start, end)
@@ -140,7 +93,7 @@ def effective_window(manual_from, manual_to, start, end):
 
 
 def parse_time(value):
-    """'8', '8:30', '08:30' -> time; '' / broken -> None."""
+    """'8', '8:30', '08.30' -> time; '' / broken -> None."""
     value = (value or "").strip().replace(".", ":")
     if not value:
         return None
@@ -151,36 +104,55 @@ def parse_time(value):
         return None
 
 
-# --- the page "📄 Aushänge & Ankündigungen": filters ----------------------------------------------
+# --- 🗺 Aushang-Route: the order of the houses for the person who hangs them (printed list) ---------
 
-A_FILTERS = [("offen", "alles Offene"), (A_OPEN, "❔ Ankündigung offen"), (A_PRINT, "🖨 noch drucken"),
-             (A_TRIP, "🚗 Fahrt planen"), (A_TRIP_PLANNED, "📅 Fahrt geplant"), (A_SEND, "✉ noch verschicken"),
-             (A_DONE, "✓ angekündigt"), ("alle", "alle")]
-A_FILTER_KEYS = [key for key, _ in A_FILTERS]
-HORIZONS = [("14", "nächste 2 Wochen"), ("28", "nächste 4 Wochen"), ("56", "nächste 8 Wochen"), ("alle", "alle geplanten")]
+AUSHANG_MINUTES = 5      # hang one Aushang in the house
+BRIEF_MINUTES = 2        # one Brief at a flat door / letterbox
 
 
-def chosen_a_filter(value):
-    return value if value in A_FILTER_KEYS else "offen"
+def stop_minutes(aushaenge, briefe):
+    return aushaenge * AUSHANG_MINUTES + briefe * BRIEF_MINUTES
 
 
-def chosen_horizon(value):
-    return value if value in dict(HORIZONS) else "28"
+def route_order(points, start=None, distance=None):
+    """Indexes of `points` ((lat, lon) or None) in driving order: nearest house next, from `start`
+    (or from the first house), then shortened by swapping (2-opt). Houses without position at the end."""
+    from planning.rules.drive_time import distance_km
+
+    distance = distance or distance_km
+    known = [i for i, p in enumerate(points) if p is not None]
+    unknown = [i for i, p in enumerate(points) if p is None]
+    if len(known) < 2:
+        return known + unknown
+    left = list(known)
+    here = start if start is not None else points[left[0]]
+    order = []
+    while left:
+        nxt = min(left, key=lambda i: distance(here, points[i]))
+        order.append(nxt)
+        left.remove(nxt)
+        here = points[nxt]
+
+    def length(seq):
+        total = distance(start, points[seq[0]]) if start is not None else 0
+        return total + sum(distance(points[a], points[b]) for a, b in zip(seq, seq[1:]))
+
+    improved = True
+    while improved:
+        improved = False
+        for i in range(len(order) - 1):
+            for j in range(i + 1, len(order)):
+                candidate = order[:i] + order[i:j + 1][::-1] + order[j + 1:]
+                if length(candidate) < length(order) - 1e-9:
+                    order, improved = candidate, True
+    return order + unknown
 
 
-def in_a_filter(chosen, state):
-    if chosen == "alle":
-        return True
-    if chosen == "offen":
-        return state in A_OPEN_STATES
-    return state == chosen
-
-
-def count_a_filters(states):
-    states = list(states)
-    return {key: sum(1 for s in states if in_a_filter(key, s)) for key in A_FILTER_KEYS}
-
-
-def is_late(deadline, today, state):
-    """Still not announced although the 14-day deadline is over."""
-    return state != A_DONE and today > deadline
+def route_times(start_minutes, drives, works):
+    """Arrival / leave (minutes) per house: drives[i] = drive TO house i (0 for the first without start)."""
+    times, t = [], start_minutes
+    for drive, work in zip(drives, works):
+        t += drive or 0
+        times.append((t, t + work))
+        t += work
+    return times

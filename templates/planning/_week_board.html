@@ -6,7 +6,7 @@
     <tbody>
       {% for person, cells in rows %}
         <tr><th class="wk-person"><span class="where-dot" style="background: {{ person.calendar_color }}"></span> {{ person.short_name }}
-          <span class="na small">{% if person.can_read %}📖{% endif %}{% if person.can_install %}🔧{% endif %}{% if person.can_notice %}📄{% endif %}</span></th>
+          <span class="na small">{% if person.can_read %}📖{% endif %}{% if person.can_install %}🔧{% endif %}</span></th>
           {% for c in cells %}
             <td class="wk-cell {{ c.state }}{% if c.level %} {{ c.level }}{% endif %}" {% if c.droppable %}data-drop data-employee="{{ person.pk }}" data-date="{{ c.iso }}"{% endif %}>
               {% if c.state == "absent" %}<span class="wk-note">🏖 {{ c.absence.get_kind_display }}</span>
@@ -17,7 +17,7 @@
               {% else %}
                 {% for i in c.items %}
                   <div class="wk-stop" draggable="true" data-item="{{ i.value }}">
-                    <span>{% if i.kind == "installation" %}🔧{% elif i.kind == "notice" %}📄{% else %}📖{% endif %} <b>{{ i.ref }}</b> {{ i.street }}, {{ i.city }} · {{ i.minutes }} min
+                    <span>{% if i.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ i.ref }}</b> {{ i.street }}, {{ i.city }} · {{ i.minutes }} min
                       {% if i.hint %}<span class="wk-hint">⚠ {{ i.hint }}</span>{% endif %}</span>
                     <button type="button" class="wk-x" title="Aus dem Tag nehmen" hx-post="{% url 'planning:week_remove' %}"
                             hx-vals='{"employee": "{{ person.pk }}", "date": "{{ c.iso }}", "item": "{{ i.value }}"}' hx-include="#week-params"

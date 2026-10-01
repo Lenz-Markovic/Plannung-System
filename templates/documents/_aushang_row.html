@@ -1,0 +1,38 @@
+{% load core_tags %}
+{# one appointment of a Fahrplan and its Aushang / Briefe #}
+<tr id="ah-{{ s.stop.pk }}" class="ah-row {{ s.state|default:'none' }}">
+  <td class="ah-pick">{% if s.state %}<input type="checkbox" name="stop" value="{{ s.stop.pk }}" form="route-form" data-tour="{{ s.stop.tour_id }}"
+      aria-label="für die Aushang-Route">{% endif %}</td>
+  <td class="ah-obj">{% if s.stop.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ s.ref }}</b> · {{ s.address }}</td>
+  <td class="ah-time">{% if s.time %}{{ s.time }}{% else %}<span class="na">ohne Uhrzeit</span>{% endif %}
+    {% if s.source == "manual" %}<span class="an-src">von Hand</span>{% elif s.source == "estimate" %}<span class="an-src est">geschätzt</span>{% endif %}</td>
+  <td class="ah-what">{% if not s.state %}<span class="na">kein Aushang</span>
+    {% elif s.flats %}✉ <b>{{ s.flats|length }} Brief{{ s.flats|length|pluralize:"e" }}</b>: {{ s.flats|join:", " }}
+    {% else %}📄 Aushang ans Haus{% endif %}</td>
+  <td class="ah-state">
+    {% if s.state == "printed" %}<span class="t-good">✓ gedruckt {{ s.stop.notice_printed_at|date:"d.m. H:i" }}{% if s.stop.notice_printed_by %} – {{ s.stop.notice_printed_by }}{% endif %}</span>
+    {% elif s.state == "outdated" %}<span class="t-crit">⚠ veraltet (Tag/Zeit geändert) – neu drucken</span>
+    {% elif s.state == "late" %}<span class="t-crit">🖨 fehlt – schon zu spät</span>
+    {% elif s.state == "missing" %}<span class="t-warn">🖨 noch nicht gedruckt</span>{% endif %}
+  </td>
+  <td class="ah-act">
+    {% if may_edit %}
+      {% if s.state %}
+        {% include "documents/_print_buttons.html" with stops=s.stop|as_list label="🖨" word_label="Word" cls="btn mini" word_cls="btn mini" late=False %}
+        <button class="linkish" hx-post="{% url 'documents:aushang_wanted' s.stop.pk %}" hx-vals='{"on": "0"}' hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML">✕</button>
+      {% else %}
+        <button class="btn mini" hx-post="{% url 'documents:aushang_wanted' s.stop.pk %}" hx-vals='{"on": "1"}' hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML">＋ Aushang</button>
+      {% endif %}
+      <details class="an-edit"><summary class="linkish">✎</summary>
+        <form hx-post="{% url 'documents:aushang_edit' s.stop.pk %}" hx-target="#ah-{{ s.stop.pk }}" hx-swap="outerHTML" class="an-form">
+          <label>Was? <select name="scope">{% for value, label in scopes %}<option value="{{ value }}" {% if s.stop.notice_scope == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <label>Welche Wohnungen? (je Wohnung ein Brief) <input name="units" value="{{ s.stop.notice_units }}" maxlength="300" placeholder="z. B. Whg 3 (Müller), Whg 7"></label>
+          <span class="an-times"><label>Zeit von <input name="von" value="{{ s.stop.notice_from|time:'H:i' }}" placeholder="{{ s.window.0|time:'H:i'|default:'08:00' }}" size="5"></label>
+            <label>bis <input name="bis" value="{{ s.stop.notice_to|time:'H:i' }}" placeholder="{{ s.window.1|time:'H:i'|default:'12:00' }}" size="5"></label></span>
+          <span class="na small">Zeit leer lassen = aus dem Fahrplan.</span>
+          <button class="btn mini primary">Speichern</button>
+        </form>
+      </details>
+    {% endif %}
+  </td>
+</tr>

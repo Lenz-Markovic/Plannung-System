@@ -32,7 +32,7 @@
         <a class="sm-btn" href="{% url 'planning:calendar' %}?frei=1">🗓 Erste freie Tage</a>
         {% if FEATURES.autoplan %}<a class="sm-btn" href="{% url 'planning:autoplan' %}">🤖 Automatisch planen</a>{% endif %}
       {% endif %}
-      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'documents:announce' %}">📄 Aushänge &amp; Ankündigungen</a>
+      {% if perms.planning.view_tour %}<a class="sm-btn" href="{% url 'documents:aushaenge' %}">📄 Aushänge &amp; Aushang-Route</a>
         <a class="sm-btn" href="{% url 'planning:tours_excel' %}">📄 Alle Fahrpläne (Excel)</a>{% endif %}
     </div>
     {% endif %}

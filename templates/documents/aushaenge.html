@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Aushänge{% endblock %}
+{% block content %}
+<header class="top">
+  <h1>📄 Aushänge</h1>
+  <span class="sub">Je Fahrplan: wo ein Aushang (oder Briefe an einzelne Wohnungen) nötig ist und was schon gedruckt ist – danach die Route zum Aufhängen</span>
+</header>
+
+<form id="aushang-filters" class="filters an-filters" hx-get="{% url 'documents:aushaenge' %}" hx-target="#aushang-blocks" hx-swap="outerHTML"
+      hx-trigger="change, input changed delay:300ms from:[name=q]">
+  <div class="ov-periods" role="radiogroup" aria-label="Welche Fahrpläne">
+    <label class="ov-period {% if only_open %}on{% endif %}"><input type="radio" name="f" value="offen" {% if only_open %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">🖨 noch zu drucken</label>
+    <label class="ov-period {% if not only_open %}on{% endif %}"><input type="radio" name="f" value="alle" {% if not only_open %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">alle Fahrpläne</label>
+  </div>
+  <label class="ov-kind">Zeitraum <select name="zeitraum">{% for key, label in horizons %}<option value="{{ key }}" {% if horizon == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="Person, AZ, RE, Straße, Ort"></label>
+</form>
+
+{# the route: a plain form - the 🚗 boxes in the rows belong to it (form="route-form") #}
+<form id="route-form" method="get" action="{% url 'documents:aushang_route' %}" target="_blank"></form>
+{% include "documents/_aushaenge_blocks.html" %}
+
+<div class="ah-routebar">
+  <span id="ah-picked">0 Häuser angekreuzt</span>
+  <button class="btn primary" type="submit" form="route-form">🗺 Aushang-Route planen</button>
+  <span class="na small">Route zum Aufhängen für die Person, die die Aushänge / Briefe verteilt – zum Ausdrucken (mit Karte) oder als Excel.</span>
+</div>
+<script>
+  (function () {
+    function count() {
+      var n = document.querySelectorAll("input[form=route-form][name=stop]:checked").length;
+      document.getElementById("ah-picked").textContent = n + " Termin" + (n === 1 ? "" : "e") + " für die Route angekreuzt";
+    }
+    document.addEventListener("change", function (event) {
+      var all = event.target.closest("[data-pick-tour]");
+      if (all) { document.querySelectorAll('input[data-tour="' + all.dataset.pickTour + '"]').forEach(function (b) { b.checked = all.checked; }); }
+      count();
+    });
+    document.addEventListener("htmx:afterSettle", count);
+    count();
+  })();
+</script>
+{% endblock %}

@@ -68,29 +68,25 @@ def select_clear(request):
 
 @permission_required(PLAN_PERMISSION, raise_exception=True)
 def plan_dialog(request):
-    """"Fahrplan erstellen" / "Montage planen": everything ticked in ALL lists.
+    """"Fahrplan erstellen" / "Montage planen": everything ticked in BOTH lists.
 
-    Buildings (🏢 Liegenschaften) become readings, orders (🔧 Montage) installations and
-    appointments ticked on the 📄 Aushänge page Aushang-Fahrten - so one plan can hold all.
+    Buildings (🏢 Liegenschaften) become readings, orders (🔧 Montage)
+    installations - so one plan can hold both.
     """
-    from documents.notices import trip_targets
-
     buildings = list(Building.objects.filter(pk__in=services.get_selection(request.session)).order_by("file_number"))
     orders = list(InstallationOrder.objects.filter(pk__in=services.get_order_selection(request.session)).order_by("re_number"))
-    notices = trip_targets(services.get_notice_selection(request.session))
     initial = {key: value for key, value in (("date", request.GET.get("datum")), ("employee", request.GET.get("person"))) if value}
-    form = PlanForm(request.POST or None, initial=initial, readings=bool(buildings) or not (orders or notices),
-                    installations=bool(orders), notices=bool(notices))
-    if request.method == "POST" and form.is_valid() and (buildings or orders or notices):
+    form = PlanForm(request.POST or None, initial=initial, readings=bool(buildings) or not orders, installations=bool(orders))
+    if request.method == "POST" and form.is_valid() and (buildings or orders):
         data = form.cleaned_data
         request.session[services.DRAFT_KEY] = services.create_draft(
             [b.pk for b in buildings], data["employee"], data["date"], data["start"], data["break_minutes"], data["strategy"],
-            order_ids=[o.pk for o in orders], notices=[(n["building_id"], n["order_id"]) for n in notices])
+            order_ids=[o.pk for o in orders])
         response = HttpResponse("")
         response["HX-Redirect"] = reverse("planning:draft")
         return response
     return render(request, "planning/_plan_dialog.html", {
-        "form": form, "buildings": buildings, "orders": orders, "notices": notices,
+        "form": form, "buildings": buildings, "orders": orders,
         "reading_minutes": sum(b.reading_minutes for b in buildings),
         "installation_minutes": sum(o.duration_minutes for o in orders),
     })
@@ -252,7 +248,6 @@ def draft_save(request):
     del request.session[services.DRAFT_KEY]
     services.clear_selection(request.session)
     services.clear_order_selection(request.session)
-    services.clear_notice_selection(request.session)
     state = "bestätigt" if confirm else "vorläufig gespeichert"
     count = tour.stops.count()
     messages.success(request, f"Fahrplan {tour.employee} am {tour.date:%d.%m.%Y} {state} ({count} Stopp{'s' if count != 1 else ''}).")
@@ -309,7 +304,7 @@ def calendar_feed(request):
     if request.GET.get("person"):
         employees = employees.filter(pk=request.GET["person"])
     editable = request.user.has_perm("planning.change_tour")
-    kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed", "notice") else ""
+    kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed") else ""
     events = calendar_events(start, end, employees, editable, kind)
     if request.GET.get("frei") == "1" and request.user.has_perm("planning.view_tour"):
         # 🗓 button: first free day of everybody
@@ -444,13 +439,8 @@ def tour_detail(request, pk):
         stop.helpers = [h for h in helps if h.kind == StopKind.HELP and services.same_object(
             h, stop.building_id, stop.installation_order_id)] if stop.kind != StopKind.HELP else []
         # tenant notice (Aushang), optional per stop: missing / late / printed / outdated
-        stop.notice_possible = office and stop.kind in notices.APPOINTMENT_KINDS
+        stop.notice_possible = office and stop.kind != StopKind.HELP
         stop.notice = notices.state_of(stop, estimates=estimates) if office and notices.wanted(stop) else None
-        if stop.notice_possible and (stop.notice_channel or stop.notice_sent_at):
-            stop.announce_label = notices.announce(stop)[1]   # how the tenants are told (📄 Aushänge & Ankündigungen)
-            stop.channel_label = notices.rules.CHANNEL_LABELS.get(stop.notice_channel, "")
-        if stop.kind == StopKind.NOTICE and office:
-            stop.notice_info = notices.trip_info(stop)
     notes.attach_notes(stops)  # 📝 open notes of each building / order
     if not request.user.has_perm("journal.view_note"):
         for stop in stops:  # Ableser/Monteur: only the problems they reported themselves, not the office notes
@@ -651,8 +641,6 @@ def _stop_context(stop):
     notes.attach_notes([stop])  # open notes of the object: problems reported from here are shown on the card
     visits.attach_attempts([stop], stop.tour.date)  # 2. Termin? what happened last time?
     stop.problems = [n for n in stop.notes if n.kind == "problem"]
-    if stop.kind == StopKind.NOTICE:  # 📄 Aushang-Fahrt: for which appointment, which time, for whom
-        stop.notice_info = notices.trip_info(stop)
     return {"s": stop, "address": address, "status_choices": BuildingStatus.choices, "reasons": REASONS, "reasons_dict": dict(REASONS),
             "navigation_url": "https://www.google.com/maps/dir/?api=1&destination=" + quote_plus(address)}
 
@@ -739,8 +727,7 @@ def stop_done(request, pk):
         response["HX-Reswap"] = "none"
         return response
     target = stop.building or stop.installation_order
-    label = ("✓ Aushang aufgehängt" if stop.kind == StopKind.NOTICE else "✓ fertig (100 %)") if done else "↺ Ergebnis zurückgesetzt"
-    record(request.user, ActivityKind.FIELD, f"{label}: {target.street} "
+    record(request.user, ActivityKind.FIELD, f"{'✓ fertig (100 %)' if done else '↺ Ergebnis zurückgesetzt'}: {target.street} "
            f"({stop.tour.employee} {day_label(stop.tour.date)})", tour=stop.tour, building=stop.building,
            order=stop.installation_order)
     return _stop_answer(request, stop, "Stopp erledigt" if done else "Stopp wieder offen")
@@ -770,11 +757,6 @@ def stop_report(request, pk):
         response["HX-Reswap"] = "none"  # keep what was typed; only the message is shown
         return response
     target = stop.building or stop.installation_order
-    if stop.kind == StopKind.NOTICE:
-        record(request.user, ActivityKind.FIELD, f"✗ Aushang nicht aufgehängt: {target.street} ({stop.tour.employee} "
-               f"{day_label(stop.tour.date)}) · {todo.strip()}", tour=stop.tour, building=stop.building,
-               order=stop.installation_order)
-        return _stop_answer(request, stop, "Ans Büro gemeldet – der Aushang hängt noch nicht")
     what = visits.OUTCOME_LABELS[outcome] + (f" – {visits.REASONS[reason]}" if reason in visits.REASONS and outcome == visits.ABSENT else "")
     number = f"{visit.attempt}. Termin · " if visit else ""
     record(request.user, ActivityKind.FIELD, f"{what}: {target.street} ({stop.tour.employee} {day_label(stop.tour.date)}) · "

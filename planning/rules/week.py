@@ -5,14 +5,13 @@ The office puts objects on a person and a day; nothing is spread automatically (
 "🤖 Automatisch planen" stays off). These rules only work out the week, the state of a cell,
 the hours of a day and hints - and move items between days without duplicates.
 
-An item is {"kind": "reading", "building": id}, {"kind": "installation", "order": id} or a 📄 Aushang-Fahrt
-{"kind": "notice", "building": id, "order": None} / {"kind": "notice", "building": None, "order": id}
+An item is {"kind": "reading", "building": id} or {"kind": "installation", "order": id}
 (the same format as the planning drafts, so a day can be saved like any other plan).
 """
 
 import datetime
 
-READING, INSTALLATION, NOTICE = "reading", "installation", "notice"   # notice = 📄 Aushang-Fahrt
+READING, INSTALLATION = "reading", "installation"
 FREE, DRAFT, PLANNED, TEAM, ABSENT = "free", "draft", "planned", "team", "absent"
 UNDER_MINUTES = 360      # a day under 6 h is shown as "noch Platz"
 WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
@@ -44,19 +43,11 @@ def week_label(monday):
 
 
 def item_key(item):
-    if item["kind"] == NOTICE:
-        return (NOTICE, item.get("building"), item.get("order"))
     return (item["kind"], item.get("building") if item["kind"] == READING else item.get("order"))
 
 
 def parse_item(value):
-    """'reading:12' / 'installation:7' / 'notice:b12' / 'notice:o7' from the page -> item (None when broken)."""
-    if str(value).startswith("notice:"):
-        rest = str(value)[len("notice:"):]
-        if rest[:1] in ("b", "o") and rest[1:].isdigit():
-            pk = int(rest[1:])
-            return {"kind": NOTICE, "building": pk if rest[0] == "b" else None, "order": pk if rest[0] == "o" else None}
-        return None
+    """'reading:12' / 'installation:7' from the page -> item (None when broken)."""
     try:
         kind, pk = str(value).split(":")
         pk = int(pk)
@@ -70,14 +61,10 @@ def parse_item(value):
 
 
 def item_value(item):
-    if item["kind"] == NOTICE:
-        return f"notice:o{item['order']}" if item.get("order") else f"notice:b{item['building']}"
     return f"{item['kind']}:{item_key(item)[1]}"
 
 
-def can_take(kind, can_read, can_install, can_notice=False):
-    if kind == NOTICE:
-        return can_notice
+def can_take(kind, can_read, can_install):
     return can_read if kind == READING else can_install
 
 

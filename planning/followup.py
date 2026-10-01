@@ -117,7 +117,7 @@ def followup_entries(today, only=None):
     missing_stops = (TourStop.objects.filter(done_at__isnull=True, outcome="",
                                              tour__date__lt=today,
                                              tour__date__gte=today - datetime.timedelta(days=rules.MISSING_LOOKBACK_DAYS))
-                     .exclude(kind__in=[StopKind.HELP, StopKind.NOTICE])
+                     .exclude(kind=StopKind.HELP)
                      .select_related("tour__employee", "building__cost_documents", "building__property_manager",
                                      "installation_order__building")
                      .prefetch_related("tour__team"))

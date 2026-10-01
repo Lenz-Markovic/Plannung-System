@@ -502,41 +502,27 @@ lists what the office still has to do after the visits (`planning/rules/followup
 - A new version of the template: replace `documents/vorlage/Aushang_Vorlage.dotx` (same
   field names) and `static/img/aushang_vorlage.jpg` (its page picture, `word/media/image1.jpeg`).
 
-## 📣 Aushänge & Ankündigungen, 📄 Aushang-Fahrten
+## 📄 Aushänge per Fahrplan and 🗺 Aushang-Route
 
-☰ Menü → **📄 Aushänge & Ankündigungen** (office): every coming appointment and how its
-tenants are told (`documents/notice_rules.py` pure, `documents/notices.py`, `documents/announce_views.py`).
+☰ Menü → **📄 Aushänge & Aushang-Route** (for the Terminierung; `documents/notice_overview.py`,
+`documents/aushang_views.py`):
 
-- **Wie?** per appointment (✎ ändern): 📄 Aushang durch uns · ✉ Brief von uns · 📧 Mail an
-  Hausverwaltung · 🏢 Aushang durch Hausverwaltung · 📞 telefonisch · Sonstiges.
-- **Für wen?** ganzes Haus or **nur bestimmte Wohnungen** (e.g. "Whg 3 (Müller), Whg 7" for a
-  Nachablesung / Nachmontage) – printed at the bottom of the Aushang / Brief: "Nur für: …".
-- **Zeit:** the Aushang now always has a time: from the plan's times; for a plan without
-  times (e.g. imported) estimated from its start + work minutes (shown "geschätzt"); or typed
-  in by hand ("von Hand", e.g. 08:00–12:00) – that wins.
-- **Stand** per appointment: ❔ Ankündigung offen → 🖨 noch drucken → 🚗 Aushang-Fahrt planen →
-  📅 Fahrt geplant → ✓ angekündigt (aufgehängt / Brief verschickt / Mail verschickt / an HV
-  geschickt …, with date and who). Filter chips, Zeitraum, Art, search; red when the 14-day
-  deadline is over and it is still not announced. Every change is in the 🕘 Verlauf.
-- **🚗 Aushang-Fahrt** (only "Aushang durch uns"): tick the appointments → **🗺 Aushang-Fahrt
-  planen** = the normal plan dialog (also together with readings / installations ticked in the
-  lists). Each becomes a stop **📄 Aushang aufhängen** (~10 min) in a normal plan – order,
-  TomTom times, map, calendar, Excel, Wochenplanung as usual. The reading appointment itself
-  stays where it is; the Aushang-Fahrt is no Termin-Ergebnis, no Nachtermin and no "❓ keine
-  Rückmeldung". A hint when it hangs less than 14 days before the appointment.
-- **Mein Tag**: the card says for which appointment, day, time and flats; the person taps
-  **✓ aufgehängt** (the appointment counts as announced) or **✗ nicht möglich** (with why).
-- The calendar panel shows each stop's Ankündigung ("📣 … · ✓ angekündigt · ✎").
-- Who may change it: Disposition, Sachbearbeitung, Admin (Leitung only looks).
-- **Aushang people:** ⚙ Verwaltung → Mitarbeiter → tick **„Aushänge“** for the people who hang
-  them (📄 next to their name, like 📖 Ableser and 🔧 Monteur). The dialog "📄 Aushang-Fahrt
-  planen" offers only them (nobody ticked yet: everybody); with readings in the same plan the
-  Ableser too.
-- **Wochenplanung → Art „📄 Aushang-Fahrten“**: rows = the Aushang people, the list "Noch nicht
-  geplant" = every appointment with "Aushang durch uns" without a trip yet (for which Termin,
-  hang until, flats). Tick → click a day or drag – as with readings; each day shows the hours and
-  "⚠ Aushang hängt nur 6 Tage vorher". In "alle" they are in the list too.
-- **Calendar**: plans with only Aushänge are "📄 Aushang" (dotted), with their own filter button.
+- **One block per coming Fahrplan** (day, person): every appointment with "kein Aushang" /
+  **🖨 noch nicht gedruckt** / **✓ gedruckt (when, by whom)** / ⚠ veraltet, the counts and
+  "aushängen bis" (14 days before). Filter "🖨 noch zu drucken" (default) or "alle Fahrpläne".
+- Per appointment: **＋ Aushang** / ✕, **🖨** (print one), **✎**: "📄 Aushang ans ganze Haus" or
+  **"✉ Briefe an einzelne Wohnungen"** (e.g. "Whg 3 (Müller), Whg 7" for a Nachablesung /
+  Nachmontage: one Brief per flat on the company template, "Für: Whg 3 (Müller)" at the
+  bottom), and the **time by hand** (else from the plan; plans without times: estimated).
+- Per Fahrplan: **🖨 fehlende drucken (n)** / ⬇ Word – printing marks them "✓ gedruckt".
+- **🗺 Aushang-Route**: tick the appointments (🚗, or ☑ a whole Fahrplan) → **Aushang-Route
+  planen** opens a printable route for the person who hangs the Aushänge / puts the Briefe at the
+  doors: one stop per house (several papers at one house together), the nearest house next
+  without detours, arrival times (5 min per Aushang, 2 min per Brief), km and drive (TomTom when
+  the key is set, else estimated), map, ☐ to tick on paper. Choose who, the day, the start time
+  and start at the first house or at the person's home; **🖨 Route drucken** or **📊 Als Excel**
+  (Nr., Straße, PLZ/Ort, km and minutes to the next house, notes, totals; green start, blue stops,
+  red end, amber warnings). It is a printed list – no plan in the calendar.
 
 ## Project layout
 

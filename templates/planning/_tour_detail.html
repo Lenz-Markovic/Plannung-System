@@ -30,7 +30,7 @@
     {% for s in stops %}
       <tr>
         <td class="z">{{ s.start_time|time:"H:i"|default:"–" }}</td>
-        <td>{% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% elif s.kind == "notice" %}📄 Aushang: {% endif %}
+        <td>{% if s.kind == "installation" %}🔧 {% elif s.kind == "help" %}🤝 {% endif %}
           {% if s.building %}<b>{{ s.building.street }}</b> <span class="o">{{ s.building.city }}</span>
           {% else %}<b>{{ s.installation_order.street }}</b> <span class="o">{{ s.installation_order.city }}</span>{% endif %}
           {% if s.building %}{% with z=s.building.access %}{% if z.apartment or z.room %}<div class="fp-zg {% if z.important %}stark{% endif %}">{{ z.text }}</div>{% endif %}{% endwith %}{% endif %}
@@ -62,10 +62,6 @@
                       hx-target="#cal-side" title="Für diesen Stopp einen Aushang für die Mieter vormerken">＋ Aushang</button>
               · {% include "documents/_print_buttons.html" with stops=s|as_list label="🖨 gleich drucken" word_label="Word" cls="linkish" word_cls="linkish" late=notices_too_late %}</div>
           {% endif %}
-          {% if s.announce_label %}<div class="g announce-line">📣 {{ s.channel_label|default:"Ankündigung" }}{% if s.notice_units %} · nur {{ s.notice_units }}{% endif %} · <b>{{ s.announce_label }}</b>
-            · <a href="{% url 'documents:announce' %}?f=alle&zeitraum=alle&q={% if s.building %}{{ s.building.file_number }}{% else %}{{ s.installation_order.re_number }}{% endif %}">✎</a></div>
-          {% elif s.notice_possible %}<div class="g announce-line na">📣 <a href="{% url 'documents:announce' %}?f=alle&zeitraum=alle&q={% if s.building %}{{ s.building.file_number }}{% else %}{{ s.installation_order.re_number }}{% endif %}">Ankündigung festlegen (Aushang, Brief, Mail an HV …)</a></div>{% endif %}
-          {% if s.notice_info %}<div class="g announce-line">📄 Aushang für {% if s.notice_info.appointment %}{{ s.notice_info.what }} am <b>{{ s.notice_info.date|date:"D d.m." }}</b>{% if s.notice_info.time %}, {{ s.notice_info.time }}{% endif %}{% if s.notice_info.units %} · {{ s.notice_info.units }}{% endif %}{% else %}– kein Termin mehr dazu geplant{% endif %}</div>{% endif %}
           {% for h in s.helpers %}<div class="g help-line">🤝 Helfer: {{ h.tour.employee }}{% if h.start_time %} {{ h.start_time|time:"H:i" }}–{{ h.end_time|time:"H:i" }}{% endif %}</div>{% endfor %}
           {% if perms.planning.add_tour and s.kind != "help" %}
             {# Somebody with an own plan helps at THIS object: opens their day in "Fahrplan prüfen" #}
@@ -99,6 +95,7 @@
       {% endif %}
       {% if perms.planning.change_tour %}
         <div class="notice-actions mt-1">
+          <a class="btn mini" href="{% url 'documents:aushaenge' %}?f=alle&zeitraum=alle&q={{ tour.employee.short_name|urlencode }}" title="Alle Fahrpläne: was gedruckt ist, Briefe an einzelne Wohnungen, Aushang-Route">📄 Aushänge-Übersicht</a>
           {% if notice_stops %}
             {% with n=notice_stops|length|stringformat:"s" %}{% with label="🖨 Aushänge drucken ("|add:n|add:")" word="⬇ Word ("|add:n|add:")" %}
               {% include "documents/_print_buttons.html" with stops=notice_stops label=label word_label=word cls="btn mini primary" word_cls="btn mini" late=notices_too_late %}

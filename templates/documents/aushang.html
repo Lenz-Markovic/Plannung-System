@@ -75,6 +75,7 @@
   {% for p in pages %}
     <div class="label">{{ forloop.counter }}. {{ p.stop.tour.employee }} · {{ p.stop.tour.date|date:"D d.m.Y" }} ·
       {% if p.stop.kind == "installation" %}🔧 Montage {{ p.stop.installation_order.re_number }}{% else %}📖 Ablesung{% endif %}
+      {% if p.flat %}· ✉ <b>Brief für {{ p.flat }}</b>{% else %}· 📄 Aushang{% endif %}
       {% if p.state.state == "late" %}· <span class="late">schon zu spät (14 Tage vorher: {{ p.state.deadline|date:"d.m." }})</span>{% endif %}</div>
     <section class="page">
       <img class="bg" src="{% static 'img/aushang_vorlage.jpg' %}" alt="">

@@ -212,8 +212,14 @@ def _chosen_stops(values):
 
 def _notice_pages(stops):
     """What every page shows: the fields of the company template."""
-    return [{"stop": stop, "fields": notices.fields_of(stop), "state": notices.state_of(stop)}
-            for stop in notices.notice_stops(stops)]
+    pages, estimates = [], {}
+    for stop in notices.notice_stops(stops):
+        if stop.tour_id not in estimates:
+            estimates[stop.tour_id] = notices.estimated_times(stop.tour)
+        state = notices.state_of(stop, estimates=estimates[stop.tour_id])
+        for flat, fields in notices.pages_of(stop, estimates[stop.tour_id]):  # one Aushang, or one Brief per flat
+            pages.append({"stop": stop, "fields": fields, "state": state, "flat": flat})
+    return pages
 
 
 @require_POST

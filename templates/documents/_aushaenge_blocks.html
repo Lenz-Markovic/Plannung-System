@@ -1,0 +1,14 @@
+<div id="aushang-blocks">
+  <p class="na small">{{ blocks|length }} Fahrpl{{ blocks|length|pluralize:"an,äne" }}{% if missing %} · <b class="t-crit">{{ missing }} Aushänge noch nicht gedruckt</b>{% endif %}
+    · Aushang ans ganze Haus oder Briefe an einzelne Wohnungen (z. B. Nachablesung): beim Termin „✎“.</p>
+  {% for b in blocks %}
+    <section class="ah-block{% if b.missing %} open{% endif %}{% if b.late %} late{% endif %}">
+      {% include "documents/_aushang_head.html" %}
+      <table class="table table-sm ah-table"><tbody>
+        {% for s in b.stops %}{% include "documents/_aushang_row.html" %}{% endfor %}
+      </tbody></table>
+    </section>
+  {% empty %}
+    <div class="card-lite fu-empty">{% if only_open %}✓ Alles gedruckt – für diesen Zeitraum fehlt kein Aushang.{% else %}Keine Fahrpläne in diesem Zeitraum.{% endif %}</div>
+  {% endfor %}
+</div>

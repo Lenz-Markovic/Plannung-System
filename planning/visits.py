@@ -64,8 +64,6 @@ def report(stop, user, outcome, todo="", reason="", on_behalf=False):
         raise PermissionDenied("Diesen Stopp darfst du nicht melden.")
     if stop.kind == StopKind.HELP and outcome != COMPLETE:
         raise ValidationError("Bei einer Hilfe meldet der Plan, dem du hilfst, das Ergebnis – bitte dort Bescheid geben.")
-    if stop.kind == StopKind.NOTICE and outcome == PARTIAL:
-        raise ValidationError("Ein Aushang hängt oder nicht: bitte „✓ aufgehängt“ oder „✗ nicht möglich“.")
     problems = report_problems(outcome, todo, reason)
     if problems:
         raise ValidationError(problems[0])
@@ -76,10 +74,6 @@ def report(stop, user, outcome, todo="", reason="", on_behalf=False):
     _update_tour_status(stop.tour)
     if stop.kind == StopKind.HELP:
         return None  # the helped plan has the visit
-    if stop.kind == StopKind.NOTICE:
-        from documents.notices import trip_reported
-        trip_reported(stop, user, outcome == COMPLETE)  # the appointment counts as announced - no Termin-Ergebnis
-        return None
     building, order = _target(stop)
     visit, _ = Visit.objects.update_or_create(stop=stop, defaults={
         "building": building, "installation_order": order, "kind": stop.kind, "date": stop.tour.date,
@@ -103,11 +97,6 @@ def undo(stop, user):
     if Visit.objects.filter(stop=stop, closed_at__isnull=False).exists():
         raise ValidationError(OFFICE_DONE_MSG)  # the office decision stays (it is shown in 🧾 Bearbeitung)
     Visit.objects.filter(stop=stop).delete()
-    if stop.kind == StopKind.NOTICE and stop.outcome == COMPLETE:
-        from documents.notices import appointment_of, mark_sent
-        appointment = appointment_of(stop)
-        if appointment is not None and appointment.notice_sent_at:
-            mark_sent(appointment, user, False)  # "aufgehängt" was a mistake: the appointment is not announced
     stop.outcome, stop.done_at, stop.done_by = "", None, None
     stop.save(update_fields=["outcome", "done_at", "done_by", "updated_at"])
     _update_tour_status(stop.tour)
@@ -176,7 +165,7 @@ def note_changed(stop, user):
 def _planned_dates(building_ids, order_ids):
     """{("building"/"order", id): [days of planned, not yet visited stops]}."""
     found = {}
-    stops = (TourStop.objects.filter(done_at__isnull=True, outcome="").exclude(kind__in=[StopKind.HELP, StopKind.NOTICE])
+    stops = (TourStop.objects.filter(done_at__isnull=True, outcome="").exclude(kind=StopKind.HELP)
              .values_list("kind", "building_id", "installation_order_id", "tour__date"))
     for kind, building, order, date in stops:
         key = ("order", order) if kind == StopKind.INSTALLATION else ("building", building)
@@ -224,9 +213,6 @@ def attach_attempts(stops, date):
         k = ("order", visit.installation_order_id) if visit.installation_order_id else ("building", visit.building_id)
         visits.setdefault(k, []).append(visit)
     for stop, k in zip(stops, keys):
-        if getattr(stop, "kind", "") == StopKind.NOTICE:  # an Aushang-Fahrt is no Termin of its own
-            stop.attempt, stop.last_visit, stop.visit = 1, None, None
-            continue
         own_pk = getattr(stop, "pk", None)
         mine = next((v for v in visits.get(k, []) if own_pk and v.stop_id == own_pk), None)
         earlier = [v for v in visits.get(k, []) if v is not mine and v.stop_id != own_pk

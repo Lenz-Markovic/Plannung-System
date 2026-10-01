@@ -154,7 +154,7 @@ def stop_row(stop, start, end):
     """What the sheets show for one stop (vorlageDaten in the prototype)."""
     building, order = stop.building, stop.installation_order
     target = building or order
-    access = building.access if building and stop.kind != StopKind.NOTICE else None  # hanging a notice: no flat
+    access = building.access if building else None
     core = building.file_number_core if building else order.building_file_number_core
     az = int(core) if core.isdigit() else (building.file_number if building else order.building_file_number)
     if stop.kind == StopKind.READING:
@@ -162,16 +162,6 @@ def stop_row(stop, start, end):
                              else (" Funk" if re.search(r"Funk|^F", building.reading_type or "", re.I) else ""))
         todo = [head]
         re_numbers = extract_re_numbers(building.order_reference, building.handwritten_note)
-    elif stop.kind == StopKind.NOTICE:
-        from documents.notices import appointment_of
-        from documents.notice_rules import units_text
-
-        appointment = appointment_of(stop)
-        todo = ["📄 Aushang aufhängen" + (f" für {'Montage' if order else 'Ablesung'} am {appointment.tour.date:%d.%m.%Y}"
-                                          if appointment else "")]
-        if appointment and units_text(appointment.notice_scope, appointment.notice_units):
-            todo.append(units_text(appointment.notice_scope, appointment.notice_units))
-        re_numbers = {order.re_number} if order else set()
     elif stop.kind == StopKind.HELP:
         helped = stop.help_tour.people_label if stop.help_tour else "?"
         todo = [f"🤝 Hilfe bei {helped}: " + (f"Montage {order.re_number}" if order else "Ablesung")]

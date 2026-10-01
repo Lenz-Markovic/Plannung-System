@@ -1,0 +1,228 @@
+"""
+📄 Aushänge per Fahrplan (for the Terminierung) and the 🗺 Aushang-Route (a printed list for the
+person who hangs them). The rules are in notice_rules.py (pure), the papers in notices.py.
+"""
+
+import datetime
+from dataclasses import dataclass, field
+from decimal import Decimal
+
+from planning.models import StopKind, Tour, TourStop
+
+from . import notice_rules as rules
+from . import notices
+
+PRINTED, OUTDATED = rules.PRINTED, rules.OUTDATED
+
+
+@dataclass
+class NoticeStop:
+    stop: object
+    state: str              # "" (kein Aushang) / missing / late / printed / outdated
+    window: tuple | None
+    source: str             # manual / plan / estimate
+    flats: list             # [] = one Aushang for the house, else one Brief per flat
+
+    @property
+    def time(self):
+        return notices.time_label(self.window)
+
+    @property
+    def ref(self):
+        s = self.stop
+        return f"AZ {s.building.file_number}" if s.kind == StopKind.READING else f"RE {s.installation_order.re_number}"
+
+    @property
+    def address(self):
+        target = self.stop.building or self.stop.installation_order
+        return f"{target.street}, {target.zip_code} {target.city}"
+
+    @property
+    def open(self):
+        return self.state in (rules.MISSING, rules.LATE, OUTDATED)
+
+
+@dataclass
+class Block:
+    tour: object
+    stops: list
+    deadline: datetime.date
+
+    @property
+    def wanted(self):
+        return [s for s in self.stops if s.state]
+
+    @property
+    def printed(self):
+        return [s for s in self.stops if s.state == PRINTED]
+
+    @property
+    def missing(self):
+        return [s for s in self.stops if s.open]
+
+    @property
+    def late(self):
+        return any(s.state == rules.LATE for s in self.stops)
+
+    @property
+    def wanted_stops(self):
+        return [s.stop for s in self.wanted]
+
+    @property
+    def missing_stops(self):
+        return [s.stop for s in self.missing]
+
+    @property
+    def papers(self):
+        return sum(len(s.flats) or 1 for s in self.wanted)
+
+
+def blocks(today, horizon=28, only_open=False, query="", tour=None):
+    """One block per coming Fahrplan with every appointment and its Aushang: wanted?, printed?"""
+    tours = (Tour.objects.filter(date__gte=today).select_related("employee").prefetch_related("team")
+             .order_by("date", "employee__short_name"))
+    if tour is not None:
+        tours = tours.filter(pk=tour.pk)
+    if horizon:
+        tours = tours.filter(date__lte=today + datetime.timedelta(days=horizon))
+    stops = {}
+    for stop in (TourStop.objects.filter(tour__in=tours, kind__in=[StopKind.READING, StopKind.INSTALLATION])
+                 .select_related("tour", "building", "installation_order", "notice_printed_by").order_by("position")):
+        stops.setdefault(stop.tour_id, []).append(stop)
+    words = query.lower().split()
+    found = []
+    for tour in tours:
+        mine = stops.get(tour.pk, [])
+        if not mine:
+            continue
+        estimates = notices.estimated_times(tour)
+        items = []
+        for stop in mine:
+            window, source = notices.window_of(stop, estimates)
+            state = notices.state_of(stop, today, estimates).state if notices.wanted(stop) else ""
+            flats = rules.papers(stop.notice_scope, stop.notice_units)
+            items.append(NoticeStop(stop, state, window, source, [f for f in flats if f]))
+        if words:
+            text = " ".join([tour.people_label] + [f"{i.ref} {i.address}" for i in items]).lower()
+            if not all(w in text for w in words):
+                continue
+        block = Block(tour, items, rules.notice_deadline(tour.date))
+        if only_open and not block.missing:
+            continue
+        found.append(block)
+    return found
+
+
+def block_of(tour, today):
+    found = blocks(today, None, tour=tour) if tour.date >= today else []
+    return found[0] if found else None
+
+
+def notice_stop(stop, today, estimates=None):
+    estimates = notices.estimated_times(stop.tour) if estimates is None else estimates
+    window, source = notices.window_of(stop, estimates)
+    state = notices.state_of(stop, today, estimates).state if notices.wanted(stop) else ""
+    flats = [f for f in rules.papers(stop.notice_scope, stop.notice_units) if f]
+    return NoticeStop(stop, state, window, source, flats)
+
+
+# --- 🗺 Aushang-Route ---------------------------------------------------------------------------------
+
+@dataclass
+class RouteStop:
+    n: int
+    target: object                   # building / order with the address
+    point: tuple | None
+    point_source: str | None
+    papers: list = field(default_factory=list)   # [(ref, "Aushang" or "Brief Whg 3", appointment date, what)]
+    drive_minutes: int = 0           # to this house
+    drive_km: Decimal | None = None
+    drive_from_tomtom: bool = False
+    arrive: int = 0
+    leave: int = 0
+    line: list = field(default_factory=list)     # road points of the drive to this house (TomTom)
+
+    @property
+    def address(self):
+        return f"{self.target.street}, {self.target.zip_code} {self.target.city}"
+
+    @property
+    def aushaenge(self):
+        return sum(1 for p in self.papers if p[1] == "Aushang")
+
+    @property
+    def briefe(self):
+        return sum(1 for p in self.papers if p[1] != "Aushang")
+
+    @property
+    def minutes(self):
+        return rules.stop_minutes(self.aushaenge, self.briefe)
+
+    @property
+    def arrive_text(self):
+        return f"{self.arrive // 60:02d}:{self.arrive % 60:02d}"
+
+
+def route(stop_ids, date, start_time, start_point=None, client=None):
+    """The chosen appointments as one route: one stop per house (several papers at one house together)."""
+    from planning import geocoding
+    from planning.rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
+    from planning.tomtom import TomTomError, local_datetime
+
+    chosen = (TourStop.objects.filter(pk__in=stop_ids, kind__in=[StopKind.READING, StopKind.INSTALLATION])
+              .select_related("tour", "building", "installation_order__building").order_by("tour__date", "position"))
+    houses = {}
+    for stop in chosen:
+        target = stop.building or stop.installation_order.building or stop.installation_order
+        key = (type(target).__name__, target.pk)
+        house = houses.setdefault(key, {"target": target, "papers": []})
+        ref = f"AZ {stop.building.file_number}" if stop.kind == StopKind.READING else f"RE {stop.installation_order.re_number}"
+        what = "Ablesung" if stop.kind == StopKind.READING else "Montage"
+        for flat in rules.papers(stop.notice_scope, stop.notice_units):
+            house["papers"].append((ref, f"Brief {flat}" if flat else "Aushang", stop.tour.date, what))
+    found = []
+    for house in houses.values():
+        point, source, _ = geocoding.position(house["target"], client)
+        found.append(RouteStop(0, house["target"], point, source, house["papers"]))
+    order = rules.route_order([s.point for s in found], start_point)
+    found = [found[i] for i in order]
+    for n, stop in enumerate(found, start=1):
+        stop.n = n
+
+    here, here_tomtom, t = start_point, start_point is not None, start_time.hour * 60 + start_time.minute
+    for stop in found:
+        if here is None or stop.point is None:
+            stop.drive_minutes = 0 if here is None else 15
+        else:
+            stop.drive_minutes = estimate_drive_minutes(here, stop.point)
+            stop.drive_km = Decimal(round(distance_km(here, stop.point), 1)).quantize(Decimal("0.1"))
+            if client is not None and here_tomtom and stop.point_source == "tomtom":
+                try:
+                    leg = client.route(here, stop.point, local_datetime(date, datetime.time(min(t // 60, 23), t % 60)))
+                    stop.drive_minutes = planned_drive_minutes(leg.seconds, leg.meters)
+                    stop.drive_km = Decimal(round(leg.meters / 1000, 1)).quantize(Decimal("0.1"))
+                    stop.drive_from_tomtom, stop.line = True, leg.points
+                except TomTomError:
+                    pass
+        t += stop.drive_minutes
+        stop.arrive, stop.leave = t, t + stop.minutes
+        t = stop.leave
+        here, here_tomtom = stop.point or here, stop.point_source == "tomtom"
+    return found
+
+
+def route_map_data(found, start_point=None):
+    """Pins for static/js/route_map.js (start green, houses blue, last red)."""
+    from planning.display import END, START, STOP
+
+    pins = []
+    last = len(found) - 1
+    for i, s in enumerate(found):
+        if s.point is None:
+            continue
+        pins.append({"n": s.n, "lat": s.point[0], "lon": s.point[1], "label": s.address, "time": s.arrive_text,
+                     "colour": START if i == 0 else (END if i == last else STOP), "done": False})
+    road = [s.line for s in found if s.line]
+    lines = road if road and len(road) == sum(1 for s in found if s.point) - (0 if start_point else 1) \
+        else ([[[p["lon"], p["lat"]] for p in pins]] if len(pins) > 1 else [])
+    return {"pins": pins, "lines": lines}

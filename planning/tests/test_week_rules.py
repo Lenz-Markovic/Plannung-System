@@ -68,15 +68,3 @@ def test_pool_order():
              {"latest": datetime.date(2026, 10, 1), "zip": "8"}]
     ordered = sorted(items, key=pool_sort_key)
     assert ordered[0].get("ticked") and ordered[1].get("revisit") and ordered[2].get("latest") and ordered[3]["zip"] == "7"
-
-
-def test_notice_items():
-    from planning.rules.week import NOTICE, item_value
-    n1, n2 = parse_item("notice:b12"), parse_item("notice:o7")
-    assert n1 == {"kind": NOTICE, "building": 12, "order": None} and n2 == {"kind": NOTICE, "building": None, "order": 7}
-    assert item_value(n1) == "notice:b12" and item_value(n2) == "notice:o7"
-    assert parse_item("notice:x1") is None and parse_item("notice:b") is None
-    assert item_key(n1) != item_key(R1) and item_key(n1) != item_key(parse_item("notice:o12"))
-    assert can_take(NOTICE, True, True, can_notice=False) is False and can_take(NOTICE, False, False, can_notice=True)
-    days, _ = place([], 1, "2026-10-05", [n1, R1])
-    assert len(days[0]["stops"]) == 2
