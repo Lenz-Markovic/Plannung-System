@@ -3,7 +3,7 @@
         <label class="ah-pickall" title="alle Termine dieses Fahrplans für die Route"><input type="checkbox" data-pick-tour="{{ b.tour.pk }}"></label>
         <div class="ah-title"><b>{{ b.tour.date|date:"l, d.m.Y" }}</b> · 👤 {{ b.tour.people_label }}{% if b.tour.status == "provisional" %} · ⏳ vorläufig{% endif %}
           <div class="na small">{{ b.stops|length }} Termin{{ b.stops|length|pluralize:"e" }} · Aushang nötig bei {{ b.wanted|length }} ·
-            <b>{{ b.printed|length }} gedruckt</b>{% if b.missing %} · <span class="t-crit">{{ b.missing|length }} fehlen</span>{% endif %}
+            <b>{{ b.printed|length }} gedruckt – bereit zum Verteilen</b>{% if b.missing %} · <span class="t-crit">{{ b.missing|length }} fehlen</span>{% endif %}
             · aushängen bis <b{% if b.deadline < today %} class="t-crit"{% endif %}>{{ b.deadline|date:"D d.m." }}</b>{% if b.deadline < today %} (schon zu spät){% endif %}</div></div>
         <div class="ah-actions">
           {% if b.missing_stops %}{% with n=b.missing_stops|length|stringformat:"s" %}{% with label="🖨 fehlende drucken ("|add:n|add:")" %}

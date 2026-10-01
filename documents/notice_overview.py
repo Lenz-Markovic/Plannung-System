@@ -77,7 +77,7 @@ class Block:
         return sum(len(s.flats) or 1 for s in self.wanted)
 
 
-def blocks(today, horizon=28, only_open=False, query="", tour=None):
+def blocks(today, horizon=28, only_open=False, query="", tour=None, ready=False):
     """One block per coming Fahrplan with every appointment and its Aushang: wanted?, printed?"""
     tours = (Tour.objects.filter(date__gte=today).select_related("employee").prefetch_related("team")
              .order_by("date", "employee__short_name"))
@@ -108,6 +108,8 @@ def blocks(today, horizon=28, only_open=False, query="", tour=None):
                 continue
         block = Block(tour, items, rules.notice_deadline(tour.date))
         if only_open and not block.missing:
+            continue
+        if ready and not block.printed:     # 🚗 printed = ready to be handed out (no fixed day for that)
             continue
         found.append(block)
     return found
@@ -162,12 +164,69 @@ class RouteStop:
     def arrive_text(self):
         return f"{self.arrive // 60:02d}:{self.arrive % 60:02d}"
 
+    @property
+    def after_text(self):
+        """Without a start time: how long after leaving the office ('35 min', '1:20 h')."""
+        return rules.duration_text(self.arrive)
 
-def route(stop_ids, date, start_time, start_point=None, client=None):
-    """The chosen appointments as one route: one stop per house (several papers at one house together)."""
-    from planning import geocoding
+
+def office(client=None):
+    """(address, (lat, lon), source) of the office - every Aushang-Route starts and ends there."""
+    from django.conf import settings
+    from django.core.cache import cache
+
+    from planning.geocoding import zip_centre
+    from planning.tomtom import TomTomError
+
+    address = f"{settings.OFFICE_STREET}, {settings.OFFICE_ZIP} {settings.OFFICE_CITY}"
+    if client is not None:
+        key = "office-point-" + address
+        point = cache.get(key)
+        if point is None:
+            try:
+                found = client.geocode(address)
+                point = (found.latitude, found.longitude)
+                cache.set(key, point, 60 * 60 * 24 * 30)
+            except TomTomError:
+                point = None
+        if point is not None:
+            return address, tuple(point), "tomtom"
+    return address, zip_centre(settings.OFFICE_ZIP), "zip"
+
+
+@dataclass
+class Leg:
+    minutes: int = 0
+    km: Decimal | None = None
+    from_tomtom: bool = False
+    line: list = field(default_factory=list)
+    arrive: int = 0
+
+
+def _leg(client, a, a_tomtom, b, b_tomtom, departure):
+    """Drive a -> b: TomTom when both positions come from TomTom, else estimated."""
     from planning.rules.drive_time import distance_km, estimate_drive_minutes, planned_drive_minutes
-    from planning.tomtom import TomTomError, local_datetime
+    from planning.tomtom import TomTomError
+
+    if a is None or b is None:
+        return Leg(15)
+    leg = Leg(estimate_drive_minutes(a, b), Decimal(round(distance_km(a, b), 1)).quantize(Decimal("0.1")))
+    if client is not None and a_tomtom and b_tomtom:
+        try:
+            found = client.route(a, b, departure)
+            return Leg(planned_drive_minutes(found.seconds, found.meters),
+                       Decimal(round(found.meters / 1000, 1)).quantize(Decimal("0.1")), True, found.points)
+        except TomTomError:
+            pass
+    return leg
+
+
+def route(stop_ids, date=None, start_time=None, client=None):
+    """The chosen appointments as one round trip office -> houses -> office: one stop per house
+    (several papers at one house together). Without a start time the times are counted from 0:00.
+    Returns (houses, the drive back to the office, the office)."""
+    from planning import geocoding
+    from planning.tomtom import local_datetime
 
     chosen = (TourStop.objects.filter(pk__in=stop_ids, kind__in=[StopKind.READING, StopKind.INSTALLATION])
               .select_related("tour", "building", "installation_order__building").order_by("tour__date", "position"))
@@ -184,45 +243,49 @@ def route(stop_ids, date, start_time, start_point=None, client=None):
     for house in houses.values():
         point, source, _ = geocoding.position(house["target"], client)
         found.append(RouteStop(0, house["target"], point, source, house["papers"]))
-    order = rules.route_order([s.point for s in found], start_point)
+    base = office(client)
+    order = rules.route_order([s.point for s in found], base[1], end=base[1])
     found = [found[i] for i in order]
+    # TomTom needs a departure: the chosen day/time, else the next working day at 8:00 (only for the traffic)
+    day = date or (datetime.date.today() + datetime.timedelta(days=1))
+    clock = start_time or datetime.time(8, 0)
+    t = clock.hour * 60 + clock.minute if start_time else 0       # without a start time: counted from 0:00
+    offset = 0 if start_time else clock.hour * 60 + clock.minute  # ... but TomTom gets a real clock time
+
+    def departure(minutes):
+        minutes = min(minutes + offset, 23 * 60 + 59)
+        return local_datetime(day, datetime.time(minutes // 60, minutes % 60))
+
+    here, here_tomtom = base[1], base[2] == "tomtom"
     for n, stop in enumerate(found, start=1):
         stop.n = n
-
-    here, here_tomtom, t = start_point, start_point is not None, start_time.hour * 60 + start_time.minute
-    for stop in found:
-        if here is None or stop.point is None:
-            stop.drive_minutes = 0 if here is None else 15
-        else:
-            stop.drive_minutes = estimate_drive_minutes(here, stop.point)
-            stop.drive_km = Decimal(round(distance_km(here, stop.point), 1)).quantize(Decimal("0.1"))
-            if client is not None and here_tomtom and stop.point_source == "tomtom":
-                try:
-                    leg = client.route(here, stop.point, local_datetime(date, datetime.time(min(t // 60, 23), t % 60)))
-                    stop.drive_minutes = planned_drive_minutes(leg.seconds, leg.meters)
-                    stop.drive_km = Decimal(round(leg.meters / 1000, 1)).quantize(Decimal("0.1"))
-                    stop.drive_from_tomtom, stop.line = True, leg.points
-                except TomTomError:
-                    pass
+        leg = _leg(client, here, here_tomtom, stop.point, stop.point_source == "tomtom", departure(t))
+        stop.drive_minutes, stop.drive_km, stop.drive_from_tomtom, stop.line = leg.minutes, leg.km, leg.from_tomtom, leg.line
         t += stop.drive_minutes
         stop.arrive, stop.leave = t, t + stop.minutes
         t = stop.leave
         here, here_tomtom = stop.point or here, stop.point_source == "tomtom"
-    return found
+    back = _leg(client, here, here_tomtom, base[1], base[2] == "tomtom", departure(t)) if found else Leg()
+    back.arrive = t + back.minutes
+    return found, back, base
 
 
-def route_map_data(found, start_point=None):
-    """Pins for static/js/route_map.js (start green, houses blue, last red)."""
-    from planning.display import END, START, STOP
+def route_map_data(found, back, base):
+    """Pins for static/js/route_map.js: the office (B, green), the houses (blue), the line there and back."""
+    from planning.display import START, STOP
 
     pins = []
-    last = len(found) - 1
-    for i, s in enumerate(found):
-        if s.point is None:
-            continue
-        pins.append({"n": s.n, "lat": s.point[0], "lon": s.point[1], "label": s.address, "time": s.arrive_text,
-                     "colour": START if i == 0 else (END if i == last else STOP), "done": False})
-    road = [s.line for s in found if s.line]
-    lines = road if road and len(road) == sum(1 for s in found if s.point) - (0 if start_point else 1) \
-        else ([[[p["lon"], p["lat"]] for p in pins]] if len(pins) > 1 else [])
+    if base[1] is not None:
+        pins.append({"n": "B", "lat": base[1][0], "lon": base[1][1], "label": f"Büro – {base[0]}", "time": "",
+                     "colour": START, "done": False})
+    for s in found:
+        if s.point is not None:
+            pins.append({"n": s.n, "lat": s.point[0], "lon": s.point[1], "label": s.address, "time": s.arrive_text,
+                         "colour": STOP, "done": False})
+    legs = [s.line for s in found] + [back.line]
+    if all(legs):
+        lines = legs
+    else:
+        points = [[p["lon"], p["lat"]] for p in pins]
+        lines = [points + points[:1]] if len(points) > 1 else []
     return {"pins": pins, "lines": lines}

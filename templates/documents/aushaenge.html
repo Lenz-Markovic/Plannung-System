@@ -10,10 +10,8 @@
 <form id="aushang-filters" class="filters an-filters" hx-get="{% url 'documents:aushaenge' %}" hx-target="#aushang-blocks" hx-swap="outerHTML"
       hx-trigger="change, input changed delay:300ms from:[name=q]">
   <div class="ov-periods" role="radiogroup" aria-label="Welche Fahrpläne">
-    <label class="ov-period {% if only_open %}on{% endif %}"><input type="radio" name="f" value="offen" {% if only_open %}checked{% endif %}
-      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">🖨 noch zu drucken</label>
-    <label class="ov-period {% if not only_open %}on{% endif %}"><input type="radio" name="f" value="alle" {% if not only_open %}checked{% endif %}
-      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">alle Fahrpläne</label>
+    {% for key, label in filters %}<label class="ov-period {% if chosen == key %}on{% endif %}"><input type="radio" name="f" value="{{ key }}" {% if chosen == key %}checked{% endif %}
+      onchange="this.form.querySelectorAll('.ov-period').forEach(l => l.classList.toggle('on', l.contains(this)))">{{ label }}</label>{% endfor %}
   </div>
   <label class="ov-kind">Zeitraum <select name="zeitraum">{% for key, label in horizons %}<option value="{{ key }}" {% if horizon == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
   <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="Person, AZ, RE, Straße, Ort"></label>
@@ -26,7 +24,7 @@
 <div class="ah-routebar">
   <span id="ah-picked">0 Häuser angekreuzt</span>
   <button class="btn primary" type="submit" form="route-form">🗺 Aushang-Route planen</button>
-  <span class="na small">Route zum Aufhängen für die Person, die die Aushänge / Briefe verteilt – zum Ausdrucken (mit Karte) oder als Excel.</span>
+  <span class="na small">Route ab und bis Büro für die Person, die die Aushänge / Briefe verteilt – Tag und Uhrzeit sind frei. Zum Ausdrucken (mit Karte) oder als Excel.</span>
 </div>
 <script>
   (function () {

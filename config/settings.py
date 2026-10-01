@@ -45,6 +45,12 @@ if not SECRET_KEY:
 # strip(): removes spaces, line breaks and quotes that easily sneak in when copying.
 TOMTOM_API_KEY = os.environ.get("TOMTOM_API_KEY", "").strip().strip("\"'").strip()
 
+# The office: every 🗺 Aushang-Route starts and ends here (documents/notice_overview.py)
+OFFICE_NAME = os.environ.get("OFFICE_NAME", "Büro")
+OFFICE_STREET = os.environ.get("OFFICE_STREET", "Zuckerfabrik 14")
+OFFICE_ZIP = os.environ.get("OFFICE_ZIP", "70376")
+OFFICE_CITY = os.environ.get("OFFICE_CITY", "Stuttgart")
+
 # Red stripe "DEMO - alle Daten frei erfunden" at the top (as in the prototype)
 DEMO_BANNER = env_bool("DEMO_BANNER", True)
 

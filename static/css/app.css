@@ -1039,3 +1039,4 @@ a.wk-note:hover { color: var(--accent); }
   .rt-grid { grid-template-columns: 1fr; }
   .route-map { height: 340px !important; }
 }
+.rt-office td { background: var(--surface-2); }

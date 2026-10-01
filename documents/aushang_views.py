@@ -18,6 +18,7 @@ from . import notice_rules as rules
 from . import notices
 
 VIEW = "planning.view_tour"
+FILTERS = [("offen", "🖨 noch zu drucken"), ("bereit", "🚗 gedruckt – bereit zum Verteilen"), ("alle", "alle Fahrpläne")]
 HORIZONS = [("14", "nächste 2 Wochen"), ("28", "nächste 4 Wochen"), ("56", "nächste 8 Wochen"), ("alle", "alle geplanten")]
 
 
@@ -41,10 +42,12 @@ def aushaenge_page(request):
 
     today = timezone.localdate()
     horizon = request.GET.get("zeitraum", "28") if request.GET.get("zeitraum", "28") in dict(HORIZONS) else "28"
-    only_open = request.GET.get("f", "offen") != "alle"
+    chosen = request.GET.get("f", "offen") if request.GET.get("f", "offen") in dict(FILTERS) else "offen"
     query = request.GET.get("q", "").strip()
-    found = overview.blocks(today, None if horizon == "alle" else int(horizon), only_open, query)
-    context = {"blocks": found, "horizons": HORIZONS, "horizon": horizon, "only_open": only_open, "q": query,
+    found = overview.blocks(today, None if horizon == "alle" else int(horizon), chosen == "offen", query,
+                            ready=chosen == "bereit")
+    context = {"blocks": found, "horizons": HORIZONS, "horizon": horizon, "only_open": chosen == "offen", "q": query,
+               "filters": FILTERS, "chosen": chosen, "ready": sum(len(b.printed) for b in found),
                "today": today, "scopes": rules.SCOPES, "may_edit": may_edit(request.user),
                "missing": sum(len(b.missing) for b in found)}
     if request.htmx_target == "aushang-blocks":
@@ -107,36 +110,33 @@ def aushang_edit(request, pk):
 
 @permission_required(VIEW, raise_exception=True)
 def aushang_route(request):
-    """🗺 The route for hanging the ticked Aushänge / Briefe: order, times, map - to print (or Excel)."""
+    """🗺 The round trip office -> houses -> office for hanging the ticked Aushänge / Briefe: order,
+    drive and minutes, map - to print (or Excel). Day and start time are optional (the drivers are flexible)."""
     from planning.tomtom import current_api_key, get_client
 
     ids = [int(v) for v in request.GET.getlist("stop") if v.isdigit()]
-    today = timezone.localdate()
     try:
-        day = datetime.date.fromisoformat(request.GET.get("datum", "")) if request.GET.get("datum") else today
+        day = datetime.date.fromisoformat(request.GET["datum"]) if request.GET.get("datum") else None
     except ValueError:
-        day = today
-    start = rules.parse_time(request.GET.get("ab", "")) or datetime.time(8, 0)
+        day = None
+    start = rules.parse_time(request.GET.get("ab", ""))
     person = Employee.objects.filter(pk=request.GET.get("person")).first() if request.GET.get("person", "").isdigit() else None
-    from_home = request.GET.get("start") == "zuhause" and person is not None and person.street
-    client = get_client()
-    start_point = None
-    if from_home:
-        from planning import geocoding
-        start_point = geocoding.position(person, client)[0]
-    found = overview.route(ids, day, start, start_point, client)
+    found, back, base = overview.route(ids, day, start, get_client())
+    work = sum(s.minutes for s in found)
+    drive = sum(s.drive_minutes for s in found) + back.minutes
     context = {
-        "route": found, "ids": ids, "day": day, "start": start, "person": person, "from_home": bool(from_home),
-        "people": Employee.objects.filter(active=True).order_by("short_name"), "today": today,
-        "total_km": sum((s.drive_km or 0) for s in found), "total_drive": sum(s.drive_minutes for s in found),
-        "total_work": sum(s.minutes for s in found), "papers": sum(len(s.papers) for s in found),
-        "end": found[-1].leave if found else 0, "all_tomtom": bool(found) and all(s.drive_from_tomtom for s in found[1:]),
-        "map_data": overview.route_map_data(found, start_point), "map_available": bool(found) and bool(current_api_key()),
+        "route": found, "back": back, "office": base, "ids": ids, "day": day, "start": start, "person": person,
+        "people": Employee.objects.filter(active=True).order_by("short_name"), "has_clock": start is not None,
+        "total_km": sum((s.drive_km or 0) for s in found) + (back.km or 0), "total_drive": drive, "total_work": work,
+        "total": rules.duration_text(drive + work), "papers": sum(len(s.papers) for s in found),
+        "end": back.arrive, "all_tomtom": bool(found) and all(s.drive_from_tomtom for s in found) and back.from_tomtom,
+        "map_data": overview.route_map_data(found, back, base), "map_available": bool(found) and bool(current_api_key()),
     }
-    context["end_text"] = f"{context['end'] // 60:02d}:{context['end'] % 60:02d}"
+    context["end_text"] = f"{back.arrive // 60:02d}:{back.arrive % 60:02d}"
     if request.GET.get("format") == "xlsx" and found:
         from .aushang_route_excel import route_workbook
         response = HttpResponse(route_workbook(context), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response["Content-Disposition"] = f'attachment; filename="Aushang_Route_{day:%Y-%m-%d}.xlsx"'
+        name = f"Aushang_Route_{day:%Y-%m-%d}.xlsx" if day else "Aushang_Route.xlsx"
+        response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
     return render(request, "documents/aushang_route.html", context)

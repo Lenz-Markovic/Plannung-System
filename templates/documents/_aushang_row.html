@@ -10,7 +10,8 @@
     {% elif s.flats %}✉ <b>{{ s.flats|length }} Brief{{ s.flats|length|pluralize:"e" }}</b>: {{ s.flats|join:", " }}
     {% else %}📄 Aushang ans Haus{% endif %}</td>
   <td class="ah-state">
-    {% if s.state == "printed" %}<span class="t-good">✓ gedruckt {{ s.stop.notice_printed_at|date:"d.m. H:i" }}{% if s.stop.notice_printed_by %} – {{ s.stop.notice_printed_by }}{% endif %}</span>
+    {% if s.state == "printed" %}<span class="t-good"><b>✓ gedruckt – bereit zum Verteilen</b></span>
+      <div class="na small">{{ s.stop.notice_printed_at|date:"d.m. H:i" }}{% if s.stop.notice_printed_by %} – {{ s.stop.notice_printed_by }}{% endif %}</div>
     {% elif s.state == "outdated" %}<span class="t-crit">⚠ veraltet (Tag/Zeit geändert) – neu drucken</span>
     {% elif s.state == "late" %}<span class="t-crit">🖨 fehlt – schon zu spät</span>
     {% elif s.state == "missing" %}<span class="t-warn">🖨 noch nicht gedruckt</span>{% endif %}

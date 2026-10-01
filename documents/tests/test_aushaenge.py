@@ -84,7 +84,7 @@ def test_briefe_for_single_flats_one_page_each(demo):
                                                                           datetime.time(8))
 
 
-def test_route_groups_houses_orders_and_prints(demo):
+def test_route_from_and_to_the_office_without_a_fixed_time(demo):
     from openpyxl import load_workbook
 
     c = login(roles.DISPATCHER, "dispo")
@@ -92,19 +92,33 @@ def test_route_groups_houses_orders_and_prints(demo):
     for s in stops:
         c.post(reverse("documents:aushang_wanted", args=[s.pk]), {"on": "1"})
     ids = [s.pk for s in stops]
-    html = c.get(reverse("documents:aushang_route"), {"stop": ids, "datum": "2026-10-02", "ab": "9:00"}).content.decode()
+    html = c.get(reverse("documents:aushang_route"), {"stop": ids}).content.decode()
     assert "🗺 Aushang-Route" in html and "🖨 Route drucken" in html and stops[0].building.street in html
-    found = notice_overview.route(ids, datetime.date(2026, 10, 2), datetime.time(9))
+    assert "Zuckerfabrik 14, 70376 Stuttgart" in html and "zurück ins Büro" in html and "nach" in html
+    found, back, office = notice_overview.route(ids)
     houses = {s.building_id for s in stops}
     assert len(found) == len(houses) and [s.n for s in found] == list(range(1, len(found) + 1))
-    assert found[0].arrive == 9 * 60 and all(a.leave <= b.arrive for a, b in zip(found, found[1:]))
-    assert sum(len(s.papers) for s in found) == len(stops)
-    xlsx = c.get(reverse("documents:aushang_route"), {"stop": ids, "datum": "2026-10-02", "format": "xlsx"})
+    assert found[0].arrive == found[0].drive_minutes                     # counted from leaving the office (0:00)
+    assert all(a.leave <= b.arrive for a, b in zip(found, found[1:])) and back.arrive >= found[-1].leave
+    assert sum(len(s.papers) for s in found) == len(stops) and found[0].minutes == 4
+    timed, _, _ = notice_overview.route(ids, datetime.date(2026, 10, 2), datetime.time(9))
+    assert timed[0].arrive == 9 * 60 + timed[0].drive_minutes
+    assert "an" in c.get(reverse("documents:aushang_route"), {"stop": ids, "ab": "9:00"}).content.decode()
+    xlsx = c.get(reverse("documents:aushang_route"), {"stop": ids, "format": "xlsx"})
     sheet = load_workbook(BytesIO(xlsx.content)).active
-    assert sheet["A1"].value.startswith("Aushang-Route 02.10.2026") and sheet.cell(5, 1).value == 1
-    assert any(row[1] == "Gesamt" for row in sheet.iter_rows(values_only=True))
-    empty = c.get(reverse("documents:aushang_route")).content.decode()
-    assert "Keine Häuser gewählt" in empty
+    assert sheet["A1"].value == "Aushang-Route" and sheet.cell(5, 1).value == "B" and sheet.cell(6, 1).value == 1
+    rows = list(sheet.iter_rows(values_only=True))
+    assert any(str(r[1]).startswith("zurück ins Büro") for r in rows) and any(r[1] == "Gesamt" for r in rows)
+    assert "Keine Häuser gewählt" in c.get(reverse("documents:aushang_route")).content.decode()
+
+
+def test_printed_is_ready_to_hand_out(demo):
+    c = login(roles.DISPATCHER, "dispo2")
+    tour, stops = a_tour()
+    c.post(reverse("documents:aushang_wanted", args=[stops[0].pk]), {"on": "1"})
+    c.post(reverse("documents:notice_print"), {"stop": [stops[0].pk]})
+    html = c.get(reverse("documents:aushaenge"), {"f": "bereit", "zeitraum": "alle"}).content.decode()
+    assert "gedruckt – bereit zum Verteilen" in html and f'id="ah-{stops[0].pk}"' in html
 
 
 def test_roles(demo):

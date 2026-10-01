@@ -60,5 +60,10 @@ def test_route_order_and_times():
     assert route_order(points) == [0, 2, 4, 1, 3]                         # along the line, unknown last
     assert route_order(points, start=(48.35, 9.0))[:4] == [1, 4, 2, 0]    # from the other end
     assert route_order([(48.0, 9.0)]) == [0] and route_order([None, None]) == [0, 1]
-    assert stop_minutes(1, 0) == 5 and stop_minutes(0, 3) == 6
+    assert stop_minutes(1, 0) == 4 and stop_minutes(0, 3) == 6
+    office = (48.0, 9.0)                                                      # out and back to the office
+    loop = route_order([(48.1, 9.0), (48.1, 9.1), (48.0, 9.1)], start=office, end=office)
+    assert loop in ([0, 1, 2], [2, 1, 0])
+    from documents.notice_rules import duration_text
+    assert duration_text(95) == "1:35 h" and duration_text(35) == "35 min"
     assert route_times(480, [0, 10, 5], [5, 6, 5]) == [(480, 485), (495, 501), (506, 511)]

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Aushang-Route {{ day|date:"d.m.Y" }}{% endblock %}
+{% block title %}Aushang-Route{% endblock %}
 {% block content %}
 <header class="top">
   <h1>🗺 Aushang-Route</h1>
-  <span class="sub">{{ day|date:"l, d.m.Y" }}{% if person %} · 👤 {{ person }}{% endif %} · {{ route|length }} Häuser · {{ papers }} Aushänge / Briefe</span>
+  <span class="sub">{% if day %}{{ day|date:"l, d.m.Y" }} · {% endif %}{% if person %}👤 {{ person }} · {% endif %}{{ route|length }} Häuser · {{ papers }} Aushänge / Briefe · ab und bis Büro</span>
   <span class="spacer"></span>
   {% if route %}<span class="rt-noprint">
     <button class="btn primary" type="button" onclick="window.print()">🖨 Route drucken</button>
@@ -12,34 +12,39 @@
 
 <form class="filters rt-form rt-noprint" method="get">
   {% for pk in ids %}<input type="hidden" name="stop" value="{{ pk }}">{% endfor %}
-  <label>Wer verteilt? <select name="person"><option value="">– (nur für den Ausdruck) –</option>
+  <label>Wer verteilt? (optional) <select name="person"><option value="">– offen –</option>
     {% for e in people %}<option value="{{ e.pk }}" {% if person.pk == e.pk %}selected{% endif %}>{{ e.short_name }}</option>{% endfor %}</select></label>
-  <label>Tag <input type="date" name="datum" value="{{ day|date:'Y-m-d' }}"></label>
-  <label>Start um <input name="ab" value="{{ start|time:'H:i' }}" size="5"></label>
-  <label>Start bei <select name="start"><option value="">dem ersten Haus</option>
-    <option value="zuhause" {% if from_home %}selected{% endif %}>zu Hause (Adresse der Person)</option></select></label>
+  <label>Tag (optional) <input type="date" name="datum" value="{{ day|date:'Y-m-d' }}"></label>
+  <label>Start um (optional) <input name="ab" value="{{ start|time:'H:i' }}" size="5" placeholder="z. B. 8:00"></label>
   <button class="btn">↻ neu rechnen</button>
-  {% if person and request.GET.start == "zuhause" and not from_home %}<span class="t-warn small">Für {{ person }} ist keine Adresse hinterlegt – Start beim ersten Haus.</span>{% endif %}
+  <span class="na small">Ohne Tag und Uhrzeit: nur Reihenfolge und Dauer – wer fährt, entscheidet selbst wann.</span>
 </form>
 
 {% if not route %}
   <div class="card-lite fu-empty">Keine Häuser gewählt. Bitte unter „📄 Aushänge“ die Termine ankreuzen (🚗) und „🗺 Aushang-Route planen“ klicken.</div>
 {% else %}
-  <p class="small">Start {{ start|time:"H:i" }} {% if from_home %}zu Hause{% else %}am ersten Haus{% endif %} · fertig ca. <b>{{ end_text }}</b> ·
-    {{ total_km|floatformat:1 }} km · Fahrt {{ total_drive }} min · Verteilen ca. {{ total_work }} min
-    · <span class="na">Fahrzeiten {% if all_tomtom %}von TomTom{% else %}geschätzt{% endif %} · Reihenfolge: immer das nächste Haus, ohne Umwege</span></p>
+  <p class="small">Start und Ende: <b>🏢 Büro, {{ office.0 }}</b> · Dauer gesamt ca. <b>{{ total }}</b>{% if has_clock %} (zurück ca. {{ end_text }}){% endif %} ·
+    {{ total_km|floatformat:1 }} km · Fahrt {{ total_drive }} min · Verteilen ca. {{ total_work }} min (4 min je Aushang, 2 min je Brief)
+    · <span class="na">Fahrzeiten {% if all_tomtom %}von TomTom{% else %}geschätzt{% endif %} · Reihenfolge: immer das nächste Haus, ohne Umwege, zurück ins Büro</span></p>
   <div class="rt-grid">
     <table class="table table-sm rt-table">
-      <thead><tr><th>Nr.</th><th>Haus</th><th>an</th><th>Was</th><th>Fahrt dorthin</th><th>✓</th></tr></thead>
-      <tbody>{% for s in route %}<tr>
-        <td><span class="rt-n {% if forloop.first %}first{% elif forloop.last %}last{% endif %}">{{ s.n }}</span></td>
-        <td><b>{{ s.target.street }}</b><div>{{ s.target.zip_code }} {{ s.target.city }}</div>
-          {% if s.point_source != "tomtom" %}<div class="t-warn small">⚠ Adresse nur ungefähr</div>{% endif %}</td>
-        <td>{{ s.arrive_text }}</td>
-        <td>{% for ref, paper, date, what in s.papers %}<div>{% if paper == "Aushang" %}📄 Aushang{% else %}✉ {{ paper }}{% endif %} <span class="na small">· {{ ref }} · {{ what }} {{ date|date:"d.m." }}</span></div>{% endfor %}</td>
-        <td class="small">{% if forloop.first and not from_home %}–{% else %}{{ s.drive_minutes }} min{% if s.drive_km %} · {{ s.drive_km }} km{% endif %}{% endif %}</td>
-        <td><span class="rt-box"></span></td>
-      </tr>{% endfor %}</tbody>
+      <thead><tr><th>Nr.</th><th>Haus</th><th>{% if has_clock %}an{% else %}nach{% endif %}</th><th>Was</th><th>Fahrt dorthin</th><th>✓</th></tr></thead>
+      <tbody>
+        <tr class="rt-office"><td><span class="rt-n first">B</span></td><td><b>🏢 Büro</b><div>{{ office.0 }}</div></td>
+          <td>{% if has_clock %}{{ start|time:"H:i" }}{% else %}Start{% endif %}</td><td class="na">los geht's</td><td></td><td></td></tr>
+        {% for s in route %}<tr>
+          <td><span class="rt-n">{{ s.n }}</span></td>
+          <td><b>{{ s.target.street }}</b><div>{{ s.target.zip_code }} {{ s.target.city }}</div>
+            {% if s.point_source != "tomtom" %}<div class="t-warn small">⚠ Adresse nur ungefähr</div>{% endif %}</td>
+          <td>{% if has_clock %}{{ s.arrive_text }}{% else %}{{ s.after_text }}{% endif %}</td>
+          <td>{% for ref, paper, date, what in s.papers %}<div>{% if paper == "Aushang" %}📄 Aushang{% else %}✉ {{ paper }}{% endif %} <span class="na small">· {{ ref }} · {{ what }} {{ date|date:"d.m." }}</span></div>{% endfor %}</td>
+          <td class="small">{{ s.drive_minutes }} min{% if s.drive_km %} · {{ s.drive_km }} km{% endif %}</td>
+          <td><span class="rt-box"></span></td>
+        </tr>{% endfor %}
+        <tr class="rt-office"><td><span class="rt-n last">B</span></td><td><b>🏢 zurück ins Büro</b><div>{{ office.0 }}</div></td>
+          <td>{% if has_clock %}{{ end_text }}{% else %}{{ total }}{% endif %}</td><td></td>
+          <td class="small">{{ back.minutes }} min{% if back.km %} · {{ back.km }} km{% endif %}</td><td></td></tr>
+      </tbody>
     </table>
     <div>{% if map_available %}{% include "planning/_map.html" with map_class="rt-map" %}{% include "planning/_map_scripts.html" %}
       {% else %}<div class="card-lite na small p-3">Karte: braucht den TomTom-Schlüssel. Die Liste reicht zum Fahren.</div>{% endif %}</div>

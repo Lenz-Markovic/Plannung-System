@@ -515,14 +515,18 @@ lists what the office still has to do after the visits (`planning/rules/followup
   Nachmontage: one Brief per flat on the company template, "Für: Whg 3 (Müller)" at the
   bottom), and the **time by hand** (else from the plan; plans without times: estimated).
 - Per Fahrplan: **🖨 fehlende drucken (n)** / ⬇ Word – printing marks them "✓ gedruckt".
+- Printed = **"✓ gedruckt – bereit zum Verteilen"** (filter "🚗 bereit zum Verteilen"). There is
+  no fixed day or time for handing them out – the drivers are flexible, and it stays like that.
 - **🗺 Aushang-Route**: tick the appointments (🚗, or ☑ a whole Fahrplan) → **Aushang-Route
-  planen** opens a printable route for the person who hangs the Aushänge / puts the Briefe at the
-  doors: one stop per house (several papers at one house together), the nearest house next
-  without detours, arrival times (5 min per Aushang, 2 min per Brief), km and drive (TomTom when
-  the key is set, else estimated), map, ☐ to tick on paper. Choose who, the day, the start time
-  and start at the first house or at the person's home; **🖨 Route drucken** or **📊 Als Excel**
-  (Nr., Straße, PLZ/Ort, km and minutes to the next house, notes, totals; green start, blue stops,
-  red end, amber warnings). It is a printed list – no plan in the calendar.
+  planen** opens a printable round trip **from the office and back** (Zuckerfabrik 14, 70376
+  Stuttgart – `OFFICE_STREET` / `OFFICE_ZIP` / `OFFICE_CITY` in the .env): one stop per house
+  (several papers at one house together), the nearest house next without detours, **4 min per
+  Aushang, 2 min per Brief**, km and drive (TomTom when the key is set, else estimated), map, ☐ to
+  tick on paper. Who, day and start time are **optional**: without them the list shows "nach
+  35 min" from leaving the office and the total time; with a start time the arrival times.
+  **🖨 Route drucken** or **📊 Als Excel** (Nr., Straße, PLZ/Ort, km and minutes to the next stop,
+  notes, totals; green = office start, blue = houses, red = back to the office, amber =
+  warnings). It is a printed list – no plan in the calendar.
 
 ## Project layout
 

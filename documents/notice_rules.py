@@ -106,7 +106,7 @@ def parse_time(value):
 
 # --- 🗺 Aushang-Route: the order of the houses for the person who hangs them (printed list) ---------
 
-AUSHANG_MINUTES = 5      # hang one Aushang in the house
+AUSHANG_MINUTES = 4      # hang one Aushang in the house
 BRIEF_MINUTES = 2        # one Brief at a flat door / letterbox
 
 
@@ -114,9 +114,10 @@ def stop_minutes(aushaenge, briefe):
     return aushaenge * AUSHANG_MINUTES + briefe * BRIEF_MINUTES
 
 
-def route_order(points, start=None, distance=None):
+def route_order(points, start=None, distance=None, end=None):
     """Indexes of `points` ((lat, lon) or None) in driving order: nearest house next, from `start`
-    (or from the first house), then shortened by swapping (2-opt). Houses without position at the end."""
+    (or from the first house), then shortened by swapping (2-opt) - with the drive back to `end`
+    (the office) counted. Houses without position at the end."""
     from planning.rules.drive_time import distance_km
 
     distance = distance or distance_km
@@ -135,6 +136,7 @@ def route_order(points, start=None, distance=None):
 
     def length(seq):
         total = distance(start, points[seq[0]]) if start is not None else 0
+        total += distance(points[seq[-1]], end) if end is not None else 0
         return total + sum(distance(points[a], points[b]) for a, b in zip(seq, seq[1:]))
 
     improved = True
@@ -146,6 +148,11 @@ def route_order(points, start=None, distance=None):
                 if length(candidate) < length(order) - 1e-9:
                     order, improved = candidate, True
     return order + unknown
+
+
+def duration_text(minutes):
+    """95 -> '1:35 h', 35 -> '35 min'."""
+    return f"{minutes // 60}:{minutes % 60:02d} h" if minutes >= 60 else f"{minutes} min"
 
 
 def route_times(start_minutes, drives, works):
