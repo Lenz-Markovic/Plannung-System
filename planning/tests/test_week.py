@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from core import roles
 from planning import services, week
-from planning.models import Absence, Employee, StopKind, Tour, TourStatus
+from planning.models import Absence, Employee, StopKind, Tour, TourStatus, TourStop
 
 pytestmark = pytest.mark.django_db
 TODAY = datetime.date(2030, 3, 6)          # far after the demo plans: an empty week to plan
@@ -127,3 +127,61 @@ def test_only_planners(demo):
     c.force_login(u)
     assert c.get(reverse("planning:week")).status_code == 403
     assert "🗓 Wochenplanung" in office().get(reverse("planning:calendar")).content.decode()
+
+
+# --- 📄 Aushang-Fahrten in the week ---------------------------------------------------------------
+
+def notice_appointment(c):
+    """A reading appointment 3 weeks after the planned week whose Aushang we hang ourselves."""
+    from buildings.models import Building
+    person = reader()
+    day = MONDAY + datetime.timedelta(days=21)
+    building = Building.objects.filter(status="open").exclude(tour_stops__kind=StopKind.READING).first()
+    tour = services.save_draft(services.create_draft([building.pk], person, day, datetime.time(8), 30, "short"),
+                               None, confirm=False)
+    stop = tour.stops.get()
+    c.post(reverse("documents:announce_save", args=[stop.pk]), {"channel": "aushang"})
+    return stop
+
+
+def test_aushang_trips_in_the_week_for_the_aushang_people(demo):
+    from planning.rules.week import NOTICE
+    c = office()
+    stop = notice_appointment(c)
+    Employee.objects.update(can_notice=False)
+    carrier = Employee.objects.filter(active=True).order_by("short_name").last()
+    carrier.can_notice = True
+    carrier.save()
+    html = c.get(reverse("planning:week"), {"kw": MONDAY.isoformat(), "art": "notice"}).content.decode()
+    value = f"notice:b{stop.building_id}"
+    assert value in html and "für den Termin am" in html
+    assert html.count('class="wk-person"') == 1 and carrier.short_name in html   # only the Aushang people
+    other = Employee.objects.filter(active=True, can_notice=False).first()
+    assert "nicht Aushänge fahren" in place(c, other, MONDAY, [value], art="notice").content.decode()
+    answer = place(c, carrier, MONDAY, [value], art="notice").content.decode()
+    assert "1 → " in answer
+    c.post(reverse("planning:week_save"), {"kw": MONDAY.isoformat()})
+    trip = TourStop.objects.get(kind=NOTICE, building_id=stop.building_id)
+    assert trip.tour.employee == carrier and trip.tour.date == MONDAY and trip.work_minutes == 10
+
+
+def test_dialog_and_calendar_know_the_aushang_people(demo):
+    from planning.calendar import tour_kind
+    from planning.forms import PlanForm
+    Employee.objects.update(can_notice=False)
+    carrier = Employee.objects.filter(active=True).first()
+    carrier.can_notice = True
+    carrier.save()
+    form = PlanForm(notices=True, readings=False)
+    assert list(form.fields["employee"].queryset) == [carrier] and "📄" in form.fields["employee"].label_from_instance(carrier)
+    Employee.objects.update(can_notice=False)
+    assert PlanForm(notices=True, readings=False).fields["employee"].queryset.count() > 1   # nobody marked: everybody
+    c = office()
+    stop = notice_appointment(c)
+    tour = services.save_draft(services.create_draft([], carrier, MONDAY, datetime.time(8), 30, "far",
+                                                     notices=[(stop.building_id, None)]), None, confirm=False)
+    assert tour_kind(list(tour.stops.all())) == "notice"
+    feed = c.get(reverse("planning:calendar_feed"), {"start": MONDAY.isoformat(), "end": (MONDAY + datetime.timedelta(days=7)).isoformat(),
+                                                     "art": "notice"}).json()
+    assert [e for e in feed if "kind-notice" in e.get("classNames", [])] and "📄 1× Aushang" in str(feed)
+    assert "📄 Aushang" in c.get(reverse("planning:calendar")).content.decode()

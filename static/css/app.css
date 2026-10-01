@@ -1024,3 +1024,7 @@ a.wk-note:hover { color: var(--accent); }
 .t-good { color: #0a7a0a; }
 .day-notice { background: var(--good-wash); border-radius: 6px; padding: 4px 8px; }
 .announce-line { font-size: 12px; }
+/* only 📄 Aushang-Fahrten: dots over the person's colour */
+.fc-event.kind-notice, .leg-bar.kind-notice {
+  background-image: radial-gradient(rgba(255,255,255,.45) 1.5px, transparent 1.6px); background-size: 7px 7px; }
+.wk-item.notice { border-left-color: var(--good); }

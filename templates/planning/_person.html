@@ -32,7 +32,7 @@
   {% for t in tours %}
     {# Click: this plan in the side panel, the calendar jumps to its day #}
     <button class="pp-tour" hx-get="{% url 'planning:tour_detail' t.pk %}" hx-target="#cal-side" data-goto="{{ t.date|date:'Y-m-d' }}">
-      <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% else %}📖 Ablesung{% endif %}</span>
+      <span class="art-tag {{ t.kind }}">{% if t.kind == "installation" %}🔧 Montage{% elif t.kind == "mixed" %}📖🔧 beides{% elif t.kind == "notice" %}📄 Aushänge{% else %}📖 Ablesung{% endif %}</span>
       <b>{{ t.date|date:"D d.m." }}</b>{% if t.employee_id != employee.pk or t.team.all %} <span class="small">👥 {{ t.people_label }}</span>{% endif %} {{ t.start_time|time:"H:i" }}–{{ t.end_shown|time:"H:i" }}
       <span class="na small">· {{ t.stops.all|length }} Stopp{{ t.stops.all|length|pluralize:"s" }} · {{ t.net_minutes|hours }}{% if t.status == "provisional" %} · ⏳ vorläufig{% endif %}</span>
     </button>

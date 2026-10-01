@@ -6,8 +6,8 @@ from .models import Absence, Employee, Tour, TourStop
 
 @admin.register(Employee)
 class EmployeeAdmin(SimpleHistoryAdmin):
-    list_display = ["short_name", "user", "can_read", "can_install", "city", "active"]
-    list_filter = ["can_read", "can_install", "active"]
+    list_display = ["short_name", "user", "can_read", "can_install", "can_notice", "city", "active"]
+    list_filter = ["can_read", "can_install", "can_notice", "active"]
     search_fields = ["short_name", "user__username"]
 
 

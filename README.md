@@ -528,6 +528,15 @@ tenants are told (`documents/notice_rules.py` pure, `documents/notices.py`, `doc
   **✓ aufgehängt** (the appointment counts as announced) or **✗ nicht möglich** (with why).
 - The calendar panel shows each stop's Ankündigung ("📣 … · ✓ angekündigt · ✎").
 - Who may change it: Disposition, Sachbearbeitung, Admin (Leitung only looks).
+- **Aushang people:** ⚙ Verwaltung → Mitarbeiter → tick **„Aushänge“** for the people who hang
+  them (📄 next to their name, like 📖 Ableser and 🔧 Monteur). The dialog "📄 Aushang-Fahrt
+  planen" offers only them (nobody ticked yet: everybody); with readings in the same plan the
+  Ableser too.
+- **Wochenplanung → Art „📄 Aushang-Fahrten“**: rows = the Aushang people, the list "Noch nicht
+  geplant" = every appointment with "Aushang durch uns" without a trip yet (for which Termin,
+  hang until, flats). Tick → click a day or drag – as with readings; each day shows the hours and
+  "⚠ Aushang hängt nur 6 Tage vorher". In "alle" they are in the list too.
+- **Calendar**: plans with only Aushänge are "📄 Aushang" (dotted), with their own filter button.
 
 ## Project layout
 

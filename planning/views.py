@@ -309,7 +309,7 @@ def calendar_feed(request):
     if request.GET.get("person"):
         employees = employees.filter(pk=request.GET["person"])
     editable = request.user.has_perm("planning.change_tour")
-    kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed") else ""
+    kind = request.GET.get("art") if request.GET.get("art") in ("reading", "installation", "mixed", "notice") else ""
     events = calendar_events(start, end, employees, editable, kind)
     if request.GET.get("frei") == "1" and request.user.has_perm("planning.view_tour"):
         # 🗓 button: first free day of everybody

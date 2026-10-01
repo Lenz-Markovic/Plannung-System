@@ -17,7 +17,8 @@
   </div>
   <label class="ov-kind">Art <select name="art" onchange="this.form.submit()"><option value="">alle</option>
     <option value="reading" {% if art == "reading" %}selected{% endif %}>📖 Ablesung</option>
-    <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
+    <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option>
+    <option value="notice" {% if art == "notice" %}selected{% endif %}>📄 Aushang-Fahrten</option></select></label>
   <label class="ov-kind">Suchen <input type="search" name="q" value="{{ q }}" placeholder="AZ, RE, Straße, PLZ, Ort, Person"
     hx-get="{% url 'planning:week' %}" hx-include="#week-params" hx-target="#week-pool" hx-swap="outerHTML"
     hx-trigger="input changed delay:300ms, search"></label>

@@ -16,6 +16,12 @@ def next_working_day(today=None):
     return day
 
 
+def role_label(e):
+    """'Kaiser (📖 🔧 📄)': what this person does."""
+    roles = " ".join(r for r, on in (("📖", e.can_read), ("🔧", e.can_install), ("📄", e.can_notice)) if on)
+    return f"{e} ({roles})" if roles else str(e)
+
+
 class PlanForm(forms.Form):
     """The dialog "Fahrplan planen" (same fields as in the prototype).
 
@@ -38,8 +44,15 @@ class PlanForm(forms.Form):
         employee = self.fields["employee"]
         active = Employee.objects.filter(active=True)
         if notices and not installations and not readings:
-            # 📄 only Aushang-Fahrten: anybody can hang a notice
-            employee.label, employee.queryset = "Person", active
+            # 📄 only Aushang-Fahrten: the people who hang the Aushänge (nobody marked yet: everybody)
+            notice_people = active.filter(can_notice=True)
+            employee.label = "Person (Aushänge)"
+            employee.queryset = notice_people if notice_people.exists() else active
+            employee.label_from_instance = role_label
+        elif notices and readings and not installations:
+            employee.label = "Person (Ableser / Aushänge)"
+            employee.queryset = active.filter(Q(can_read=True) | Q(can_notice=True))
+            employee.label_from_instance = role_label
         elif installations and readings:
             employee.label = "Person (Ableser / Monteur)"
             employee.queryset = active.filter(Q(can_read=True) | Q(can_install=True))

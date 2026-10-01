@@ -977,6 +977,8 @@ def _add_findings(preview, draft):
             stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Ableser eingetragen"))
         if stop.kind == StopKind.INSTALLATION and not preview.employee.can_install:
             stop.findings.append(Finding("warning", f"{preview.employee} ist nicht als Monteur eingetragen"))
+        if stop.kind == StopKind.NOTICE and not preview.employee.can_notice and not preview.employee.can_read:
+            stop.findings.append(Finding("hint", f"{preview.employee} ist nicht für Aushänge eingetragen"))
 
 
 def _add_commute(preview, client):
@@ -1370,12 +1372,22 @@ def autoplan(employees, start, end, kind=""):
 
 def autoplan_recount(day):
     """Work and estimated drive of a proposed day again (after a stop was removed)."""
-    buildings = Building.objects.in_bulk([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING])
-    orders = InstallationOrder.objects.in_bulk([s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
-    targets = [buildings.get(s.get("building")) if s["kind"] == StopKind.READING else orders.get(s.get("order")) for s in day["stops"]]
-    targets = [t for t in targets if t is not None]
+    buildings = Building.objects.in_bulk([s["building"] for s in day["stops"] if s.get("building")])
+    orders = InstallationOrder.objects.in_bulk([s["order"] for s in day["stops"] if s.get("order")])
+    found = []
+    for s in day["stops"]:
+        if s["kind"] == StopKind.NOTICE:   # 📄 Aushang-Fahrt: a few minutes at the house
+            found.append((buildings.get(s.get("building")) or orders.get(s.get("order")), DEFAULT_TRIP_MINUTES))
+        elif s["kind"] == StopKind.READING:
+            target = buildings.get(s.get("building"))
+            found.append((target, target.reading_minutes if target else 0))
+        else:
+            target = orders.get(s.get("order"))
+            found.append((target, target.duration_minutes if target else 0))
+    found = [(t, m) for t, m in found if t is not None]
+    targets = [t for t, _ in found]
     points = [geocoding.position(t, None)[0] for t in targets]
-    day["work"] = sum(t.reading_minutes if isinstance(t, Building) else t.duration_minutes for t in targets)
+    day["work"] = sum(m for _, m in found)
     day["drive"] = sum(autoplan_rules.estimated_drive(a, b) for a, b in zip(points, points[1:]))
     return day
 
@@ -1385,7 +1397,8 @@ def autoplan_draft(day):
     employee = Employee.objects.get(pk=day["employee"])
     return create_draft([s["building"] for s in day["stops"] if s["kind"] == StopKind.READING], employee,
                         datetime.date.fromisoformat(day["date"]), employee.default_start_time, 30, "far",
-                        order_ids=[s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION])
+                        order_ids=[s["order"] for s in day["stops"] if s["kind"] == StopKind.INSTALLATION],
+                        notices=[(s.get("building"), s.get("order")) for s in day["stops"] if s["kind"] == StopKind.NOTICE])
 
 
 def autoplan_save_all(proposal, user):

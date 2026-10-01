@@ -39,11 +39,14 @@ def installation_conflicts(tours):
     return clashing
 
 
-KIND_ICONS = {"reading": "📖", "installation": "🔧", "mixed": "📖🔧"}
+KIND_ICONS = {"reading": "📖", "installation": "🔧", "mixed": "📖🔧", "notice": "📄"}
 
 
 def tour_kind(stops):
-    """'reading', 'installation' or 'mixed' (both in one plan). Help stops count as what they help with."""
+    """'reading', 'installation', 'mixed' (both in one plan) or 'notice' (only 📄 Aushang-Fahrten).
+    Help stops count as what they help with; Aushang-Fahrten in a reading plan count as reading."""
+    if stops and all(s.kind == StopKind.NOTICE for s in stops):
+        return "notice"
     kinds = {(StopKind.INSTALLATION if s.installation_order_id else StopKind.READING)
              if s.kind in (StopKind.HELP, StopKind.NOTICE) else s.kind
              for s in stops}
@@ -92,9 +95,10 @@ def calendar_events(start, end, employees, editable, kind=""):
             badges.append("⏱")  # info: more than 7,5 h / less than 6 h
         installations = sum(1 for s in stops if s.kind == StopKind.INSTALLATION)
         helps = sum(1 for s in stops if s.kind == StopKind.HELP)
-        readings = len(stops) - installations - helps
+        trips = sum(1 for s in stops if s.kind == StopKind.NOTICE)
+        readings = len(stops) - installations - helps - trips
         what = " · ".join(([f"{readings}× Ablesung"] if readings else []) + ([f"{installations}× Montage"] if installations else [])
-                          + ([f"🤝 {helps}× Hilfe"] if helps else []))
+                          + ([f"🤝 {helps}× Hilfe"] if helps else []) + ([f"📄 {trips}× Aushang"] if trips else []))
         end_time = tour.end_time or (datetime.datetime.combine(tour.date, tour.start_time)
                                      + datetime.timedelta(minutes=tour.work_minutes + tour.drive_minutes)).time()
         events.append({
@@ -140,11 +144,13 @@ def free_day_events(start, end, employees, kind="", can_plan=True):
         people = people.filter(can_read=True)
     if kind in ("installation", "mixed"):
         people = people.filter(can_install=True)
+    if kind == "notice":
+        people = people.filter(can_notice=True)
     events = []
     for employee, day in services.first_free_days(people, timezone.localdate()).items():
         if day is None or not (start <= day < end):
             continue
-        roles = ("📖" if employee.can_read else "") + ("🔧" if employee.can_install else "")
+        roles = ("📖" if employee.can_read else "") + ("🔧" if employee.can_install else "") + ("📄" if employee.can_notice else "")
         events.append({
             "title": f"🟢 frei: {employee.short_name} {roles}",
             "start": day.isoformat(), "allDay": True, "editable": False,

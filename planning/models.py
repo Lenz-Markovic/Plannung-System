@@ -32,6 +32,8 @@ class Employee(TimeStampedModel, GeocodedAddress):
     short_name = models.CharField("Kurzname", max_length=50, unique=True)
     can_read = models.BooleanField("Ableser", default=True)
     can_install = models.BooleanField("Monteur", default=False)
+    # 📄 hangs the tenant notices (Aushang-Fahrten) - planned like readings and installations
+    can_notice = models.BooleanField("Aushänge", default=False, help_text="fährt Aushänge aus (📄 Aushang-Fahrten)")
     calendar_color = models.CharField("Kalenderfarbe", max_length=7, default="#0d6efd")
     max_daily_minutes = models.PositiveSmallIntegerField("max. Netto-Arbeitszeit/Tag (min)", default=450)
     default_start_time = models.TimeField("übliche Startzeit", default=datetime.time(8, 0))

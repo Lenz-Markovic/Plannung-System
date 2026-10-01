@@ -8,10 +8,11 @@
       <label class="wk-item {{ i.kind }}" draggable="true" data-item="{{ i.value }}">
         <input type="checkbox" name="item" value="{{ i.value }}" {% if i.ticked %}checked{% endif %}>
         <span class="wk-item-main">
-          <span>{% if i.kind == "installation" %}🔧{% else %}📖{% endif %} <b>{{ i.ref }}</b> · {{ i.minutes }} min
+          <span>{% if i.kind == "installation" %}🔧{% elif i.kind == "notice" %}📄 Aushang{% else %}📖{% endif %} <b>{{ i.ref }}</b> · {{ i.minutes }} min
             {% if i.revisit %}<span class="wk-tag crit">🔁 Nachtermin</span>{% endif %}{% if i.ticked %}<span class="wk-tag">✓ angekreuzt</span>{% endif %}</span>
           <span class="wk-item-addr">{{ i.street }}, {{ i.zip }} {{ i.city }}</span>
-          {% if i.person or i.earliest or i.latest %}<span class="na small">{% if i.person %}👤 {{ i.person }}{% endif %}
+          {% if i.kind == "notice" %}<span class="na small">für den Termin am <b>{{ i.appointment|date:"D d.m." }}</b> · aufhängen bis {{ i.latest|date:"d.m." }}{% if i.units %} · {{ i.units }}{% endif %}</span>
+          {% elif i.person or i.earliest or i.latest %}<span class="na small">{% if i.person %}👤 {{ i.person }}{% endif %}
             {% if i.earliest %} · frühestens {{ i.earliest|date:"d.m." }}{% endif %}{% if i.latest %} · spätestens {{ i.latest|date:"d.m." }}{% endif %}</span>{% endif %}
         </span>
       </label>

@@ -21,7 +21,7 @@ PLAN = "planning.add_tour"
 def _params(data):
     today = timezone.localdate()
     monday = rules.chosen_monday(data.get("kw", ""), today)
-    kind = data.get("art", "") if data.get("art", "") in ("reading", "installation") else ""
+    kind = data.get("art", "") if data.get("art", "") in ("reading", "installation", "notice") else ""
     return monday, kind, data.get("q", "").strip()
 
 
@@ -29,7 +29,7 @@ def _context(request, monday, kind, query):
     session = request.session
     days = week.get_days(session, monday)
     items, found, windows = week.pool(kind, query, days, set(services.get_selection(session)),
-                                      set(services.get_order_selection(session)))
+                                      set(services.get_order_selection(session)), set(services.get_notice_selection(session)))
     return {
         "monday": monday, "label": rules.week_label(monday), "dates": rules.week_days(monday), "art": kind, "q": query,
         "previous": monday - datetime.timedelta(days=7), "next": monday + datetime.timedelta(days=7),
@@ -82,10 +82,10 @@ def week_place(request):
     items = [i for i in (rules.parse_item(v) for v in request.POST.getlist("item")) if i]
     if not items:
         return _answer(request, monday, kind, query, "Erst links Objekte ankreuzen (oder eins hierher ziehen).", error=True)
-    wrong = [i for i in items if not rules.can_take(i["kind"], employee.can_read, employee.can_install)]
+    wrong = [i for i in items if not rules.can_take(i["kind"], employee.can_read, employee.can_install, employee.can_notice)]
     items = [i for i in items if i not in wrong]
     if not items:
-        what = "ablesen" if wrong[0]["kind"] == "reading" else "montieren"
+        what = {"reading": "ablesen", "installation": "montieren"}.get(wrong[0]["kind"], "Aushänge fahren")
         return _answer(request, monday, kind, query, f"{employee} darf laut Stammdaten nicht {what}.", error=True)
     days, moved = rules.place(week.get_days(request.session, monday), employee.pk, date.isoformat(), items)
     week.recount(days, moved | {(employee.pk, date.isoformat())})
