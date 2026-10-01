@@ -976,6 +976,19 @@ def overview_page(request):
     stichtag = overview_rules.chosen_stichtag(request.GET.get("stichtag", ""), set(known))
     context = {**overview.collect(period, kind, today, stichtag), "tiles": overview.headline(today), "period": period,
                "periods": overview_rules.PERIODS, "art": kind, "today": today, "stichtag": stichtag, "stichtage": known}
+    if request.GET.get("format") == "xlsx":
+        from .overview_excel import overview_workbook
+
+        filters = (f"Zeitraum {context['start']:%d.%m.%Y} – {context['end']:%d.%m.%Y} · "
+                   f"{ {'reading': 'nur Ablesung', 'installation': 'nur Montage'}.get(kind, 'Ablesung und Montage') } · "
+                   f"Stichtag {stichtag:%d.%m.%Y}" if stichtag else
+                   f"Zeitraum {context['start']:%d.%m.%Y} – {context['end']:%d.%m.%Y} · "
+                   f"{ {'reading': 'nur Ablesung', 'installation': 'nur Montage'}.get(kind, 'Ablesung und Montage') } · alle Stichtage")
+        response = HttpResponse(overview_workbook(context, context["tiles"], filters, request.user),
+                                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = content_disposition_header(
+            True, f"Uebersicht_{context['start']:%Y-%m-%d}_bis_{context['end']:%Y-%m-%d}.xlsx")
+        return response
     if request.htmx_target == "ov-body":
         response = render(request, "planning/_overview_body.html", context)
         response["HX-Push-Url"] = clean_url(request)

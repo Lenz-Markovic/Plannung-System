@@ -17,6 +17,8 @@
     <option value="installation" {% if art == "installation" %}selected{% endif %}>🔧 Montage</option></select></label>
   <label class="ov-kind">Stichtag <select name="stichtag"><option value="">alle</option>
     {% for d in stichtage %}<option value="{{ d|date:'Y-m-d' }}" {% if d == stichtag %}selected{% endif %}>{{ d|date:"d.m.Y" }}</option>{% endfor %}</select></label>
+  {# a normal download with the filters chosen right now (the form only reacts to "change" via HTMX) #}
+  <button class="btn ov-excel" type="submit" name="format" value="xlsx" title="Alle Zahlen dieser Übersicht mit den gewählten Filtern als Excel-Datei">📄 Als Excel</button>
 </form>
 
 {# what is open NOW - not scoped by the time range #}

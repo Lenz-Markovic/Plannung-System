@@ -348,6 +348,10 @@ counted fresh on every load (`planning/rules/overview.py`, `planning/overview.py
   its period, number of buildings, the status split (offen / Nacharbeit / freigegeben),
   % freigegeben, how many are planned, how many still have **no appointment**, and 🔁 Nachtermine.
 - Hover (or Tab to) a bar for its exact numbers.
+- **📄 Als Excel** (top right) downloads everything with the filters chosen right now
+  (`planning/overview_excel.py`): sheets Übersicht (open now, results, status), Termine je
+  Tag/Woche (with a stacked column chart), Nach Stichtag, Pro Person, Gründe & Termine – each
+  with the chosen range, filters, date and who made it; printed landscape, one page wide.
 
 ## 🛰 Wer ist wo? (map by the Fahrplan)
 

@@ -104,3 +104,27 @@ def test_per_stichtag_and_filter(demo):
     empty = overview.collect("30", "", TODAY, other)
     assert empty["buildings_total"] == 0 and empty["reported"] == 0 and empty["stichtag_rows"] == []
     assert "Stichtag 01.01." not in c.get(reverse("planning:overview"), {"stichtag": "2001-01-01"}).content.decode()
+
+
+def test_excel_with_the_same_filters(demo):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    _, n = add_visits()
+    c = client_for(roles.MANAGEMENT, "leitung-xl")
+    page = c.get(reverse("planning:overview")).content.decode()
+    assert 'name="format" value="xlsx"' in page and "📄 Als Excel" in page
+    response = c.get(reverse("planning:overview"), {"zeitraum": "30", "art": "reading", "format": "xlsx"})
+    assert response["Content-Type"].startswith("application/vnd.openxmlformats")
+    assert "Uebersicht_" in response["Content-Disposition"]
+    wb = load_workbook(BytesIO(response.content))
+    assert wb.sheetnames == ["Übersicht", "Termine je Tag", "Nach Stichtag", "Pro Person", "Gründe & Termine"]
+    first = wb["Übersicht"]
+    assert "nur Ablesung" in first["A2"].value and "leitung-xl" in first["A2"].value
+    days = wb["Termine je Tag"]
+    total = [row for row in days.iter_rows(values_only=True) if row[0] == "Gesamt"][0]
+    assert total[1] == 1 and total[4] == n and sum(total[1:4]) == n and days._charts
+    assert wb["Nach Stichtag"].cell(5, 4).value == 240
+    if n == 3:
+        assert any(row[0] == "Kein Zugang (Schlüssel / Heizraum)" for row in wb["Gründe & Termine"].iter_rows(values_only=True))

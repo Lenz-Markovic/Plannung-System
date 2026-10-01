@@ -995,3 +995,4 @@ a.wk-note:hover { color: var(--accent); }
 .wk-footer { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--ring);
   position: sticky; bottom: 0; background: var(--surface); }
 @media (max-width: 900px) { .wk-grid { grid-template-columns: 1fr; } .wk-pool { position: static; } .wk-pool-list { max-height: 40vh; } }
+.ov-excel { margin-left: auto; }
